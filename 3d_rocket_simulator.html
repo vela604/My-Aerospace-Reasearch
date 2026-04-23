@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Rocket Simulator</title>
+    <style>
+        body { font-family: Arial, sans-serif; }
+        canvas { border: 1px solid black; }
+    </style>
+</head>
+<body>
+    <h1>3D Rocket Simulator</h1>
+    <canvas id="rocketCanvas" width="800" height="600"></canvas>
+    <script>
+        // Placeholder for 3D rocket simulation logic
+        const canvas = document.getElementById('rocketCanvas');
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = 'lightblue';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = 'red';
+        ctx.fillRect(390, 290, 20, 30); // Simple representation of a rocket
+    </script>
+</body>
+</html>
