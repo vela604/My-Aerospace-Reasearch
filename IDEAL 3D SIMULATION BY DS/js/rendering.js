@@ -238,15 +238,27 @@ function drawDetailedRocket(ctx, map, worldToProj, viewType) {
     ctx.rotate(gimRad);
     ctx.fillStyle = sim.thr_main > 0 ? '#ff6b00' : '#cc4400';
     ctx.fillRect(-radPx * 0.4, 0, radPx * 0.8, radPx * 0.5);
-    if (sim.thr_main > 0) {
-        let flame = radPx * 0.6 + Math.random() * radPx * 0.4;
-        ctx.fillStyle = 'rgba(255,80,0,0.8)';
-        ctx.beginPath();
-        ctx.moveTo(-radPx * 0.3, radPx * 0.5);
-        ctx.lineTo(0, radPx * 0.5 + flame);
-        ctx.lineTo(radPx * 0.3, radPx * 0.5);
-        ctx.fill();
-    }
+// Main thruster flame – clear direction, large size
+if (sim.thr_main > 0) {
+    // Flame length in pixels (absolute, independent of rocket scale)
+    let flameLen = 100 + (sim.thr_main / 400000) * 30;
+    // Wide base
+    let baseW = Math.max(10, radPx * 0.8);
+    // Draw flame as a triangle pointing "down" (positive Y) in the rotated frame
+    ctx.fillStyle = '#ff6600';
+    ctx.beginPath();
+    ctx.moveTo(-baseW / 2, radPx * 0.5); // bottom left of nozzle
+    ctx.lineTo(0, radPx * 0.5 + flameLen); // tip
+    ctx.lineTo(baseW / 2, radPx * 0.5); // bottom right
+    ctx.fill();
+    // Inner brighter tip
+    ctx.fillStyle = '#ffcc00';
+    ctx.beginPath();
+    ctx.moveTo(-baseW / 4, radPx * 0.5);
+    ctx.lineTo(0, radPx * 0.5 + flameLen * 0.8);
+    ctx.lineTo(baseW / 4, radPx * 0.5);
+    ctx.fill();
+}
     ctx.restore();
     
     if (Math.abs(sim.rcsX) + Math.abs(sim.rcsZ) > 0) {
