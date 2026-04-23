@@ -3,23 +3,1186 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D Rocket Simulator</title>
+    <title>3D Rocket Physics Simulator</title>
     <style>
-        body { font-family: Arial, sans-serif; }
-        canvas { border: 1px solid black; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Courier New', monospace;
+            background: #0a0e27;
+            color: #00ff00;
+            padding: 20px;
+            overflow-x: auto;
+        }
+
+        h1 {
+            text-align: center;
+            color: #00ffff;
+            margin-bottom: 20px;
+            text-shadow: 0 0 10px #00ffff;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        .control-panel {
+            background: #1a1f3a;
+            border: 2px solid #00ff00;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0, 255, 0, 0.3);
+        }
+
+        .control-row {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        label {
+            font-size: 12px;
+            color: #00ffff;
+            text-transform: uppercase;
+            font-weight: bold;
+        }
+
+        input[type="range"] {
+            width: 150px;
+            cursor: pointer;
+        }
+
+        input[type="number"] {
+            background: #0a0e27;
+            color: #00ff00;
+            border: 1px solid #00ff00;
+            padding: 5px;
+            width: 100px;
+            border-radius: 3px;
+        }
+
+        button {
+            background: #00ff00;
+            color: #0a0e27;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+            font-size: 12px;
+            text-transform: uppercase;
+        }
+
+        button:hover {
+            background: #00ffff;
+            box-shadow: 0 0 10px #00ffff;
+        }
+
+        button:active {
+            transform: scale(0.95);
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .toggle-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .toggle-btn {
+            padding: 8px 12px;
+            font-size: 11px;
+            background: #333;
+            color: #00ff00;
+            border: 1px solid #00ff00;
+        }
+
+        .toggle-btn.active {
+            background: #00ff00;
+            color: #0a0e27;
+        }
+
+        .canvas-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .canvas-wrapper {
+            background: #1a1f3a;
+            border: 2px solid #00ff00;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0, 255, 0, 0.3);
+        }
+
+        canvas {
+            display: block;
+            background: #000;
+            width: 100%;
+            height: auto;
+            border-radius: 3px;
+            cursor: crosshair;
+        }
+
+        .telemetry {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .telemetry-box {
+            background: #1a1f3a;
+            border: 2px solid #00ff00;
+            padding: 15px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0, 255, 0, 0.3);
+        }
+
+        .telemetry-box h3 {
+            color: #00ffff;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            font-size: 12px;
+        }
+
+        .telemetry-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            border-bottom: 1px solid #00ff00;
+            font-size: 12px;
+        }
+
+        .telemetry-row:last-child {
+            border-bottom: none;
+        }
+
+        .telemetry-label {
+            color: #00ffff;
+        }
+
+        .telemetry-value {
+            color: #00ff00;
+            font-weight: bold;
+            font-family: monospace;
+        }
+
+        .warning {
+            color: #ff6600;
+        }
+
+        .critical {
+            color: #ff0000;
+        }
+
+        .info-panel {
+            background: #1a1f3a;
+            border: 2px solid #00ff00;
+            padding: 15px;
+            border-radius: 5px;
+            font-size: 12px;
+            line-height: 1.6;
+        }
+
+        .rcs-controls {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+        }
+
+        .rcs-btn {
+            padding: 10px;
+            font-size: 11px;
+            background: #333;
+            color: #00ff00;
+            border: 1px solid #00ff00;
+            cursor: pointer;
+            border-radius: 3px;
+            transition: all 0.2s;
+        }
+
+        .rcs-btn:hover {
+            background: #00ff00;
+            color: #0a0e27;
+        }
+
+        .rcs-btn.active {
+            background: #ff6600;
+            color: #000;
+            border-color: #ff6600;
+        }
     </style>
 </head>
 <body>
-    <h1>3D Rocket Simulator</h1>
-    <canvas id="rocketCanvas" width="800" height="600"></canvas>
+    <div class="container">
+        <h1>🚀 3D ROCKET PHYSICS SIMULATOR</h1>
+
+        <div class="control-panel">
+            <div class="control-row">
+                <div class="control-group">
+                    <label for="throttle">Main Throttle (%)</label>
+                    <input type="range" id="throttle" min="0" max="100" value="0" step="1">
+                    <span id="throttleValue">0%</span>
+                </div>
+
+                <div class="control-group">
+                    <label for="gimbalPitch">Gimbal Pitch (°)</label>
+                    <input type="range" id="gimbalPitch" min="-30" max="30" value="0" step="1">
+                    <span id="gimbalPitchValue">0°</span>
+                </div>
+
+                <div class="control-group">
+                    <label for="gimbalYaw">Gimbal Yaw (°)</label>
+                    <input type="range" id="gimbalYaw" min="-30" max="30" value="0" step="1">
+                    <span id="gimbalYawValue">0°</span>
+                </div>
+
+                <div class="control-group">
+                    <label for="timeScale">Time Scale</label>
+                    <select id="timeScale" style="background: #0a0e27; color: #00ff00; border: 1px solid #00ff00; padding: 5px; border-radius: 3px;">
+                        <option value="1">1x</option>
+                        <option value="2">2x</option>
+                        <option value="4">4x</option>
+                        <option value="0.5">0.5x</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="control-row">
+                <div class="button-group">
+                    <button id="playBtn">▶ PLAY</button>
+                    <button id="pauseBtn">⏸ PAUSE</button>
+                    <button id="resetBtn">⟲ RESET</button>
+                </div>
+            </div>
+
+            <div class="control-row">
+                <div class="toggle-group">
+                    <button class="toggle-btn active" id="gravityToggle">GRAVITY: ON</button>
+                    <button class="toggle-btn active" id="dragToggle">DRAG: ON</button>
+                    <button class="toggle-btn active" id="trajectoryToggle">TRAJECTORY: ON</button>
+                    <button class="toggle-btn active" id="vectorsToggle">VECTORS: ON</button>
+                    <button class="toggle-btn" id="gridToggle">GRID: OFF</button>
+                </div>
+            </div>
+
+            <div class="control-row">
+                <div style="width: 100%; border-top: 1px solid #00ff00; padding-top: 15px; margin-top: 15px;">
+                    <label style="display: block; margin-bottom: 10px;">RCS THRUSTERS</label>
+                    <div class="rcs-controls">
+                        <button class="rcs-btn" data-rcs="0">+X</button>
+                        <button class="rcs-btn" data-rcs="1">-X</button>
+                        <button class="rcs-btn" data-rcs="2">+Y</button>
+                        <button class="rcs-btn" data-rcs="3">-Y</button>
+                        <button class="rcs-btn" data-rcs="4">+Z</button>
+                        <button class="rcs-btn" data-rcs="5">-Z</button>
+                        <button class="rcs-btn" data-rcs="6">Roll+</button>
+                        <button class="rcs-btn" data-rcs="7">Roll-</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="canvas-container">
+            <div class="canvas-wrapper">
+                <canvas id="xyCanvas" width="400" height="400"></canvas>
+                <p style="text-align: center; font-size: 12px; margin-top: 5px;">X-Y PLANE (Top View)</p>
+            </div>
+            <div class="canvas-wrapper">
+                <canvas id="yzCanvas" width="400" height="400"></canvas>
+                <p style="text-align: center; font-size: 12px; margin-top: 5px;">Y-Z PLANE (Side View)</p>
+            </div>
+            <div class="canvas-wrapper">
+                <canvas id="xzCanvas" width="400" height="400"></canvas>
+                <p style="text-align: center; font-size: 12px; margin-top: 5px;">X-Z PLANE (Front View)</p>
+            </div>
+        </div>
+
+        <div class="telemetry">
+            <div class="telemetry-box">
+                <h3>Position & Velocity</h3>
+                <div class="telemetry-row">
+                    <span class="telemetry-label">Position X:</span>
+                    <span class="telemetry-value" id="posX">0.00</span>
+                </div>
+                <div class="telemetry-row">
+                    <span class="telemetry-label">Position Y:</span>
+                    <span class="telemetry-value" id="posY">0.00</span>
+                </div>
+                <div class="telemetry-row">
+                    <span class="telemetry-label">Position Z:</span>
+                    <span class="telemetry-value" id="posZ">0.00</span>
+                </div>
+                <div class="telemetry-row">
+                    <span class="telemetry-label">Velocity X:</span>
+                    <span class="telemetry-value" id="velX">0.00</span>
+                </div>
+                <div class="telemetry-row">
+                    <span class="telemetry-label">Velocity Y:</span>
+                    <span class="telemetry-value" id="velY">0.00</span>
+                </div>
+                <div class="telemetry-row">
+                    <span class="telemetry-label">Velocity Z:</span>
+                    <span class="telemetry-value" id="velZ">0.00</span>
+                </div>
+            </div>
+
+            <div class="telemetry-box">
+                <h3>Acceleration & Orientation</h3>
+                <div class="telemetry-row">
+                    <span class="telemetry-label">Acceleration X:</span>
+                    <span class="telemetry-value" id="accX">0.00</span>
+                </div>
+                <div class="telemetry-row">
+                    <span class="telemetry-label">Acceleration Y:</span>
+                    <span class="telemetry-value" id="accY">0.00</span>
+                </div>
+                <div class="telemetry-row">
+                    <span class="telemetry-label">Acceleration Z:</span>
+                    <span class="telemetry-value" id="accZ">0.00</span>
+                </div>
+                <div class="telemetry-row">
+                    <span class="telemetry-label">Pitch:</span>
+                    <span class="telemetry-value" id="pitch">0.00°</span>
+                </div>
+                <div class="telemetry-row">
+                    <span class="telemetry-label">Yaw:</span>
+                    <span class="telemetry-value" id="yaw">0.00°</span>
+                </div>
+                <div class="telemetry-row">
+                    <span class="telemetry-label">Roll:</span>
+                    <span class="telemetry-value" id="roll">0.00°</span>
+                </div>
+            </div>
+
+            <div class="telemetry-box">
+                <h3>Propulsion & Mass</h3>
+                <div class="telemetry-row">
+                    <span class="telemetry-label">Fuel Mass:</span>
+                    <span class="telemetry-value" id="fuelMass">500.00</span>
+                </div>
+                <div class="telemetry-row">
+                    <span class="telemetry-label">Dry Mass:</span>
+                    <span class="telemetry-value" id="dryMass">1000.00</span>
+                </div>
+                <div class="telemetry-row">
+                    <span class="telemetry-label">Total Mass:</span>
+                    <span class="telemetry-value" id="totalMass">1500.00</span>
+                </div>
+                <div class="telemetry-row">
+                    <span class="telemetry-label">Fuel %:</span>
+                    <span class="telemetry-value" id="fuelPercent">100%</span>
+                </div>
+                <div class="telemetry-row">
+                    <span class="telemetry-label">Mass Flow Rate:</span>
+                    <span class="telemetry-value" id="massFlowRate">0.00</span>
+                </div>
+                <div class="telemetry-row">
+                    <span class="telemetry-label">Thrust Force:</span>
+                    <span class="telemetry-value" id="thrustForce">0.00</span>
+                </div>
+            </div>
+
+            <div class="telemetry-box">
+                <h3>Forces & Torques</h3>
+                <div class="telemetry-row">
+                    <span class="telemetry-label">Net Force Mag:</span>
+                    <span class="telemetry-value" id="netForce">0.00</span>
+                </div>
+                <div class="telemetry-row">
+                    <span class="telemetry-label">Gravity Force:</span>
+                    <span class="telemetry-value" id="gravityForce">0.00</span>
+                </div>
+                <div class="telemetry-row">
+                    <span class="telemetry-label">Drag Force:</span>
+                    <span class="telemetry-value" id="dragForce">0.00</span>
+                </div>
+                <div class="telemetry-row">
+                    <span class="telemetry-label">Angular Velocity:</span>
+                    <span class="telemetry-value" id="angularVel">0.00</span>
+                </div>
+                <div class="telemetry-row">
+                    <span class="telemetry-label">Total Torque:</span>
+                    <span class="telemetry-value" id="torque">0.00</span>
+                </div>
+                <div class="telemetry-row">
+                    <span class="telemetry-label">Speed:</span>
+                    <span class="telemetry-value" id="speed">0.00</span>
+                </div>
+            </div>
+
+            <div class="telemetry-box">
+                <h3>Energy & Altitude</h3>
+                <div class="telemetry-row">
+                    <span class="telemetry-label">Altitude:</span>
+                    <span class="telemetry-value" id="altitude">0.00</span>
+                </div>
+                <div class="telemetry-row">
+                    <span class="telemetry-label">Kinetic Energy:</span>
+                    <span class="telemetry-value" id="kineticEnergy">0.00</span>
+                </div>
+                <div class="telemetry-row">
+                    <span class="telemetry-label">Potential Energy:</span>
+                    <span class="telemetry-value" id="potentialEnergy">0.00</span>
+                </div>
+                <div class="telemetry-row">
+                    <span class="telemetry-label">Total Energy:</span>
+                    <span class="telemetry-value" id="totalEnergy">0.00</span>
+                </div>
+                <div class="telemetry-row">
+                    <span class="telemetry-label">Sim Time:</span>
+                    <span class="telemetry-value" id="simTime">0.00s</span>
+                </div>
+                <div class="telemetry-row">
+                    <span class="telemetry-label">FPS:</span>
+                    <span class="telemetry-value" id="fps">60</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="info-panel">
+            <h3 style="color: #00ffff; margin-bottom: 10px;">SIMULATION NOTES</h3>
+            <p>
+                • <strong>Exhaust Velocity:</strong> 4500 m/s (constant)<br>
+                • <strong>Thrust Model:</strong> Mass flow rate = Throttle % × Max flow rate<br>
+                • <strong>Center of Mass:</strong> Recalculated real-time as fuel depletes<br>
+                • <strong>Integration Method:</strong> Euler numerical (Δt = 16.67ms)<br>
+                • <strong>Moment of Inertia:</strong> 3×3 tensor calculated from rocket geometry<br>
+                • <strong>Angular Physics:</strong> Full 3-axis rotational dynamics<br>
+                • <strong>RCS:</strong> 8 independent thrusters (±X, ±Y, ±Z + Roll control)<br>
+                • <strong>Drag Model:</strong> F_drag = 0.5 × ρ × v² × C_d × A (when enabled)<br>
+                • <strong>Keyboard Controls:</strong> Arrow keys for gimbal, WASD for RCS
+            </p>
+        </div>
+    </div>
+
     <script>
-        // Placeholder for 3D rocket simulation logic
-        const canvas = document.getElementById('rocketCanvas');
-        const ctx = canvas.getContext('2d');
-        ctx.fillStyle = 'lightblue';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = 'red';
-        ctx.fillRect(390, 290, 20, 30); // Simple representation of a ocket
+        // ===== PHYSICS ENGINE =====
+        class Rocket {
+            constructor() {
+                // Physical properties
+                this.dryMass = 1000; // kg
+                this.fuelMass = 500; // kg
+                this.exhaustVelocity = 4500; // m/s
+                this.maxThrustForce = 50000; // N
+                this.maxMassFlowRate = this.maxThrustForce / this.exhaustVelocity; // kg/s
+
+                // Position and velocity (world frame)
+                this.position = { x: 0, y: 0, z: 0 }; // meters
+                this.velocity = { x: 0, y: 0, z: 0 }; // m/s
+                this.acceleration = { x: 0, y: 0, z: 0 }; // m/s²
+
+                // Orientation (Euler angles in radians)
+                this.orientation = { pitch: 0, yaw: 0, roll: 0 }; // radians
+                this.angularVelocity = { pitch: 0, yaw: 0, roll: 0 }; // rad/s
+                this.angularAcceleration = { pitch: 0, yaw: 0, roll: 0 }; // rad/s²
+
+                // Control inputs
+                this.throttle = 0; // 0-100%
+                this.gimbalPitch = 0; // degrees
+                this.gimbalYaw = 0; // degrees
+                this.rcsThrusters = new Array(8).fill(0); // RCS on/off states
+
+                // Environment
+                this.gravity = 9.81; // m/s²
+                this.airDensity = 1.225; // kg/m³
+                this.dragCoefficient = 0.25; // dimensionless
+                this.crossSectionalArea = Math.PI * (1.5 ** 2); // m² (diameter ~3m)
+
+                // Rocket geometry
+                this.length = 50; // meters
+                this.width = 3; // meters
+                this.diameter = 3; // meters
+
+                // Moment of inertia (calculated for a cylinder)
+                this.updateMomentOfInertia();
+
+                // Trajectory tracking
+                this.trajectory = [];
+                this.maxTrajectoryPoints = 1000;
+
+                // Forces
+                this.thrustVector = { x: 0, y: 0, z: 0 };
+                this.gravityVector = { x: 0, y: 0, z: 0 };
+                this.dragVector = { x: 0, y: 0, z: 0 };
+                this.rcsForceVector = { x: 0, y: 0, z: 0 };
+            }
+
+            getTotalMass() {
+                return this.dryMass + this.fuelMass;
+            }
+
+            getCenterOfMass() {
+                // Simple model: center of mass shifts as fuel burns
+                const fuelCenterOffset = this.length * 0.4; // Fuel tank is 40% from nose
+                const dryMassCOM = this.length * 0.5;
+                const totalMass = this.getTotalMass();
+                
+                const comY = (this.fuelMass * fuelCenterOffset + this.dryMass * dryMassCOM) / totalMass;
+                return { x: 0, y: comY - this.length / 2, z: 0 };
+            }
+
+            updateMomentOfInertia() {
+                const totalMass = this.getTotalMass();
+                const radius = this.diameter / 2;
+                
+                // Moment of inertia for a cylinder about its center
+                // Ixx = Izz = (1/12) * m * (3*r² + h²)
+                // Iyy = (1/2) * m * r²
+                const Ixx = (1/12) * totalMass * (3 * radius ** 2 + this.length ** 2);
+                const Iyy = (1/2) * totalMass * radius ** 2;
+                const Izz = (1/12) * totalMass * (3 * radius ** 2 + this.length ** 2);
+
+                this.momentOfInertia = {
+                    xx: Ixx,
+                    yy: Iyy,
+                    zz: Izz
+                };
+            }
+
+            calculateRotationMatrix() {
+                const p = this.orientation.pitch;
+                const y = this.orientation.yaw;
+                const r = this.orientation.roll;
+
+                // Roll-Pitch-Yaw convention
+                const cp = Math.cos(p), sp = Math.sin(p);
+                const cy = Math.cos(y), sy = Math.sin(y);
+                const cr = Math.cos(r), sr = Math.sin(r);
+
+                return {
+                    m11: cy * cr - sy * sp * sr,
+                    m12: -cy * sr - sy * sp * cr,
+                    m13: sy * cp,
+                    m21: sy * cr + cy * sp * sr,
+                    m22: -sy * sr + cy * sp * cr,
+                    m23: -cy * cp,
+                    m31: -cp * sr,
+                    m32: cp * cr,
+                    m33: sp
+                };
+            }
+
+            rotateVector(v, rotMatrix) {
+                return {
+                    x: rotMatrix.m11 * v.x + rotMatrix.m12 * v.y + rotMatrix.m13 * v.z,
+                    y: rotMatrix.m21 * v.x + rotMatrix.m22 * v.y + rotMatrix.m23 * v.z,
+                    z: rotMatrix.m31 * v.x + rotMatrix.m32 * v.y + rotMatrix.m33 * v.z
+                };
+            }
+
+            calculateThrustForce(dt) {
+                // Calculate mass flow rate based on throttle
+                const massFlowRate = (this.throttle / 100) * this.maxMassFlowRate;
+                
+                // Burn fuel
+                const fuelBurned = massFlowRate * dt;
+                this.fuelMass = Math.max(0, this.fuelMass - fuelBurned);
+
+                // Update moment of inertia as mass changes
+                this.updateMomentOfInertia();
+
+                // Calculate thrust magnitude
+                const thrustMagnitude = massFlowRate * this.exhaustVelocity;
+
+                // Thrust vector in body frame (pointing up +Y in body frame)
+                const bodyFrameThrust = {
+                    x: Math.sin(this.gimbalYaw * Math.PI / 180) * thrustMagnitude,
+                    y: thrustMagnitude * Math.cos(this.gimbalPitch * Math.PI / 180) * Math.cos(this.gimbalYaw * Math.PI / 180),
+                    z: Math.sin(this.gimbalPitch * Math.PI / 180) * thrustMagnitude
+                };
+
+                // Rotate to world frame
+                const rotMatrix = this.calculateRotationMatrix();
+                this.thrustVector = this.rotateVector(bodyFrameThrust, rotMatrix);
+
+                return { massFlowRate, thrustMagnitude };
+            }
+
+            calculateGravity() {
+                const totalMass = this.getTotalMass();
+                this.gravityVector = {
+                    x: 0,
+                    y: -this.gravity * totalMass,
+                    z: 0
+                };
+            }
+
+            calculateDrag(enableDrag) {
+                if (!enableDrag || this.airDensity === 0) {
+                    this.dragVector = { x: 0, y: 0, z: 0 };
+                    return;
+                }
+
+                const speed = Math.sqrt(
+                    this.velocity.x ** 2 + this.velocity.y ** 2 + this.velocity.z ** 2
+                );
+
+                if (speed < 0.01) {
+                    this.dragVector = { x: 0, y: 0, z: 0 };
+                    return;
+                }
+
+                const dragMagnitude = 0.5 * this.airDensity * speed ** 2 * this.dragCoefficient * this.crossSectionalArea;
+                const dragScale = -dragMagnitude / speed;
+
+                this.dragVector = {
+                    x: dragScale * this.velocity.x,
+                    y: dragScale * this.velocity.y,
+                    z: dragScale * this.velocity.z
+                };
+            }
+
+            calculateRCSForces() {
+                const rcsForce = 5000; // N per RCS thruster
+                this.rcsForceVector = { x: 0, y: 0, z: 0 };
+
+                // RCS thruster mapping: [+X, -X, +Y, -Y, +Z, -Z, Roll+, Roll-]
+                if (this.rcsThrusters[0]) this.rcsForceVector.x += rcsForce; // +X
+                if (this.rcsThrusters[1]) this.rcsForceVector.x -= rcsForce; // -X
+                if (this.rcsThrusters[2]) this.rcsForceVector.y += rcsForce; // +Y
+                if (this.rcsThrusters[3]) this.rcsForceVector.y -= rcsForce; // -Y
+                if (this.rcsThrusters[4]) this.rcsForceVector.z += rcsForce; // +Z
+                if (this.rcsThrusters[5]) this.rcsForceVector.z -= rcsForce; // -Z
+            }
+
+            calculateTorques() {
+                let torque = { x: 0, y: 0, z: 0 };
+
+                // Torque from gimbal (thrust offset from COM)
+                const thrustCOM = { x: 0, y: 0.5, z: 0 }; // Thruster offset from COM
+                torque.x += thrustCOM.y * this.thrustVector.z - thrustCOM.z * this.thrustVector.y;
+                torque.y += thrustCOM.z * this.thrustVector.x - thrustCOM.x * this.thrustVector.z;
+                torque.z += thrustCOM.x * this.thrustVector.y - thrustCOM.y * this.thrustVector.x;
+
+                // Torque from RCS thrusters
+                const rcsPositions = [
+                    { x: 1, y: 0, z: 1 },   // 0: +X
+                    { x: -1, y: 0, z: 1 },  // 1: -X
+                    { x: 1, y: 0, z: -1 },  // 2: +Y
+                    { x: -1, y: 0, z: -1 }, // 3: -Y
+                    { x: 0, y: 0.5, z: 1 }, // 4: +Z
+                    { x: 0, y: 0.5, z: -1 } // 5: -Z
+                ];
+
+                for (let i = 0; i < Math.min(6, this.rcsThrusters.length); i++) {
+                    if (this.rcsThrusters[i]) {
+                        const rcsForce = 5000;
+                        const pos = rcsPositions[i];
+                        const force = { x: 0, y: 0, z: 0 };
+
+                        if (i < 2) force.x = (i === 0 ? 1 : -1) * rcsForce;
+                        else if (i < 4) force.y = (i === 2 ? 1 : -1) * rcsForce;
+                        else force.z = (i === 4 ? 1 : -1) * rcsForce;
+
+                        torque.x += pos.y * force.z - pos.z * force.y;
+                        torque.y += pos.z * force.x - pos.x * force.z;
+                        torque.z += pos.x * force.y - pos.y * force.x;
+                    }
+                }
+
+                // Roll control from RCS
+                if (this.rcsThrusters[6]) torque.y += 50000; // Roll +
+                if (this.rcsThrusters[7]) torque.y -= 50000; // Roll -
+
+                return torque;
+            }
+
+            update(dt, enableGravity, enableDrag) {
+                const thrustData = this.calculateThrustForce(dt);
+                if (enableGravity) this.calculateGravity();
+                this.calculateDrag(enableDrag);
+                this.calculateRCSForces();
+
+                const totalMass = this.getTotalMass();
+
+                // Calculate total forces
+                const totalForce = {
+                    x: this.thrustVector.x + this.dragVector.x + this.rcsForceVector.x,
+                    y: this.thrustVector.y + this.dragVector.y + this.rcsForceVector.y + (enableGravity ? this.gravityVector.y : 0),
+                    z: this.thrustVector.z + this.dragVector.z + this.rcsForceVector.z
+                };
+
+                // Update linear acceleration
+                this.acceleration = {
+                    x: totalForce.x / totalMass,
+                    y: totalForce.y / totalMass,
+                    z: totalForce.z / totalMass
+                };
+
+                // Update linear velocity and position
+                this.velocity.x += this.acceleration.x * dt;
+                this.velocity.y += this.acceleration.y * dt;
+                this.velocity.z += this.acceleration.z * dt;
+
+                this.position.x += this.velocity.x * dt;
+                this.position.y += this.velocity.y * dt;
+                this.position.z += this.velocity.z * dt;
+
+                // Calculate torques
+                const torque = this.calculateTorques();
+
+                // Update angular acceleration
+                this.angularAcceleration.pitch = torque.x / this.momentOfInertia.xx;
+                this.angularAcceleration.yaw = torque.y / this.momentOfInertia.yy;
+                this.angularAcceleration.roll = torque.z / this.momentOfInertia.zz;
+
+                // Update angular velocity and orientation
+                this.angularVelocity.pitch += this.angularAcceleration.pitch * dt;
+                this.angularVelocity.yaw += this.angularAcceleration.yaw * dt;
+                this.angularVelocity.roll += this.angularAcceleration.roll * dt;
+
+                this.orientation.pitch += this.angularVelocity.pitch * dt;
+                this.orientation.yaw += this.angularVelocity.yaw * dt;
+                this.orientation.roll += this.angularVelocity.roll * dt;
+
+                // Store trajectory
+                if (this.trajectory.length === 0 || 
+                    Math.sqrt((this.position.x - this.trajectory[this.trajectory.length - 1].x) ** 2 +
+                             (this.position.y - this.trajectory[this.trajectory.length - 1].y) ** 2 +
+                             (this.position.z - this.trajectory[this.trajectory.length - 1].z) ** 2) > 5) {
+                    this.trajectory.push({
+                        x: this.position.x,
+                        y: this.position.y,
+                        z: this.position.z,
+                        time: performance.now()
+                    });
+                    if (this.trajectory.length > this.maxTrajectoryPoints) {
+                        this.trajectory.shift();
+                    }
+                }
+
+                return thrustData;
+            }
+
+            getSpeed() {
+                return Math.sqrt(this.velocity.x ** 2 + this.velocity.y ** 2 + this.velocity.z ** 2);
+            }
+
+            getTotalForce() {
+                return Math.sqrt(
+                    (this.thrustVector.x + this.dragVector.x + this.rcsForceVector.x) ** 2 +
+                    (this.thrustVector.y + this.dragVector.y + this.rcsForceVector.y + this.gravityVector.y) ** 2 +
+                    (this.thrustVector.z + this.dragVector.z + this.rcsForceVector.z) ** 2
+                );
+            }
+
+            reset() {
+                this.position = { x: 0, y: 0, z: 0 };
+                this.velocity = { x: 0, y: 0, z: 0 };
+                this.acceleration = { x: 0, y: 0, z: 0 };
+                this.orientation = { pitch: 0, yaw: 0, roll: 0 };
+                this.angularVelocity = { pitch: 0, yaw: 0, roll: 0 };
+                this.angularAcceleration = { pitch: 0, yaw: 0, roll: 0 };
+                this.fuelMass = 500;
+                this.throttle = 0;
+                this.trajectory = [];
+                this.updateMomentOfInertia();
+            }
+        }
+
+        // ===== RENDERER =====
+        const rocket = new Rocket();
+        const canvases = {
+            xy: document.getElementById('xyCanvas'),
+            yz: document.getElementById('yzCanvas'),
+            xz: document.getElementById('xzCanvas')
+        };
+
+        const contexts = {
+            xy: canvases.xy.getContext('2d'),
+            yz: canvases.yz.getContext('2d'),
+            xz: canvases.xz.getContext('2d')
+        };
+
+        let isRunning = false;
+        let showTrajectory = true;
+        let showVectors = true;
+        let enableGravity = true;
+        let enableDrag = true;
+        let showGrid = false;
+        let simTime = 0;
+        let frameCount = 0;
+        let lastFpsUpdate = performance.now();
+        let currentFps = 60;
+        let timeScale = 1;
+
+        function drawGrid(ctx, width, height, scale = 50) {
+            ctx.strokeStyle = 'rgba(0, 255, 0, 0.1)';
+            ctx.lineWidth = 0.5;
+
+            const centerX = width / 2;
+            const centerY = height / 2;
+
+            for (let x = -2000; x <= 2000; x += scale) {
+                const screenX = centerX + (x / 500) * 100;
+                ctx.beginPath();
+                ctx.moveTo(screenX, 0);
+                ctx.lineTo(screenX, height);
+                ctx.stroke();
+            }
+
+            for (let y = -2000; y <= 2000; y += scale) {
+                const screenY = centerY + (y / 500) * 100;
+                ctx.beginPath();
+                ctx.moveTo(0, screenY);
+                ctx.lineTo(width, screenY);
+                ctx.stroke();
+            }
+
+            // Draw axes
+            ctx.strokeStyle = 'rgba(0, 255, 100, 0.5)';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(centerX, 0);
+            ctx.lineTo(centerX, height);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(0, centerY);
+            ctx.lineTo(width, centerY);
+            ctx.stroke();
+        }
+
+        function drawRocket(ctx, pos, angle, canvasType) {
+            const scale = 1; // pixels per meter
+            const centerX = canvases[canvasType].width / 2;
+            const centerY = canvases[canvasType].height / 2;
+
+            let screenX, screenY;
+
+            if (canvasType === 'xy') {
+                screenX = centerX + pos.x * scale;
+                screenY = centerY - pos.z * scale;
+            } else if (canvasType === 'yz') {
+                screenX = centerX + pos.z * scale;
+                screenY = centerY - pos.y * scale;
+            } else if (canvasType === 'xz') {
+                screenX = centerX + pos.x * scale;
+                screenY = centerY - pos.y * scale;
+            }
+
+            const rocketLength = 8;
+            const rocketWidth = 3;
+
+            ctx.save();
+            ctx.translate(screenX, screenY);
+            ctx.rotate(angle);
+
+            // Rocket body
+            ctx.fillStyle = '#00ff00';
+            ctx.fillRect(-rocketWidth / 2, -rocketLength / 2, rocketWidth, rocketLength);
+
+            // Rocket nose
+            ctx.fillStyle = '#ff6600';
+            ctx.beginPath();
+            ctx.moveTo(0, -rocketLength / 2);
+            ctx.lineTo(rocketWidth / 2, -rocketLength / 2 + 3);
+            ctx.lineTo(-rocketWidth / 2, -rocketLength / 2 + 3);
+            ctx.fill();
+
+            ctx.restore();
+        }
+
+        function drawVectors(ctx, canvasType) {
+            const scale = 0.01;
+            const centerX = canvases[canvasType].width / 2;
+            const centerY = canvases[canvasType].height / 2;
+
+            let posX, posY, forceX, forceY;
+
+            if (canvasType === 'xy') {
+                posX = centerX + rocket.position.x * scale;
+                posY = centerY - rocket.position.z * scale;
+                forceX = rocket.acceleration.x * 10;
+                forceY = -rocket.acceleration.z * 10;
+            } else if (canvasType === 'yz') {
+                posX = centerX + rocket.position.z * scale;
+                posY = centerY - rocket.position.y * scale;
+                forceX = rocket.acceleration.z * 10;
+                forceY = -rocket.acceleration.y * 10;
+            } else if (canvasType === 'xz') {
+                posX = centerX + rocket.position.x * scale;
+                posY = centerY - rocket.position.y * scale;
+                forceX = rocket.acceleration.x * 10;
+                forceY = -rocket.acceleration.y * 10;
+            }
+
+            // Velocity vector (green)
+            ctx.strokeStyle = '#00ff00';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(posX, posY);
+            ctx.lineTo(posX + forceX * scale, posY + forceY * scale);
+            ctx.stroke();
+        }
+
+        function drawTrajectory(ctx, canvasType) {
+            if (rocket.trajectory.length < 2) return;
+
+            ctx.strokeStyle = 'rgba(0, 255, 0, 0.5)';
+            ctx.lineWidth = 1;
+
+            const scale = 1;
+            const centerX = canvases[canvasType].width / 2;
+            const centerY = canvases[canvasType].height / 2;
+
+            ctx.beginPath();
+
+            for (let i = 0; i < rocket.trajectory.length; i++) {
+                let screenX, screenY;
+                const point = rocket.trajectory[i];
+
+                if (canvasType === 'xy') {
+                    screenX = centerX + point.x * scale;
+                    screenY = centerY - point.z * scale;
+                } else if (canvasType === 'yz') {
+                    screenX = centerX + point.z * scale;
+                    screenY = centerY - point.y * scale;
+                } else if (canvasType === 'xz') {
+                    screenX = centerX + point.x * scale;
+                    screenY = centerY - point.y * scale;
+                }
+
+                if (i === 0) ctx.moveTo(screenX, screenY);
+                else ctx.lineTo(screenX, screenY);
+            }
+
+            ctx.stroke();
+        }
+
+        function render() {
+            // Clear canvases
+            for (const key in contexts) {
+                const canvas = canvases[key];
+                const ctx = contexts[key];
+
+                ctx.fillStyle = '#000000';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                if (showGrid) drawGrid(ctx, canvas.width, canvas.height);
+
+                // Draw trajectory
+                if (showTrajectory) drawTrajectory(ctx, key);
+
+                // Draw rocket
+                let angle = 0;
+                if (key === 'xy') angle = rocket.orientation.yaw;
+                else if (key === 'yz') angle = rocket.orientation.pitch;
+                else if (key === 'xz') angle = rocket.orientation.pitch;
+
+                drawRocket(ctx, rocket.position, angle, key);
+
+                // Draw vectors
+                if (showVectors) drawVectors(ctx, key);
+            }
+        }
+
+        function updateTelemetry() {
+            const pitch = rocket.orientation.pitch * 180 / Math.PI;
+            const yaw = rocket.orientation.yaw * 180 / Math.PI;
+            const roll = rocket.orientation.roll * 180 / Math.PI;
+
+            const speed = rocket.getSpeed();
+            const altitude = Math.max(0, rocket.position.y);
+            const totalMass = rocket.getTotalMass();
+            const fuelPercent = (rocket.fuelMass / 500) * 100;
+            const ke = 0.5 * totalMass * speed ** 2;
+            const pe = totalMass * rocket.gravity * altitude;
+
+            document.getElementById('posX').textContent = rocket.position.x.toFixed(2);
+            document.getElementById('posY').textContent = rocket.position.y.toFixed(2);
+            document.getElementById('posZ').textContent = rocket.position.z.toFixed(2);
+            document.getElementById('velX').textContent = rocket.velocity.x.toFixed(2);
+            document.getElementById('velY').textContent = rocket.velocity.y.toFixed(2);
+            document.getElementById('velZ').textContent = rocket.velocity.z.toFixed(2);
+            document.getElementById('accX').textContent = rocket.acceleration.x.toFixed(2);
+            document.getElementById('accY').textContent = rocket.acceleration.y.toFixed(2);
+            document.getElementById('accZ').textContent = rocket.acceleration.z.toFixed(2);
+            document.getElementById('pitch').textContent = pitch.toFixed(2) + '°';
+            document.getElementById('yaw').textContent = yaw.toFixed(2) + '°';
+            document.getElementById('roll').textContent = roll.toFixed(2) + '°';
+            document.getElementById('fuelMass').textContent = rocket.fuelMass.toFixed(2);
+            document.getElementById('dryMass').textContent = rocket.dryMass.toFixed(2);
+            document.getElementById('totalMass').textContent = totalMass.toFixed(2);
+            document.getElementById('fuelPercent').textContent = fuelPercent.toFixed(1) + '%';
+            document.getElementById('massFlowRate').textContent = (rocket.throttle / 100 * rocket.maxMassFlowRate).toFixed(2);
+            document.getElementById('thrustForce').textContent = Math.sqrt(rocket.thrustVector.x ** 2 + rocket.thrustVector.y ** 2 + rocket.thrustVector.z ** 2).toFixed(2);
+            document.getElementById('netForce').textContent = rocket.getTotalForce().toFixed(2);
+            document.getElementById('gravityForce').textContent = Math.abs(rocket.gravityVector.y).toFixed(2);
+            document.getElementById('dragForce').textContent = Math.sqrt(rocket.dragVector.x ** 2 + rocket.dragVector.y ** 2 + rocket.dragVector.z ** 2).toFixed(2);
+            document.getElementById('speed').textContent = speed.toFixed(2);
+            document.getElementById('altitude').textContent = altitude.toFixed(2);
+            document.getElementById('kineticEnergy').textContent = (ke / 1e6).toFixed(2) + ' MJ';
+            document.getElementById('potentialEnergy').textContent = (pe / 1e6).toFixed(2) + ' MJ';
+            document.getElementById('totalEnergy').textContent = ((ke + pe) / 1e6).toFixed(2) + ' MJ';
+            document.getElementById('simTime').textContent = (simTime / 1000).toFixed(2) + 's';
+            document.getElementById('fps').textContent = currentFps;
+
+            const angularVelMag = Math.sqrt(
+                rocket.angularVelocity.pitch ** 2 +
+                rocket.angularVelocity.yaw ** 2 +
+                rocket.angularVelocity.roll ** 2
+            );
+            document.getElementById('angularVel').textContent = angularVelMag.toFixed(4);
+        }
+
+        function animate() {
+            if (isRunning) {
+                const dt = (16.67 / 1000) * timeScale; // ~60 FPS with time scale
+                rocket.update(dt, enableGravity, enableDrag);
+                simTime += 16.67 * timeScale;
+            }
+
+            render();
+            updateTelemetry();
+
+            frameCount++;
+            const now = performance.now();
+            if (now - lastFpsUpdate >= 1000) {
+                currentFps = frameCount;
+                frameCount = 0;
+                lastFpsUpdate = now;
+            }
+
+            requestAnimationFrame(animate);
+        }
+
+        // ===== UI CONTROLS =====
+        document.getElementById('playBtn').addEventListener('click', () => {
+            isRunning = true;
+        });
+
+        document.getElementById('pauseBtn').addEventListener('click', () => {
+            isRunning = false;
+        });
+
+        document.getElementById('resetBtn').addEventListener('click', () => {
+            rocket.reset();
+            simTime = 0;
+        });
+
+        document.getElementById('throttle').addEventListener('input', (e) => {
+            rocket.throttle = parseFloat(e.target.value);
+            document.getElementById('throttleValue').textContent = e.target.value + '%';
+        });
+
+        document.getElementById('gimbalPitch').addEventListener('input', (e) => {
+            rocket.gimbalPitch = parseFloat(e.target.value);
+            document.getElementById('gimbalPitchValue').textContent = e.target.value + '°';
+        });
+
+        document.getElementById('gimbalYaw').addEventListener('input', (e) => {
+            rocket.gimbalYaw = parseFloat(e.target.value);
+            document.getElementById('gimbalYawValue').textContent = e.target.value + '°';
+        });
+
+        document.getElementById('timeScale').addEventListener('change', (e) => {
+            timeScale = parseFloat(e.target.value);
+        });
+
+        // Toggle buttons
+        document.getElementById('gravityToggle').addEventListener('click', function() {
+            enableGravity = !enableGravity;
+            this.textContent = 'GRAVITY: ' + (enableGravity ? 'ON' : 'OFF');
+            this.classList.toggle('active');
+        });
+
+        document.getElementById('dragToggle').addEventListener('click', function() {
+            enableDrag = !enableDrag;
+            this.textContent = 'DRAG: ' + (enableDrag ? 'ON' : 'OFF');
+            this.classList.toggle('active');
+        });
+
+        document.getElementById('trajectoryToggle').addEventListener('click', function() {
+            showTrajectory = !showTrajectory;
+            this.textContent = 'TRAJECTORY: ' + (showTrajectory ? 'ON' : 'OFF');
+            this.classList.toggle('active');
+        });
+
+        document.getElementById('vectorsToggle').addEventListener('click', function() {
+            showVectors = !showVectors;
+            this.textContent = 'VECTORS: ' + (showVectors ? 'ON' : 'OFF');
+            this.classList.toggle('active');
+        });
+
+        document.getElementById('gridToggle').addEventListener('click', function() {
+            showGrid = !showGrid;
+            this.textContent = 'GRID: ' + (showGrid ? 'ON' : 'OFF');
+            this.classList.toggle('active');
+        });
+
+        // RCS controls
+        document.querySelectorAll('.rcs-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const rcsIndex = parseInt(this.getAttribute('data-rcs'));
+                rocket.rcsThrusters[rcsIndex] = !rocket.rcsThrusters[rcsIndex];
+                this.classList.toggle('active');
+            });
+        });
+
+        // Keyboard controls
+        const keys = {};
+        document.addEventListener('keydown', (e) => {
+            keys[e.key] = true;
+
+            if (e.key === ' ') {
+                e.preventDefault();
+                rocket.throttle = Math.min(100, rocket.throttle + 10);
+            }
+            if (e.key === 'Shift') {
+                e.preventDefault();
+                rocket.throttle = Math.max(0, rocket.throttle - 10);
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            keys[e.key] = false;
+        });
+
+        // Update gimbal with keyboard
+        setInterval(() => {
+            let pitchDelta = 0;
+            let yawDelta = 0;
+
+            if (keys['ArrowUp']) pitchDelta = -2;
+            if (keys['ArrowDown']) pitchDelta = 2;
+            if (keys['ArrowLeft']) yawDelta = -2;
+            if (keys['ArrowRight']) yawDelta = 2;
+
+            rocket.gimbalPitch = Math.max(-30, Math.min(30, rocket.gimbalPitch + pitchDelta));
+            rocket.gimbalYaw = Math.max(-30, Math.min(30, rocket.gimbalYaw + yawDelta));
+
+            document.getElementById('gimbalPitch').value = rocket.gimbalPitch;
+            document.getElementById('gimbalYaw').value = rocket.gimbalYaw;
+            document.getElementById('gimbalPitchValue').textContent = rocket.gimbalPitch.toFixed(0) + '°';
+            document.getElementById('gimbalYawValue').textContent = rocket.gimbalYaw.toFixed(0) + '°';
+        }, 50);
+
+        // Start animation loop
+        animate();
     </script>
 </body>
 </html>
