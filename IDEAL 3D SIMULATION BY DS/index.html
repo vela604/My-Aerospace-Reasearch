@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>3D ROCKET SIM | Modular</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+        }
+        
+        body {
+            background: #030b14;
+            font-family: 'Share Tech Mono', monospace;
+            color: #a8d8ea;
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap');
+
+        :root {
+            --bg: #030b14;
+            --panel: #050f1c;
+            --border: #0a2840;
+            --accent: #00d4ff;
+            --accent2: #ff6b00;
+            --accent3: #00ff88;
+            --warn: #ffcc00;
+            --danger: #ff2244;
+            --text: #a8d8ea;
+            --dim: #3a5a6a;
+        }
+    </style>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+    <div class="app">
+        <div class="top-bar">
+            <div class="title">🚀 3D ROCKET SIM | MODULAR</div>
+            <div class="status-group">
+                <div class="status-led">
+                    <div class="dot" id="statusDot"></div><span id="statusText">STOPPED</span>
+                </div>
+                <div class="sim-time" id="simClock">T+00:00.0</div>
+            </div>
+        </div>
+        <div class="main-row">
+            <div class="left-panel">
+                <div class="section">
+                    <div class="section-title">🚦 SIMULATION</div>
+                    <div class="btn-group">
+                        <button class="btn btn-start" id="btnStart">▶ START</button>
+                        <button class="btn btn-stop" id="btnStop">⏸ STOP</button>
+                        <button class="btn btn-reset" id="btnReset">↺ RESET</button>
+                    </div>
+                </div>
+                <div class="section">
+                    <div class="section-title">⚙️ INIT CONFIG</div>
+                    <div class="ctrl-row">
+                        <div class="ctrl-label">Dry Mass (kg) <span id="dryMassVal">5000</span></div><input type="range" id="dryMass" min="500" max="20000" step="100" value="5000">
+                    </div>
+                    <div class="ctrl-row">
+                        <div class="ctrl-label">Fuel Mass (kg) <span id="fuelMassVal">3000</span></div><input type="range" id="fuelMass" min="100" max="15000" step="100" value="3000">
+                    </div>
+                    <div class="ctrl-row">
+                        <div class="ctrl-label">Length (m) <span id="lenVal">15</span></div><input type="range" id="rocketLen" min="8" max="30" step="0.5" value="15">
+                    </div>
+                    <div class="ctrl-row">
+                        <div class="ctrl-label">Radius (m) <span id="radVal">1.5</span></div><input type="range" id="rocketRad" min="0.8" max="3.5" step="0.1" value="1.5">
+                    </div>
+                    <div class="ctrl-row">
+                        <div class="ctrl-label">Gravity (m/s²) <span id="gravVal">9.81</span></div><input type="range" id="gravity" min="0" max="20" step="0.1" value="9.81">
+                    </div>
+                </div>
+                <div class="section">
+                    <div class="section-title">🖌️ TOGGLES</div>
+                    <div class="toggle-row"><span>Trajectory</span>
+                        <div class="toggle on" id="togTraj"></div>
+                    </div>
+                    <div class="toggle-row"><span>Grid</span>
+                        <div class="toggle on" id="togGrid"></div>
+                    </div>
+                    <div class="toggle-row"><span>Impact Point</span>
+                        <div class="toggle on" id="togImpact"></div>
+                    </div>
+                    <div class="toggle-row"><span>Drag Force</span>
+                        <div class="toggle" id="togDrag"></div>
+                    </div>
+                    <div class="toggle-row"><span>Force Vectors</span>
+                        <div class="toggle on" id="togForces"></div>
+                    </div>
+                    <div class="toggle-row"><span>Velocity Vector</span>
+                        <div class="toggle on" id="togVel"></div>
+                    </div>
+                    <div class="toggle-row"><span>Acceleration Vector</span>
+                        <div class="toggle on" id="togAcc"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="canvas-panel">
+                <div class="canvas-row">
+                    <div class="canvas-container">
+                        <div class="canvas-title">📐 X - Y (Range vs Altitude)</div><canvas id="canvasXY" class="proj-canvas"></canvas>
+                    </div>
+                    <div class="canvas-container">
+                        <div class="canvas-title">📐 Z - Y (Lateral vs Altitude)</div><canvas id="canvasZY" class="proj-canvas"></canvas>
+                    </div>
+                </div>
+                <div class="canvas-row">
+                    <div class="canvas-container">
+                        <div class="canvas-title">🗺️ X - Z (Top Down)</div><canvas id="canvasXZ" class="proj-canvas"></canvas>
+                    </div>
+                    <div class="canvas-container">
+                        <div class="canvas-title">📡 ORIENTATION (Pitch/Roll/Yaw)</div><canvas id="attitudeCanvas" width="200" height="150" style="width:100%; height:100%; background:#02070f;"></canvas>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="right-panel">
+                <div class="section">
+                    <div class="section-title">🔥 MAIN ENGINE (GIMBAL)</div>
+                    <div class="ctrl-row">
+                        <div class="ctrl-label">Thrust (N) <span id="thrustVal">0</span></div><input type="range" id="mainThrust" min="0" max="400000" step="2000" value="0">
+                    </div>
+                    <div class="ctrl-row">
+                        <div class="ctrl-label">Gimbal Pitch (deg) <span id="gimPitchVal">0</span></div><input type="range" id="gimbalPitch" min="-5" max="5" step="0.1" value="0">
+                    </div>
+                    <div class="ctrl-row">
+                        <div class="ctrl-label">Gimbal Yaw (deg) <span id="gimYawVal">0</span></div><input type="range" id="gimbalYaw" min="-5" max="5" step="0.1" value="0">
+                    </div>
+                    <div class="small-note">Ve=3200 m/s → ṁ = F/Ve</div>
+                </div>
+                <div class="section">
+                    <div class="section-title">🛰️ RCS THRUSTERS (3-axis)</div>
+                    <div class="ctrl-row">
+                        <div class="ctrl-label">X‑trans (N) <span id="rcsXVal">0</span></div><input type="range" id="rcsX" min="-60000" max="60000" step="1000" value="0">
+                    </div>
+                    <div class="ctrl-row">
+                        <div class="ctrl-label">Z‑trans (N) <span id="rcsZVal">0</span></div><input type="range" id="rcsZ" min="-60000" max="60000" step="1000" value="0">
+                    </div>
+                    <div class="ctrl-row">
+                        <div class="ctrl-label">Roll Torque (Nm) <span id="rollTorqueVal">0</span></div><input type="range" id="rollTorque" min="-80000" max="80000" step="2000" value="0">
+                    </div>
+                </div>
+                <div class="section">
+                    <div class="section-title">📊 FUEL & MASS</div>
+                    <div class="data-item"><span>Fuel Left</span><span id="fuelLeft">0 kg</span></div>
+                    <div class="fuel-bar">
+                        <div class="fuel-fill" id="fuelFillBar" style="width:100%"></div>
+                    </div>
+                    <div class="data-item"><span>Total Mass</span><span id="totalMass">0 kg</span></div>
+                    <div class="data-item"><span>ṁ total (kg/s)</span><span id="mdotTotal">0</span></div>
+                    <div class="data-item"><span>CoM offset (m)</span><span id="comPos">0</span></div>
+                </div>
+                <div class="section">
+                    <div class="section-title">🎯 KINEMATICS (3D)</div>
+                    <div class="data-grid">
+                        <div><span>X</span> <span id="posX">0.0</span> m</div>
+                        <div><span>Y</span> <span id="posY">0.0</span> m</div>
+                        <div><span>Z</span> <span id="posZ">0.0</span> m</div>
+                        <div><span>Vx</span> <span id="velX">0.0</span></div>
+                        <div><span>Vy</span> <span id="velY">0.0</span></div>
+                        <div><span>Vz</span> <span id="velZ">0.0</span></div>
+                        <div><span>|V|</span> <span id="speed">0.0</span> m/s</div>
+                        <div><span>Pitch/θ</span><span id="pitchAng">0.0°</span></div>
+                        <div><span>Yaw/ψ</span><span id="yawAng">0.0°</span></div>
+                        <div><span>Roll/φ</span><span id="rollAng">0.0°</span></div>
+                        <div><span>ωx (roll)</span><span id="omegaX">0</span></div>
+                        <div><span>ωy</span><span id="omegaY">0</span></div>
+                        <div><span>ωz</span><span id="omegaZ">0</span></div>
+                    </div>
+                </div>
+                <div class="section">
+                    <div class="section-title">⚡ FORCES & TORQUES</div>
+                    <div class="data-item"><span>F_thrust (N)</span><span id="fThrust">0</span></div>
+                    <div class="data-item"><span>F_gravity (N)</span><span id="fGrav">0</span></div>
+                    <div class="data-item"><span>F_drag</span><span id="fDrag">0</span></div>
+                    <div class="data-item"><span>τ_pitch (Nm)</span><span id="tauPitch">0</span></div>
+                    <div class="data-item"><span>τ_yaw</span><span id="tauYaw">0</span></div>
+                    <div class="data-item"><span>τ_roll</span><span id="tauRoll">0</span></div>
+                    <div class="data-item"><span>a_x (m/s²)</span><span id="accX">0.0</span></div>
+                    <div class="data-item"><span>a_y</span><span id="accY">0.0</span></div>
+                    <div class="data-item"><span>a_z</span><span id="accZ">0.0</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script type="module" src="js/main.js"></script>
+</body>
+
+</html>
