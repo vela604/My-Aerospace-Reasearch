@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Rocket Simulation</title>
+    <style>
+        body { font-family: Arial, sans-serif; }
+        canvas { border: 1px solid black; }
+        #controls { margin: 20px; }
+        #data-table { margin-top: 20px; border-collapse: collapse; }
+        #data-table th, #data-table td { border: 1px solid black; padding: 5px; }
+        #data-table th { background-color: #f2f2f2; }
+    </style>
+</head>
+<body>
+    <h1>3D Rocket Simulation</h1>
+    <div id="controls">
+        <button onclick="startSimulation()">Play</button>
+        <button onclick="pauseSimulation()">Pause</button>
+        <button onclick="resetSimulation()">Reset</button>
+        <label><input type="checkbox" id="dragForceToggle"> Toggle Drag Force</label>
+    </div>
+    <div>
+        <canvas id="canvasXY" width="400" height="400"></canvas>
+        <canvas id="canvasZY" width="400" height="400"></canvas>
+        <canvas id="canvasXZ" width="400" height="400"></canvas>
+    </div>
+    <table id="data-table">
+        <thead>
+            <tr>
+                <th>Parameter</th>
+                <th>Value</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr><td>Position X</td><td id="posX">0</td></tr>
+            <tr><td>Position Y</td><td id="posY">0</td></tr>
+            <tr><td>Position Z</td><td id="posZ">0</td></tr>
+            <tr><td>Velocity X</td><td id="velX">0</td></tr>
+            <tr><td>Velocity Y</td><td id="velY">0</td></tr>
+            <tr><td>Velocity Z</td><td id="velZ">0</td></tr>
+            <tr><td>Fuel Remaining</td><td id="fuel">100</td></tr>
+        </tbody>
+    </table>
+    <script>
+        // Rocket Simulation Variables
+        let position = { x: 0, y: 0, z: 0 };
+        let velocity = { x: 0, y: 0, z: 0 };
+        let fuel = 100;
+        let running = false;
+        let dragForceEnabled = false;
+
+        function startSimulation() { running = true; runSimulation(); }
+        function pauseSimulation() { running = false; }
+        function resetSimulation() {
+            position = { x: 0, y: 0, z: 0 };
+            velocity = { x: 0, y: 0, z: 0 };
+            fuel = 100;
+            updateTable();
+        }
+
+        function runSimulation() {
+            if (!running) return;
+            // Simulate physics here (basic numerical integration)
+            // Update position, velocity, and fuel consumption here
+            // This is where you'd calculate forces, drag, thrust, etc.
+
+            // Example of updating position
+            position.x += velocity.x;
+            position.y += velocity.y;
+            position.z += velocity.z;
+            updateTable();
+            requestAnimationFrame(runSimulation);
+        }
+
+        function updateTable() {
+            document.getElementById('posX').innerText = position.x.toFixed(2);
+            document.getElementById('posY').innerText = position.y.toFixed(2);
+            document.getElementById('posZ').innerText = position.z.toFixed(2);
+            document.getElementById('velX').innerText = velocity.x.toFixed(2);
+            document.getElementById('velY').innerText = velocity.y.toFixed(2);
+            document.getElementById('velZ').innerText = velocity.z.toFixed(2);
+            document.getElementById('fuel').innerText = fuel.toFixed(2);
+        }
+
+        // Initialize simulation
+        updateTable();
+    </script>
+</body>
+</html>
