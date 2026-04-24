@@ -1,0 +1,2719 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>2D Rocket Simulation</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap');
+
+  :root {
+    --bg: #030b14;
+    --panel: #050f1c;
+    --border: #0a2840;
+    --accent: #00d4ff;
+    --accent2: #ff6b00;
+    --accent3: #00ff88;
+    --warn: #ffcc00;
+    --danger: #ff2244;
+    --text: #a8d8ea;
+    --dim: #3a5a6a;
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  header {
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    padding: 6px 16px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-shrink: 0;
+  }
+
+  header h1 {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 14px;
+    font-weight: 900;
+    color: var(--accent);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+  }
+
+  .status-bar {
+    display: flex;
+    gap: 16px;
+    margin-left: auto;
+    align-items: center;
+    font-size: 11px;
+  }
+
+  .status-indicator {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--dim);
+  }
+  .dot.active { background: var(--accent3); box-shadow: 0 0 6px var(--accent3); animation: pulse 1s infinite; }
+  .dot.stopped { background: var(--warn); }
+  .dot.crashed { background: var(--danger); }
+
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  .main-layout {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* LEFT PANEL */
+  .left-panel {
+    width: 220px;
+    flex-shrink: 0;
+    background: var(--panel);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    padding: 8px;
+    gap: 8px;
+  }
+
+  /* CANVAS AREA */
+  .canvas-area {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    background: #010810;
+  }
+
+  canvas#sim {
+    display: block;
+  }
+
+  /* RIGHT PANEL */
+  .right-panel {
+    width: 230px;
+    flex-shrink: 0;
+    background: var(--panel);
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    padding: 8px;
+    gap: 8px;
+  }
+
+  .panel-section {
+    background: rgba(0,20,40,0.6);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 8px;
+  }
+
+  .section-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 9px;
+    letter-spacing: 2px;
+    color: var(--accent);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 4px;
+  }
+
+  .ctrl-row {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    margin-bottom: 8px;
+  }
+
+  .ctrl-label {
+    font-size: 10px;
+    color: var(--dim);
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .ctrl-label span { color: var(--accent2); }
+
+  input[type=range] {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    outline: none;
+  }
+
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    box-shadow: 0 0 4px var(--accent);
+  }
+
+  input[type=range].orange::-webkit-slider-thumb { background: var(--accent2); box-shadow: 0 0 4px var(--accent2); }
+  input[type=range].green::-webkit-slider-thumb { background: var(--accent3); box-shadow: 0 0 4px var(--accent3); }
+
+  .data-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    padding: 2px 0;
+    border-bottom: 1px solid rgba(10,40,64,0.5);
+  }
+
+  .data-row .key { color: var(--dim); }
+  .data-row .val { color: var(--accent3); font-weight: bold; }
+  .data-row .val.warn { color: var(--warn); }
+  .data-row .val.danger { color: var(--danger); }
+
+  .btn {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 10px;
+    letter-spacing: 1px;
+    border: 1px solid;
+    border-radius: 3px;
+    padding: 6px 10px;
+    cursor: pointer;
+    text-transform: uppercase;
+    background: transparent;
+    transition: all 0.15s;
+    width: 100%;
+    margin-bottom: 4px;
+  }
+
+  .btn-start {
+    border-color: var(--accent3);
+    color: var(--accent3);
+  }
+  .btn-start:hover { background: var(--accent3); color: #000; }
+
+  .btn-stop {
+    border-color: var(--warn);
+    color: var(--warn);
+  }
+  .btn-stop:hover { background: var(--warn); color: #000; }
+
+  .btn-reset {
+    border-color: var(--danger);
+    color: var(--danger);
+  }
+  .btn-reset:hover { background: var(--danger); color: #fff; }
+
+  /* Thruster angle display */
+  .angle-display {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 4px;
+  }
+
+  .angle-dial {
+    width: 36px; height: 36px;
+    border: 2px solid var(--accent2);
+    border-radius: 50%;
+    position: relative;
+    flex-shrink: 0;
+  }
+
+  .angle-needle {
+    position: absolute;
+    width: 2px;
+    height: 14px;
+    background: var(--accent2);
+    left: 50%;
+    bottom: 50%;
+    transform-origin: bottom center;
+    transform: translateX(-50%) rotate(0deg);
+    border-radius: 2px;
+  }
+
+  .fuel-bar-wrap {
+    margin-bottom: 6px;
+  }
+
+  .fuel-bar-bg {
+    width: 100%;
+    height: 8px;
+    background: var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .fuel-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--danger), var(--warn), var(--accent3));
+    border-radius: 4px;
+    transition: width 0.1s;
+  }
+
+  .input-num {
+    background: rgba(0,20,40,0.8);
+    border: 1px solid var(--border);
+    color: var(--accent);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    padding: 3px 6px;
+    border-radius: 3px;
+    width: 100%;
+  }
+
+  .time-display {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 18px;
+    color: var(--accent);
+    text-align: center;
+    letter-spacing: 3px;
+    padding: 4px 0;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .force-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    font-size: 9px;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+  }
+
+  .legend-dot {
+    width: 8px; height: 3px;
+    border-radius: 1px;
+  }
+
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 10px;
+    margin-bottom: 4px;
+  }
+
+  .toggle {
+    width: 28px; height: 14px;
+    background: var(--border);
+    border-radius: 7px;
+    position: relative;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+
+  .toggle.on { background: var(--accent); }
+
+  .toggle::after {
+    content: '';
+    position: absolute;
+    width: 10px; height: 10px;
+    background: #fff;
+    border-radius: 50%;
+    top: 2px; left: 2px;
+    transition: left 0.2s;
+  }
+
+  .toggle.on::after { left: 16px; }
+
+  .section-title.orange { color: var(--accent2); }
+  .section-title.green { color: var(--accent3); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🚀 Rocket Sim 2D</h1>
+  <div class="status-bar">
+    <div class="status-indicator">
+      <div class="dot" id="statusDot"></div>
+      <span id="statusText">STOPPED</span>
+    </div>
+    <div class="time-display" id="timeDisplay">T+00:00.0</div>
+  </div>
+</header>
+
+<div class="main-layout">
+
+  <!-- LEFT PANEL: Controls -->
+  <div class="left-panel">
+
+    <div class="panel-section">
+      <div class="section-title">Simulation</div>
+      <button class="btn btn-start" id="btnStart" onclick="startSim()">▶ START</button>
+      <button class="btn btn-stop" id="btnStop" onclick="stopSim()">⏸ STOP</button>
+      <button class="btn btn-reset" onclick="resetSim()">↺ RESET</button>
+      <button class="btn" id="btnTest" onclick="activateTestMode()"
+        style="border-color:#cc44ff;color:#cc44ff;margin-top:4px;">
+        🎯 LANDING TEST
+      </button>
+      <button class="btn" onclick="loadPreset()"
+        style="border-color:#ffaa00;color:#ffaa00;margin-top:4px;">
+        🧪 PRESET TEST
+      </button>
+      <button class="btn" onclick="showHLPanel()"
+        style="border-color:#00ffcc;color:#00ffcc;margin-top:4px;">
+        🚀 HOVER→LAND
+      </button>
+    </div>
+
+    <div class="panel-section" id="hlConfigPanel" style="display:none; border-color:#00ffcc;">
+      <div class="section-title" style="color:#00ffcc;">Hover → Land Config</div>
+      <div class="ctrl-row">
+        <div class="ctrl-label">Total Time T (s)</div>
+        <input type="number" min="5" max="120" step="1" value="20" id="sl_hl_T" class="input-num">
+      </div>
+      <div style="font-size:9px;color:#00ffcc;margin:6px 0 3px;border-top:1px solid #0a2840;padding-top:4px;">Z values (dist to target)</div>
+      <div class="ctrl-row">
+        <div class="ctrl-label">Z_X horiz dist (m)</div>
+        <input type="number" min="0" step="10" value="200" id="sl_hl_ZX" class="input-num">
+      </div>
+      <div class="ctrl-row">
+        <div class="ctrl-label">Z_Y vert dist (m)</div>
+        <input type="number" min="0" step="10" value="200" id="sl_hl_ZY" class="input-num">
+      </div>
+      <div style="font-size:9px;color:#00ffcc;margin:6px 0 3px;border-top:1px solid #0a2840;padding-top:4px;">Land Target (absolute)</div>
+      <div class="ctrl-row">
+        <div class="ctrl-label">Target X (m)</div>
+        <input type="number" step="10" value="100" id="hl_targetX_inp" class="input-num">
+      </div>
+      <div class="ctrl-row">
+        <div class="ctrl-label">Target Y (m)</div>
+        <input type="number" step="1" value="0" id="hl_targetY_inp" class="input-num">
+      </div>
+      <div style="font-size:9px;color:var(--dim);margin-top:4px;">
+        θ₀ = 0° (upright) · Z_θ = 0.001 rad (fixed)
+      </div>
+      <button class="btn" onclick="loadHLPreset()"
+        style="border-color:#00ffcc;color:#00ffcc;margin-top:6px;">① LOAD PRESET</button>
+      <button class="btn" id="btnHL2" onclick="hlBtn2Click()"
+        style="border-color:#00ff88;color:#00ff88;margin-top:2px;">② HOVER (then land)</button>
+      <div id="hlStatus" style="font-size:9px;color:var(--dim);margin-top:4px;">Not loaded</div>
+    </div>
+
+    <div class="panel-section">
+      <div class="section-title">Initial Config</div>
+      <div class="ctrl-row">
+        <div class="ctrl-label">Dry Mass (kg) <span id="lbl_mass">5000</span></div>
+        <input type="range" min="500" max="20000" value="5000" id="sl_mass" oninput="updateInitConfig()">
+      </div>
+      <div class="ctrl-row">
+        <div class="ctrl-label">Fuel Mass (kg) <span id="lbl_fuel">3000</span></div>
+        <input type="range" min="100" max="15000" value="3000" id="sl_fuel" oninput="updateInitConfig()">
+      </div>
+      <div class="ctrl-row">
+        <div class="ctrl-label">Rocket Height (m) <span id="lbl_rh">20</span></div>
+        <input type="range" min="5" max="60" value="20" id="sl_rh" oninput="updateInitConfig()">
+      </div>
+      <div class="ctrl-row">
+        <div class="ctrl-label">Rocket Width (m) <span id="lbl_rw">4</span></div>
+        <input type="range" min="1" max="12" value="4" id="sl_rw" oninput="updateInitConfig()">
+      </div>
+      <div class="ctrl-row">
+        <div class="ctrl-label">Init Angle (°) <span id="lbl_ang">0</span></div>
+        <input type="range" min="-45" max="45" value="0" id="sl_ang" oninput="updateInitConfig()">
+      </div>
+      <div class="ctrl-row">
+        <div class="ctrl-label">Gravity (m/s²) <span id="lbl_grav">9.81</span></div>
+        <input type="range" min="0" max="25" step="0.1" value="9.81" id="sl_grav" oninput="updateInitConfig()">
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <div class="section-title">Display</div>
+      <div class="toggle-row">
+        <span>Trajectory</span>
+        <div class="toggle on" id="tog_traj" onclick="toggleOpt('traj')"></div>
+      </div>
+      <div class="toggle-row">
+        <span>Forces</span>
+        <div class="toggle on" id="tog_forces" onclick="toggleOpt('forces')"></div>
+      </div>
+      <div class="toggle-row">
+        <span>CoM Marker</span>
+        <div class="toggle on" id="tog_com" onclick="toggleOpt('com')"></div>
+      </div>
+      <div class="toggle-row">
+        <span>Impact Point</span>
+        <div class="toggle on" id="tog_impact" onclick="toggleOpt('impact')"></div>
+      </div>
+      <div class="toggle-row">
+        <span>Velocity Vec</span>
+        <div class="toggle on" id="tog_vel" onclick="toggleOpt('vel')"></div>
+      </div>
+      <div class="toggle-row">
+        <span>Grid</span>
+        <div class="toggle on" id="tog_grid" onclick="toggleOpt('grid')"></div>
+      </div>
+      <div class="toggle-row">
+        <span>Drag Force</span>
+        <div class="toggle" id="tog_drag" onclick="toggleOpt('drag')"></div>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <div class="section-title">Force Legend</div>
+      <div class="force-legend">
+        <div class="legend-item"><div class="legend-dot" style="background:#ff2244"></div><span>Gravity</span></div>
+        <div class="legend-item"><div class="legend-dot" style="background:#ff6b00"></div><span>Thrust</span></div>
+        <div class="legend-item"><div class="legend-dot" style="background:#00d4ff"></div><span>Drag</span></div>
+        <div class="legend-item"><div class="legend-dot" style="background:#00ff88"></div><span>Net Force</span></div>
+        <div class="legend-item"><div class="legend-dot" style="background:#ffcc00"></div><span>Velocity</span></div>
+        <div class="legend-item"><div class="legend-dot" style="background:#cc44ff"></div><span>CoM</span></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- CANVAS -->
+  <div class="canvas-area" id="canvasArea">
+    <canvas id="sim"></canvas>
+  </div>
+
+  <!-- RIGHT PANEL: Thruster controls + Data -->
+  <div class="right-panel">
+
+    <div class="panel-section">
+      <div class="section-title orange">Main Thruster (Centre)</div>
+      <div class="ctrl-row">
+        <div class="ctrl-label">Thrust Force (N) <span id="lbl_mt" style="color:var(--accent2)">0</span></div>
+        <input type="range" class="orange" min="0" max="300000" step="1000" value="0" id="sl_mt" oninput="updateThrusters()">
+      </div>
+      <div class="ctrl-row">
+        <div class="ctrl-label">Gimbal Angle (°) <span id="lbl_gimbal" style="color:var(--accent2)">0</span></div>
+        <input type="range" class="orange" min="-90" max="90" step="0.5" value="0" id="sl_gimbal" oninput="updateThrusters()">
+      </div>
+      <div class="angle-display">
+        <div class="angle-dial">
+          <div class="angle-needle" id="gimbalNeedle"></div>
+        </div>
+        <div style="font-size:9px; color:var(--dim)">Gimbal<br>Direction</div>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <div class="section-title green">Side Thrusters (L+R)</div>
+      <div class="ctrl-row">
+        <div class="ctrl-label">Combined Thrust (N) <span id="lbl_st" style="color:var(--accent3)">0</span></div>
+        <input type="range" class="green" min="0" max="100000" step="500" value="0" id="sl_st" oninput="updateThrusters()">
+      </div>
+      <div style="font-size:9px; color:var(--dim); margin-top:4px;">Side thrusters: fixed upward only.<br>Each gets half of combined thrust.</div>
+    </div>
+
+    <div class="panel-section">
+      <div class="section-title">Fuel Status</div>
+      <div class="data-row"><span class="key">Total Fuel</span><span class="val" id="d_fuelTotal">3000.0 kg</span></div>
+      <div class="data-row"><span class="key">Remaining</span><span class="val" id="d_fuelRem">3000.0 kg</span></div>
+      <div class="fuel-bar-wrap">
+        <div class="fuel-bar-bg"><div class="fuel-bar-fill" id="fuelBar" style="width:100%"></div></div>
+      </div>
+      <div class="data-row"><span class="key">ṁ main (kg/s)</span><span class="val" id="d_mdotMain">0.000</span></div>
+      <div class="data-row"><span class="key">ṁ side (kg/s)</span><span class="val" id="d_mdotSide">0.000</span></div>
+      <div class="data-row"><span class="key">ṁ total (kg/s)</span><span class="val" id="d_mdotTotal">0.000</span></div>
+      <div class="data-row"><span class="key">Ve main (m/s)</span><span class="val" id="d_veMain">3000</span></div>
+      <div class="data-row"><span class="key">Ve side (m/s)</span><span class="val" id="d_veSide">2800</span></div>
+      <div class="data-row"><span class="key">r main (kg/s)</span><span class="val" id="d_rMain">0.000</span></div>
+      <div class="data-row"><span class="key">r side (kg/s)</span><span class="val" id="d_rSide">0.000</span></div>
+    </div>
+
+    <div class="panel-section">
+      <div class="section-title">Kinematics</div>
+      <div class="data-row"><span class="key">X (m)</span><span class="val" id="d_x">0.0</span></div>
+      <div class="data-row"><span class="key">Y (m)</span><span class="val" id="d_y">0.0</span></div>
+      <div class="data-row"><span class="key">Vx (m/s)</span><span class="val" id="d_vx">0.0</span></div>
+      <div class="data-row"><span class="key">Vy (m/s)</span><span class="val" id="d_vy">0.0</span></div>
+      <div class="data-row"><span class="key">|V| (m/s)</span><span class="val" id="d_vmod">0.0</span></div>
+      <div class="data-row"><span class="key">Ax (m/s²)</span><span class="val" id="d_ax">0.0</span></div>
+      <div class="data-row"><span class="key">Ay (m/s²)</span><span class="val" id="d_ay">0.0</span></div>
+      <div class="data-row"><span class="key">θ (°)</span><span class="val" id="d_theta">0.0</span></div>
+      <div class="data-row"><span class="key">ω (°/s)</span><span class="val" id="d_omega">0.0</span></div>
+      <div class="data-row"><span class="key">α (°/s²)</span><span class="val" id="d_alpha">0.0</span></div>
+    </div>
+
+    <div class="panel-section">
+      <div class="section-title">Forces & Torques</div>
+      <div class="data-row"><span class="key">F_gravity (N)</span><span class="val" id="d_fg">0.0</span></div>
+      <div class="data-row"><span class="key">F_thrust (N)</span><span class="val" id="d_ft">0.0</span></div>
+      <div class="data-row"><span class="key">F_drag (N)</span><span class="val" id="d_fd">0.0</span></div>
+      <div class="data-row"><span class="key">F_net_x (N)</span><span class="val" id="d_fnx">0.0</span></div>
+      <div class="data-row"><span class="key">F_net_y (N)</span><span class="val" id="d_fny">0.0</span></div>
+      <div class="data-row"><span class="key">τ_main (N·m)</span><span class="val" id="d_tm">0.0</span></div>
+      <div class="data-row"><span class="key">τ_side_L (N·m)</span><span class="val" id="d_tsl">0.0</span></div>
+      <div class="data-row"><span class="key">τ_side_R (N·m)</span><span class="val" id="d_tsr">0.0</span></div>
+      <div class="data-row"><span class="key">τ_net (N·m)</span><span class="val" id="d_tn">0.0</span></div>
+      <div class="data-row"><span class="key">Mass (kg)</span><span class="val" id="d_mass">8000.0</span></div>
+      <div class="data-row"><span class="key">CoM height (m)</span><span class="val" id="d_com">10.0</span></div>
+      <div class="data-row"><span class="key">Inertia (kg·m²)</span><span class="val" id="d_inertia">0.0</span></div>
+    </div>
+
+    <div class="panel-section">
+      <div class="section-title">Trajectory</div>
+      <div class="data-row"><span class="key">Alt (m)</span><span class="val" id="d_alt">0.0</span></div>
+      <div class="data-row"><span class="key">Range (m)</span><span class="val" id="d_range">0.0</span></div>
+      <div class="data-row"><span class="key">Impact X (m)</span><span class="val" id="d_impactX">—</span></div>
+      <div class="data-row"><span class="key">Max Alt (m)</span><span class="val" id="d_maxAlt">0.0</span></div>
+      <div class="data-row"><span class="key">Time (s)</span><span class="val" id="d_time">0.0</span></div>
+    </div>
+
+    <div class="panel-section" id="testPanel" style="border-color:#cc44ff;">
+      <div class="section-title" style="color:#cc44ff;">🎯 Landing Test</div>
+      <div style="font-size:9px;color:var(--dim);margin-bottom:6px;" id="testStatus">
+        Inactive — activate when vy &lt; 0
+      </div>
+      <div class="data-row"><span class="key">T (s)</span><span class="val" id="td_T">—</span></div>
+      <div class="data-row"><span class="key">t elapsed (s)</span><span class="val" id="td_t">—</span></div>
+      <div class="data-row"><span class="key">t remaining (s)</span><span class="val" id="td_tr">—</span></div>
+      <div class="data-row"><span class="key">s=(g·T−vy)/Ve</span><span class="val" id="td_s">—</span></div>
+      <div class="data-row"><span class="key">K fuel (kg)</span><span class="val" id="td_K">—</span></div>
+      <div class="data-row"><span class="key">a coeff r(t)</span><span class="val" id="td_a">—</span></div>
+      <div class="data-row"><span class="key">b coeff r(t)</span><span class="val" id="td_b">—</span></div>
+      <div class="data-row"><span class="key">F(t) now (N)</span><span class="val" id="td_F">—</span></div>
+      <div class="data-row"><span class="key">F hover (N)</span><span class="val" id="td_Ff">—</span></div>
+      <div class="data-row"><span class="key">F_x (N)</span><span class="val" id="td_Fx">—</span></div>
+      <div class="data-row"><span class="key">F_y (N)</span><span class="val" id="td_Fy">—</span></div>
+      <div style="font-size:9px;color:#cc44ff;margin:4px 0 2px;">— Rotational EQ —</div>
+      <div class="data-row"><span class="key">RE active</span><span class="val" id="td_re_active">—</span></div>
+      <div class="data-row"><span class="key">RE t_local (s)</span><span class="val" id="td_re_t">—</span></div>
+      <div class="data-row"><span class="key">RE Tr (s)</span><span class="val" id="td_re_Tr">—</span></div>
+      <div class="data-row"><span class="key">RE e coeff</span><span class="val" id="td_re_e">—</span></div>
+      <div class="data-row"><span class="key">RE f coeff</span><span class="val" id="td_re_f">—</span></div>
+      <div class="data-row"><span class="key">RE calls</span><span class="val" id="td_re_calls">0</span></div>
+    </div>
+
+    <!-- HOVER→LAND LIVE DATA -->
+    <div class="panel-section" id="hlDataPanel" style="display:none; border-color:#00ffcc;">
+      <div class="section-title" style="color:#00ffcc;">🚀 H→L Live Data</div>
+      <div style="font-size:9px;color:var(--dim);margin-bottom:4px;" id="hlLiveStatus">Inactive</div>
+      <div class="data-row"><span class="key">t / T (s)</span><span class="val" id="hl_t">—</span></div>
+      <div class="data-row"><span class="key">S (rad)</span><span class="val" id="hl_S">—</span></div>
+      <div style="font-size:9px;color:#00ffcc;margin:3px 0 1px;">— Translational X —</div>
+      <div class="data-row"><span class="key">aX (m/s²)</span><span class="val" id="hl_aX">—</span></div>
+      <div class="data-row"><span class="key">vX (m/s)</span><span class="val" id="hl_vX">—</span></div>
+      <div class="data-row"><span class="key">dX (m)</span><span class="val" id="hl_dX">—</span></div>
+      <div class="data-row"><span class="key">Fx_world (N)</span><span class="val" id="hl_Fxw">—</span></div>
+      <div style="font-size:9px;color:#00ffcc;margin:3px 0 1px;">— Vertical Y —</div>
+      <div class="data-row"><span class="key">aY (m/s²)</span><span class="val" id="hl_aY">—</span></div>
+      <div class="data-row"><span class="key">vY (m/s)</span><span class="val" id="hl_vY">—</span></div>
+      <div class="data-row"><span class="key">dY (m)</span><span class="val" id="hl_dY">—</span></div>
+      <div class="data-row"><span class="key">Fy_world (N)</span><span class="val" id="hl_Fyw">—</span></div>
+      <div style="font-size:9px;color:#00ffcc;margin:3px 0 1px;">— Rotational —</div>
+      <div class="data-row"><span class="key">alpha (°/s²)</span><span class="val" id="hl_alph">—</span></div>
+      <div class="data-row"><span class="key">omega (°/s)</span><span class="val" id="hl_omeg">—</span></div>
+      <div class="data-row"><span class="key">theta (°)</span><span class="val" id="hl_thet">—</span></div>
+      <div class="data-row"><span class="key">Fx_rocket (N)</span><span class="val" id="hl_Fxr">—</span></div>
+      <div style="font-size:9px;color:#00ffcc;margin:3px 0 1px;">— Thrust Output —</div>
+      <div class="data-row"><span class="key">Fy_rocket (N)</span><span class="val" id="hl_Fyr">—</span></div>
+      <div class="data-row"><span class="key">Thrust Mag (N)</span><span class="val" id="hl_Tmag">—</span></div>
+      <div class="data-row"><span class="key">Gimbal (°)</span><span class="val" id="hl_gimb">—</span></div>
+      <div class="data-row"><span class="key">X err (m)</span><span class="val" id="hl_Xerr">—</span></div>
+      <div class="data-row"><span class="key">Y err (m)</span><span class="val" id="hl_Yerr">—</span></div>
+
+      <!-- COMPARISON: Formula vs Actual -->
+      <div style="font-size:9px;color:#ffcc00;margin:6px 0 2px;border-top:1px solid #0a2840;padding-top:4px;">— Formula vs Actual (X) —</div>
+      <div class="data-row"><span class="key" style="color:#00ffcc;">aX formula</span><span class="val" id="cmp_aX_f">—</span></div>
+      <div class="data-row"><span class="key" style="color:#ffcc00;">aX actual</span><span class="val" id="cmp_aX_r">—</span></div>
+      <div class="data-row"><span class="key" style="color:#ff6b00;">aX diff</span><span class="val" id="cmp_aX_d">—</span></div>
+      <div class="data-row"><span class="key" style="color:#00ffcc;">vX formula</span><span class="val" id="cmp_vX_f">—</span></div>
+      <div class="data-row"><span class="key" style="color:#ffcc00;">vX actual</span><span class="val" id="cmp_vX_r">—</span></div>
+      <div class="data-row"><span class="key" style="color:#ff6b00;">vX diff</span><span class="val" id="cmp_vX_d">—</span></div>
+      <div class="data-row"><span class="key" style="color:#00ffcc;">X formula (rel)</span><span class="val" id="cmp_X_f">—</span></div>
+      <div class="data-row"><span class="key" style="color:#ffcc00;">X actual (rel)</span><span class="val" id="cmp_X_r">—</span></div>
+      <div class="data-row"><span class="key" style="color:#ff6b00;">X diff</span><span class="val" id="cmp_X_d">—</span></div>
+
+      <div style="font-size:9px;color:#ffcc00;margin:6px 0 2px;border-top:1px solid #0a2840;padding-top:4px;">— Formula vs Actual (Y) —</div>
+      <div class="data-row"><span class="key" style="color:#00ffcc;">aY formula</span><span class="val" id="cmp_aY_f">—</span></div>
+      <div class="data-row"><span class="key" style="color:#ffcc00;">aY actual</span><span class="val" id="cmp_aY_r">—</span></div>
+      <div class="data-row"><span class="key" style="color:#ff6b00;">aY diff</span><span class="val" id="cmp_aY_d">—</span></div>
+      <div class="data-row"><span class="key" style="color:#00ffcc;">vY formula</span><span class="val" id="cmp_vY_f">—</span></div>
+      <div class="data-row"><span class="key" style="color:#ffcc00;">vY actual</span><span class="val" id="cmp_vY_r">—</span></div>
+      <div class="data-row"><span class="key" style="color:#ff6b00;">vY diff</span><span class="val" id="cmp_vY_d">—</span></div>
+      <div class="data-row"><span class="key" style="color:#00ffcc;">Y formula (rel)</span><span class="val" id="cmp_Y_f">—</span></div>
+      <div class="data-row"><span class="key" style="color:#ffcc00;">Y actual (rel)</span><span class="val" id="cmp_Y_r">—</span></div>
+      <div class="data-row"><span class="key" style="color:#ff6b00;">Y diff</span><span class="val" id="cmp_Y_d">—</span></div>
+
+      <div style="font-size:9px;color:#ffcc00;margin:6px 0 2px;border-top:1px solid #0a2840;padding-top:4px;">— Formula vs Actual (θ rotation) —</div>
+      <div class="data-row"><span class="key" style="color:#00ffcc;">α formula (°/s²)</span><span class="val" id="cmp_al_f">—</span></div>
+      <div class="data-row"><span class="key" style="color:#ffcc00;">α actual (°/s²)</span><span class="val" id="cmp_al_r">—</span></div>
+      <div class="data-row"><span class="key" style="color:#ff6b00;">α diff</span><span class="val" id="cmp_al_d">—</span></div>
+      <div class="data-row"><span class="key" style="color:#00ffcc;">ω formula (°/s)</span><span class="val" id="cmp_om_f">—</span></div>
+      <div class="data-row"><span class="key" style="color:#ffcc00;">ω actual (°/s)</span><span class="val" id="cmp_om_r">—</span></div>
+      <div class="data-row"><span class="key" style="color:#ff6b00;">ω diff</span><span class="val" id="cmp_om_d">—</span></div>
+      <div class="data-row"><span class="key" style="color:#00ffcc;">θ formula (°)</span><span class="val" id="cmp_th_f">—</span></div>
+      <div class="data-row"><span class="key" style="color:#ffcc00;">θ actual (°)</span><span class="val" id="cmp_th_r">—</span></div>
+      <div class="data-row"><span class="key" style="color:#ff6b00;">θ diff</span><span class="val" id="cmp_th_d">—</span></div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ===================== PHYSICS CONSTANTS =====================
+const Ve_MAIN = 3000;  // exhaust velocity main thruster (m/s) - constant
+const Ve_SIDE = 2800;  // exhaust velocity side thrusters (m/s) - constant
+const Cd = 0.4;        // drag coefficient
+const RHO_AIR = 1.225; // air density (kg/m³)
+const SCALE_PIX_PER_M = 2; // pixels per meter
+
+// ===================== STATE =====================
+let state = {};
+let running = false;
+let animId = null;
+let lastTime = null;
+let simTime = 0;
+let maxAlt = 0;
+let trajectory = [];
+let opts = { traj: true, forces: true, com: true, impact: true, vel: true, grid: true, drag: false };
+
+// ===================== TEST MODE (Landing Controller) =====================
+let testMode = {
+  active: false,
+  T: 0,          // total time to impact at activation instant
+  t: 0,          // elapsed time since activation
+  M: 0,          // total mass at activation instant
+  s: 0,          // v/u = vy / Ve_MAIN at activation
+  K: 0,          // fuel to burn = M*(1 - e^s)
+  a: 0,          // parabolic thrust coeff (t²)
+  b: 0,          // parabolic thrust coeff (t)
+  F_final: 0,    // thrust magnitude locked after t >= T
+  Fx: 0,         // X-component of thrust force (N)
+  Fy: 0,         // Y-component of thrust force (N)
+  locked: false, // true once t >= T
+
+  // ---- Rotational Equilibrium (RE) sub-controller ----
+  re: {
+    active:  false,
+    t:       0,
+    Tr:      0,
+    e:       0,   // cubic alpha coeff  (t³ term)
+    f:       0,   // quadratic alpha coeff (t² term)
+    g:       0,   // linear alpha coeff (t  term)
+    rC:      0,
+    callCount: 0,
+  },
+};
+
+// ===================== HOVER→LAND MODE =====================
+// Formula set (same structure for X, Y, theta):
+//   S(t)  = π*t / (2*T)
+//   A(t)  = K * sin(S)                           ← acceleration
+//   B(t)  = (2*K*T/π) * (1 - cos(S))            ← velocity
+//   C(t)  = (2*K*T/π) * (t - (2*T/π)*sin(S))    ← displacement
+//   K     = π*Z / (8*T²)                         ← amplitude constant
+//
+// For X:  Z = initial horizontal dist to target, A=accelX, Fx_world = M*A
+// For Y:  Z = initial vertical dist to target,   A=accelY, Fy_world = M*A
+// For θ:  Z = theta0 (rad),                      A=alpha,  Fx_rocket = I*A/rc
+
+let hl = {
+  active: false,
+  T: 0,          // total landing time (user input)
+  T_q: 0,        // T/4 — formula quarter-period parameter
+  t: 0,          // elapsed since activation
+  // Z values
+  Z_X: 0,        // horizontal dist to target
+  Z_Y: 0,        // vertical dist to target (height, original)
+  Z_Y_corr: 0,   // Z_Y + 8*g*T_q²  — gravity-compensated Z for formula
+  Z_th: 0,       // initial theta (radians)
+  // K constants (computed once)
+  K_X: 0, K_Y: 0, K_th: 0,
+  // Target positions
+  targetX: 0, targetY: 0,
+  // Live display values
+  _S: 0,
+  _aX: 0, _vX: 0, _dX: 0,
+  _aY: 0, _vY: 0, _dY: 0,
+  _alpha: 0, _omega: 0, _theta_disp: 0,
+  _Fxw: 0, _Fyw: 0, _Fxr: 0, _Fyr: 0,
+  _Tmag: 0, _gimbal: 0,
+};
+
+function hlFormula(t, T, Z) {
+  // Returns {A, B, C} for given t, T, Z
+  const K  = Math.PI * Z / (8 * T * T);
+  const S  = Math.PI * t / (2 * T);
+  const A  = K * Math.sin(S);
+  const B  = (2 * K * T / Math.PI) * (1 - Math.cos(S));
+  const C  = (2 * K * T / Math.PI) * (t - (2 * T / Math.PI) * Math.sin(S));
+  return { K, S, A, B, C };
+}
+
+function showHLPanel() {
+  const p = document.getElementById('hlConfigPanel');
+  p.style.display = p.style.display === 'none' ? 'block' : 'none';
+}
+
+function loadHLPreset() {
+  resetSim();
+
+  const T_total  = parseFloat(document.getElementById('sl_hl_T').value);
+  const Z_X      = parseFloat(document.getElementById('sl_hl_ZX').value);
+  const Z_Y      = parseFloat(document.getElementById('sl_hl_ZY').value);
+  const targetX  = parseFloat(document.getElementById('hl_targetX_inp').value);
+  const targetY  = parseFloat(document.getElementById('hl_targetY_inp').value);
+  const Z_th     = 0.001;
+
+  // Use current initCfg values (mass, size sliders)
+  const totalMass = initCfg.dryMass + initCfg.fuelMass;
+  const comH = computeCoM(initCfg.fuelMass, totalMass, initCfg.rocketH);
+  const I    = momentOfInertia(totalMass, initCfg.rocketH, initCfg.rocketW, comH);
+
+  // Start position derived from target and Z distances
+  const startX = targetX - Z_X;
+  const startY = targetY + Z_Y;
+
+  // Force angle slider to 0
+  document.getElementById('sl_ang').value = 0;
+  initCfg.initAngle = 0;
+  updateLabels();
+
+  state = {
+    x: startX, y: startY,
+    vx: 0, vy: 0, ax: 0, ay: 0,
+    theta: 0, omega: 0, alpha: 0,
+    mass: totalMass, dryMass: initCfg.dryMass,
+    fuelMass: initCfg.fuelMass, fuelMassInit: initCfg.fuelMass,
+    H: initCfg.rocketH, W: initCfg.rocketW,
+    gravity: initCfg.gravity,
+    comH: comH, I: I,
+    crashed: false, landed: false,
+  };
+
+  maxAlt = startY;
+  trajectory = [[startX, startY]];
+
+  const formula_T = T_total / 2;
+  hl.T       = T_total;
+  hl.T_f     = formula_T;
+  hl.Z_X     = Z_X;
+  hl.Z_Y     = Z_Y;
+  hl.Z_th    = Z_th;
+  hl.K_X     = Math.PI * Z_X  / (8 * formula_T * formula_T);
+  hl.K_Y     = Math.PI * Z_Y  / (8 * formula_T * formula_T);
+  hl.K_th    = Math.PI * Z_th / (8 * formula_T * formula_T);
+  hl.targetX = targetX;
+  hl.targetY = targetY;
+  hl.active  = false;
+  hl.hovering = false;
+  hl.t       = 0;
+  hl.startX  = 0;
+  hl.startY  = 0;
+
+  console.log("=== HOVER→LAND PRESET LOADED ===");
+  console.log(`T_total=${T_total}s  Z_X=${Z_X}m  Z_Y=${Z_Y}m`);
+  console.log(`Start: x=${startX} y=${startY}  Target: x=${targetX} y=${targetY}`);
+
+  document.getElementById('hlStatus').textContent = `Loaded. Press ② to start hover+land.`;
+  updateDataPanel(); drawFrame(); updateStatusUI('stopped');
+}
+
+function hlBtn2Click() {
+  if (!hl.active) {
+    // First press: start hover
+    activateHL();
+    document.getElementById('btnHL2').textContent = '③ BEGIN LANDING';
+    document.getElementById('btnHL2').style.borderColor = '#ffaa00';
+    document.getElementById('btnHL2').style.color = '#ffaa00';
+  } else if (hl.hovering) {
+    // Second press: transition to landing
+    beginHLLanding();
+    document.getElementById('btnHL2').textContent = '— LANDING —';
+    document.getElementById('btnHL2').style.borderColor = '#ff2244';
+    document.getElementById('btnHL2').style.color = '#ff2244';
+  }
+}
+
+function activateHL() {
+  if (hl.T <= 0) {
+    document.getElementById('hlStatus').textContent = 'ERR: Load preset first!';
+    return;
+  }
+  // Auto-start sim if not running
+  if (!running) startSim();
+
+  hl.active   = true;
+  hl.hovering = true;   // start in hover phase — engine on, balance Mg
+  hl.t        = 0;
+  document.getElementById('hlDataPanel').style.display = 'block';
+  document.getElementById('hlLiveStatus').textContent  = 'HOVERING — balancing Mg';
+  document.getElementById('hlStatus').textContent = `Hovering... press again to begin landing`;
+  console.log("=== HOVER→LAND: HOVER PHASE START ===");
+}
+
+// Call this to transition from hover → land
+function beginHLLanding() {
+  if (!hl.active || !hl.hovering) return;
+  hl.hovering = false;
+  hl.t = 0;
+  hl.startX = state.x;
+  hl.startY = state.y;
+
+  // Snap actual Z values from current position
+  hl.Z_X = hl.targetX - state.x;   // actual horizontal dist remaining
+  hl.Z_Y = state.y - hl.targetY;   // actual vertical dist remaining
+
+  // Hard-zero velocities so formula starts clean
+  state.vx = 0; state.vy = 0; state.omega = 0;
+
+  console.log(`=== HOVER→LAND: LANDING PHASE START ===`);
+  console.log(`Z_X=${hl.Z_X.toFixed(2)}m  Z_Y=${hl.Z_Y.toFixed(2)}m`);
+  document.getElementById('hlLiveStatus').textContent = 'LANDING — formula active';
+  document.getElementById('hlStatus').textContent = `Landing T=${hl.T}s → X=${hl.targetX.toFixed(0)}m`;
+}
+
+function stepHL(dt) {
+  if (!hl.active) return;
+  const s = state;
+
+  // ── HOVER PHASE: engine on, thrust = Mg, rocket stationary ──
+  if (hl.hovering) {
+    const Fy_hover = s.mass * s.gravity;  // exactly balance gravity
+    ctrl.mainThrust = Fy_hover;
+    ctrl.gimbalDeg  = 0;  // straight up, theta=0 so no gimbal needed
+    document.getElementById('sl_mt').value = Math.min(300000, ctrl.mainThrust);
+    document.getElementById('lbl_mt').textContent = ctrl.mainThrust.toFixed(0);
+    document.getElementById('sl_gimbal').value = 0;
+    document.getElementById('lbl_gimbal').textContent = '0.0';
+    document.getElementById('gimbalNeedle').style.transform = 'translateX(-50%) rotate(0deg)';
+    // Display
+    hl._Fxw = 0; hl._Fyw = Fy_hover;
+    hl._Fxr = 0; hl._Fyr = Fy_hover;
+    hl._Tmag = Fy_hover; hl._gimbal = 0;
+    hl._aX = 0; hl._vX = 0; hl._dX = 0;
+    hl._aY = 0; hl._vY = 0; hl._dY = 0;
+    hl._alpha = 0; hl._omega = 0; hl._theta_disp = 0;
+    hl._S = 0;
+    return;
+  }
+
+  // ── LANDING PHASE: formula-driven ──
+
+  if (hl.t >= hl.T) {
+    hl.active = false;
+    ctrl.mainThrust = 0; ctrl.gimbalDeg = 0;
+    document.getElementById('hlLiveStatus').textContent = '✅ LANDED';
+    document.getElementById('sl_mt').value = 0;
+    document.getElementById('lbl_mt').textContent = '0';
+    console.log(`[HL DONE] x=${state.x.toFixed(2)} y=${state.y.toFixed(2)} vx=${state.vx.toFixed(3)} vy=${state.vy.toFixed(3)}`);
+    return;
+  }
+
+  const t = hl.t;
+  const T = hl.T;    // total time
+  const g = s.gravity;
+  const M = s.mass;
+
+  // Formula completes at t = 4*T_formula, so T_formula = T/4
+  const T_f = T / 4;
+
+  // ── X axis ──
+  const fX = hlFormula(t, T_f, hl.Z_X);
+  const Fx_world = M * fX.A;
+
+  // ── Y axis ──
+  const fY = hlFormula(t, T_f, -hl.Z_Y);
+  const Fy_world = M * (fY.A + g);
+
+  // ── Core insight ──
+  // Thruster produces force in rocket frame: (Fx_rocket, Fy_rocket)
+  // These map to world frame as:
+  //   Ftx_world = Fy_rocket*sin(θ) + Fx_rocket*cos(θ)
+  //   Fty_world = Fy_rocket*cos(θ) - Fx_rocket*sin(θ)
+  //
+  // We have 2 unknowns (Fx_rocket, Fy_rocket) and 2 world constraints:
+  //   Ftx_world = Fx_world_needed
+  //   Fty_world = Fy_world_needed
+  //
+  // Solve this 2x2 system:
+  //   | sin(θ)  cos(θ) | | Fy_rocket |   | Fx_world |
+  //   | cos(θ) -sin(θ) | | Fx_rocket | = | Fy_world |
+  //
+  // Solution (det = -sin²θ - cos²θ = -1):
+  //   Fy_rocket =  Fx_world*sin(θ) + Fy_world*cos(θ)
+  //   Fx_rocket =  Fx_world*cos(θ) - Fy_world*sin(θ)
+  //
+  // NOTE: This Fx_rocket will produce a torque = Fx_rocket * comH
+  // which may differ from alpha_des torque — that's acceptable,
+  // theta=0 is maintained by the formula's tiny Z_th, not by torque override.
+
+  const sinT = Math.sin(s.theta);
+  const cosT = Math.cos(s.theta);
+
+  const Fy_rocket        =  Fx_world * sinT + Fy_world * cosT;
+  const Fx_rocket_actual =  Fx_world * cosT - Fy_world * sinT;
+
+  // Store for display
+  const fTh = hlFormula(t, T_f, hl.Z_th);
+
+  // ── Thrust magnitude & gimbal from rocket-frame components ──
+  const thrust_mag = Math.sqrt(Fx_rocket_actual * Fx_rocket_actual + Fy_rocket * Fy_rocket);
+  const gimbal_rad = Math.atan2(Fx_rocket_actual, Fy_rocket);
+
+  ctrl.mainThrust = Math.max(0, thrust_mag);
+  ctrl.gimbalDeg  = gimbal_rad * 180 / Math.PI;
+
+  // Store for RK4
+  hl._t_now = t;
+
+  document.getElementById('sl_mt').value = Math.min(300000, ctrl.mainThrust);
+  document.getElementById('lbl_mt').textContent = ctrl.mainThrust.toFixed(0);
+  document.getElementById('sl_gimbal').value = Math.max(-90, Math.min(90, ctrl.gimbalDeg));
+  document.getElementById('lbl_gimbal').textContent = ctrl.gimbalDeg.toFixed(1);
+  document.getElementById('gimbalNeedle').style.transform = `translateX(-50%) rotate(${ctrl.gimbalDeg}deg)`;
+
+  // Display
+  hl._S    = fX.S;
+  hl._aX   = fX.A;  hl._vX = fX.B;  hl._dX = fX.C;
+  hl._aY   = fY.A;  hl._vY = fY.B;  hl._dY = fY.C;
+
+  hl._alpha      = fTh.A * 180 / Math.PI;
+  hl._omega      = fTh.B * 180 / Math.PI;
+  hl._theta_disp = fTh.C * 180 / Math.PI;
+  hl._Fxw  = Fx_world;  hl._Fyw = Fy_world;
+  hl._Fxr  = Fx_rocket_actual; hl._Fyr = Fy_rocket;
+  hl._Tmag = thrust_mag; hl._gimbal = ctrl.gimbalDeg;
+
+  // Advance t AFTER forces computed
+  hl.t += dt;
+}
+
+// Thruster controls (runtime)
+let ctrl = {
+  mainThrust: 0,    // N
+  gimbalDeg: 0,     // degrees (from rocket axis)
+  sideThrust: 0,    // N (combined)
+};
+
+// Init config
+let initCfg = {
+  dryMass: 5000,
+  fuelMass: 3000,
+  rocketH: 20,
+  rocketW: 4,
+  initAngle: 0,
+  gravity: 9.81,
+};
+
+// ===================== INIT =====================
+function buildInitState() {
+  const totalMass = initCfg.dryMass + initCfg.fuelMass;
+  const H = initCfg.rocketH;
+  const W = initCfg.rocketW;
+  const theta = initCfg.initAngle * Math.PI / 180;
+
+  // CoM: fuel in lower ~60%, dry mass distributed
+  // CoM from bottom = fuelFraction * 0.4*H + 0.6*H * 0.5 (simplified)
+  const fuelFrac = initCfg.fuelMass / totalMass;
+  const comH = computeCoM(initCfg.fuelMass, totalMass, H);
+
+  // Moment of inertia about CoM (cylinder approximation)
+  const I = momentOfInertia(totalMass, H, W, comH);
+
+  const canvas = document.getElementById('sim');
+  // Start position: bottom of rocket at ground center
+  const startX = 0;
+  const startY = 0; // ground
+
+  return {
+    x: startX,
+    y: startY,
+    vx: 0, vy: 0,
+    ax: 0, ay: 0,
+    theta: theta,
+    omega: 0,
+    alpha: 0,
+    mass: totalMass,
+    dryMass: initCfg.dryMass,
+    fuelMass: initCfg.fuelMass,
+    fuelMassInit: initCfg.fuelMass,
+    H: H, W: W,
+    gravity: initCfg.gravity,
+    comH: comH,
+    I: I,
+    crashed: false,
+    landed: false,
+  };
+}
+
+function computeCoM(fuelMass, totalMass, H) {
+  // Fuel in bottom 55% of rocket, dry mass uniform
+  const dryMass = totalMass - fuelMass;
+  const fuelCom = 0.275 * H;      // center of fuel section (bottom 55%)
+  const dryCom  = 0.5 * H;        // center of dry mass (uniform)
+  return (fuelMass * fuelCom + dryMass * dryCom) / totalMass;
+}
+
+function momentOfInertia(mass, H, W, comH) {
+  // Uniform rod about CoM: I = m*(H²)/12 + parallel axis correction is zero for rod
+  // Plus width contribution: I += m*(W²)/12
+  return mass * (H * H / 12 + W * W / 12);
+}
+
+function resetSim() {
+  running = false;
+  if (animId) cancelAnimationFrame(animId);
+  animId = null;
+  lastTime = null;
+  simTime = 0;
+  maxAlt = 0;
+  trajectory = [];
+  state = buildInitState();
+  ctrl.mainThrust = 0;
+  ctrl.gimbalDeg = 0;
+  ctrl.sideThrust = 0;
+  document.getElementById('sl_mt').value = 0;
+  document.getElementById('sl_gimbal').value = 0;
+  document.getElementById('sl_st').value = 0;
+  // Reset test mode
+  testMode.active = false;
+  testMode.locked = false;
+  testMode.t = 0;
+  testMode.Fx = 0;
+  testMode.Fy = 0;
+  testMode.re.active    = false;
+  testMode.re.t         = 0;
+  testMode.re.g         = 0;
+  testMode.re.callCount = 0;
+  testMode._impactLogged = false;
+  document.getElementById('testStatus').textContent = "Inactive — activate when vy < 0";
+  document.getElementById('testStatus').style.color = '';
+  // Reset hover→land mode
+  hl.active = false;
+  hl.t = 0;
+  hl.T = 0;
+  hl.T_q = 0;
+  hl.Z_Y_corr = 0;
+  hl.hovering = false;
+  document.getElementById('hlDataPanel').style.display = 'none';
+  if (document.getElementById('hlStatus'))
+    document.getElementById('hlStatus').textContent = 'Not loaded';
+  const btnHL2 = document.getElementById('btnHL2');
+  if (btnHL2) {
+    btnHL2.textContent = '② HOVER (then land)';
+    btnHL2.style.borderColor = '#00ff88';
+    btnHL2.style.color = '#00ff88';
+  }
+  updateLabels();
+  updateStatusUI('stopped');
+  updateDataPanel();
+  drawFrame();
+}
+
+// ===================== PRESET TEST STATE =====================
+// Injects a mid-air falling rocket with drift + spin for landing test validation.
+function loadPreset() {
+  // First do a clean reset
+  resetSim();
+
+  // ── Preset parameters ──
+  const PRESET = {
+    dryMass  : 5000,   // kg
+    fuelMass : 3000,   // kg
+    rocketH  : 20,     // m
+    rocketW  : 4,      // m
+    gravity  : 9.81,   // m/s²
+    // Mid-air state
+    x        : -100,      // m  (horizontal position)
+    y        : 500,    // m  (altitude — enough time for RE + decel)
+    vx       : 15,      // m/s  (rightward drift)
+    vy       : -15,    // m/s  (falling — negative = downward)
+    theta    : -45,     // deg  (tilted CCW from vertical)
+    omega    : -0.0,    // rad/s  (CCW spin, positive)
+  };
+
+  // ── Sync initCfg sliders to preset values ──
+  initCfg.dryMass  = PRESET.dryMass;
+  initCfg.fuelMass = PRESET.fuelMass;
+  initCfg.rocketH  = PRESET.rocketH;
+  initCfg.rocketW  = PRESET.rocketW;
+  initCfg.initAngle = 0;   // buildInitState handles angle separately
+  initCfg.gravity  = PRESET.gravity;
+
+  document.getElementById('sl_mass').value = PRESET.dryMass;
+  document.getElementById('sl_fuel').value = PRESET.fuelMass;
+  document.getElementById('sl_rh').value   = PRESET.rocketH;
+  document.getElementById('sl_rw').value   = PRESET.rocketW;
+  document.getElementById('sl_ang').value  = 0;
+  document.getElementById('sl_grav').value = PRESET.gravity;
+  updateLabels();
+
+  // ── Build base state, then override kinematics ──
+  const totalMass = PRESET.dryMass + PRESET.fuelMass;
+  const comH = computeCoM(PRESET.fuelMass, totalMass, PRESET.rocketH);
+  const I    = momentOfInertia(totalMass, PRESET.rocketH, PRESET.rocketW, comH);
+
+  state = {
+    x        : PRESET.x,
+    y        : PRESET.y,
+    vx       : PRESET.vx,
+    vy       : PRESET.vy,
+    ax       : 0, ay: 0,
+    theta    : PRESET.theta * Math.PI / 180,   // radians
+    omega    : PRESET.omega,                    // rad/s
+    alpha    : 0,
+    mass     : totalMass,
+    dryMass  : PRESET.dryMass,
+    fuelMass : PRESET.fuelMass,
+    fuelMassInit: PRESET.fuelMass,
+    H        : PRESET.rocketH,
+    W        : PRESET.rocketW,
+    gravity  : PRESET.gravity,
+    comH     : comH,
+    I        : I,
+    crashed  : false,
+    landed   : false,
+  };
+
+  // Reset tracking
+  maxAlt     = PRESET.y;
+  trajectory = [[PRESET.x, PRESET.y]];
+
+  // ── Log preset values to console ──
+  console.log("=== PRESET TEST LOADED ===");
+  console.log(`  Alt    : ${PRESET.y} m`);
+  console.log(`  Vx     : ${PRESET.vx} m/s`);
+  console.log(`  Vy     : ${PRESET.vy} m/s`);
+  console.log(`  theta  : ${PRESET.theta}°`);
+  console.log(`  omega  : ${PRESET.omega} rad/s  (CCW)`);
+  console.log(`  mass   : ${totalMass} kg`);
+  console.log(`  comH   : ${comH.toFixed(3)} m`);
+  console.log(`  I      : ${I.toFixed(1)} kg·m²`);
+  console.log("Press START then LANDING TEST to begin.");
+
+  updateDataPanel();
+  drawFrame();
+  updateStatusUI('stopped');
+}
+
+function startSim() {
+  if (running) return;
+  if (state.crashed) resetSim();
+  running = true;
+  lastTime = null;
+  updateStatusUI('running');
+  animId = requestAnimationFrame(loop);
+}
+
+function stopSim() {
+  running = false;
+  if (animId) cancelAnimationFrame(animId);
+  animId = null;
+  updateStatusUI('stopped');
+}
+
+function activateTestMode() {
+  const s = state;
+
+  // Guard: only activate if rocket is moving downward (net vy < 0)
+  if (s.vy >= 0) {
+    alert("Test mode activates only when rocket is falling (vy < 0).\nWait until rocket is descending.");
+    return;
+  }
+  if (!running) {
+    alert("Simulation must be RUNNING to activate landing test.");
+    return;
+  }
+
+  // ── Step 1: T = time to impact (free-fall, no thrust) ──
+  const g   = s.gravity;
+  const H   = s.y;       // current altitude
+  const V0  = s.vy;      // vy at activation (negative, falling)
+  const M   = s.mass;
+  const Ve  = Ve_MAIN;
+
+  if (H <= 0) { alert("Cannot compute impact time."); return; }
+
+  // ── Step 2: V(t) = p·t² + V0  (q = 0 fixed) ──
+  // Two simultaneous conditions:
+  //   (A) V(T) = 0        → p·T² + V0 = 0      → p = -V0 / T²
+  //   (B) ∫₀ᵀ V dt = -H  → p·T³/3 + V0·T = -H
+  //
+  // Substitute (A) into (B):
+  //   (-V0/T²)·T³/3 + V0·T = -H
+  //   -V0·T/3 + V0·T = -H
+  //   (2/3)·V0·T = -H
+  //   T = -3H / (2·V0)          ← V0 is negative, so T is positive ✅
+  //
+  // Then: p = -V0 / T²
+  const q_c = 0;
+  const T = (-3 * H) / (2 * V0);   // V0 < 0, H > 0  → T > 0
+  if (T <= 0.1) { alert("Impact too imminent (T < 0.1s)."); return; }
+  const p_c = -V0 / (T * T);       // p > 0 (since V0 < 0)
+
+  // ── Step 3: s(t) = (V(t) + g·t) / Ve ──
+  // V(t) = p·t² + q·t + V0  substituted
+  // r(t) = M·(1 - e^(-s(t))) / t
+  // F(t) = r(t) · Ve
+
+  // t* = time when V(t) = 0  →  p·t*² + V0 = 0  →  t* = sqrt(-V0/p)
+  // After t*, thrust = M·g (hover: balance gravity, net accel = 0)
+  const t_hover = Math.sqrt(-V0 / p_c);
+
+  const VT_check   = p_c*T*T + V0;
+  const area_check = p_c*T*T*T/3 + V0*T;
+
+  testMode.active            = true;
+  testMode.locked            = false;
+  testMode.T                 = T;
+  testMode.t                 = 0;
+  testMode.M                 = M;
+  testMode.Ve                = Ve;
+  testMode.H                 = H;
+  testMode.V0                = V0;
+  testMode.p                 = p_c;
+  testMode.q                 = q_c;
+  testMode.g                 = g;
+  testMode.t_hover           = t_hover;
+  testMode.hovering          = false;
+  testMode.F_final           = 0;
+  testMode.K                 = 0;
+  testMode.s                 = 0;
+  testMode.Fx                = 0;
+  testMode.Fy                = 0;
+  testMode._fuelAtActivation = s.fuelMass;
+  testMode._impactLogged     = false;
+
+  // ── Reset RE sub-controller and fire first call ──
+  testMode.re.active    = false;
+  testMode.re.t         = 0;
+  testMode.re.g         = 0;
+  testMode.re.callCount = 0;
+  // First RE call: a=current theta(deg), b=current omega(rad/s), c=T (full time left)
+  rotationalEquilibrium(s.theta * 180 / Math.PI, s.omega, T);
+
+  console.log("=== LANDING TEST (q=0 + hover mode) ===");
+  console.log("T            : " + T.toFixed(3) + " s");
+  console.log("t* (V=0)     : " + t_hover.toFixed(3) + " s  ← hover starts here");
+  console.log("H (altitude) : " + H.toFixed(2) + " m");
+  console.log("M (Mass) : " + M.toFixed(2) + " Kg");
+  console.log("V0 (vy0)     : " + V0.toFixed(3) + " m/s");
+  console.log("p coeff      : " + p_c.toFixed(6));
+  console.log("V(t) = " + p_c.toFixed(4) + "·t² + (" + V0.toFixed(3) + ")");
+  console.log("V(T) check   : " + VT_check.toFixed(6));
+  console.log("∫V dt check  : " + area_check.toFixed(4) + "  (should be " + (-H).toFixed(4) + ")");
+
+  document.getElementById('testStatus').textContent = "ACTIVE — Decel → Hover mode";
+  document.getElementById('testStatus').style.color = '#cc44ff';
+}
+
+// ===================== ROTATIONAL EQUILIBRIUM CONTROLLER =====================
+//
+// rotationalEquilibrium(a, b, c)
+//   a = current theta in degrees   (CCW positive, simulation convention)
+//   b = current omega in rad/s     (CCW positive)
+//   c = time remaining until landing (seconds)
+//
+// Goal: design alpha(t) profile over window Tr = 0.7*c
+//       such that at t=Tr: theta = 0 AND omega = 0
+//
+// Let theta0 = initial theta (rad), omega0 = initial omega (rad/s)
+// We integrate:  omega(t) = omega0 + ∫₀ᵗ alpha dt
+//                theta(t) = theta0 + ∫₀ᵗ omega dt
+// Boundary conditions at t = Tr:
+//   omega(Tr) = 0
+//   theta(Tr) = 0
+//
+// Choose alpha(t) = e·t² + f·t   (starts at 0, ends at 0 iff f = -e·Tr)
+//
+// From f = -e·Tr:
+//   ∫₀ᵀʳ alpha dt  = e·Tr³/3 + f·Tr²/2
+//                   = e·Tr³/3 - e·Tr³/2
+//                   = -e·Tr³/6
+//   This must equal -omega0:
+//     -e·Tr³/6 = -omega0  →  e = 6·omega0 / Tr³
+//
+// Verify theta condition:
+//   ∫₀ᵀʳ omega dt = omega0·Tr + ∫₀ᵀʳ∫₀ᵗ alpha ds dt
+//                 = omega0·Tr + e·Tr⁴/12 + f·Tr³/6
+//                 = omega0·Tr + e·Tr⁴/12 - e·Tr⁴/6
+//                 = omega0·Tr - e·Tr⁴/12
+//   This must equal -theta0:
+//     omega0·Tr - e·Tr⁴/12 = -theta0
+//   → This gives e = 12(omega0·Tr + theta0) / Tr⁴
+//
+// Two conditions → two equations → we need BOTH satisfied.
+// But alpha = e·t² + f·t has only 2 free params (e, f) with the constraint f = -e·Tr.
+// So we have 1 free param (e) but 2 conditions (omega=0, theta=0).
+// → We need one more degree of freedom.
+//
+// Solution: use alpha(t) = e·t³ + f·t² + g_coeff·t  (cubic, 3 free params)
+// Boundary conditions:
+//   alpha(0)  = 0   ✅ (no constant term)
+//   alpha(Tr) = 0   → e·Tr³ + f·Tr² + g·Tr = 0  → g = -e·Tr² - f·Tr
+//   ∫ alpha dt|Tr = -omega0  (change in omega = -omega0)
+//   ∫∫ alpha dt²|Tr = -theta0  (change in theta = -theta0)
+//
+// With g = -e·Tr² - f·Tr:
+//   ∫₀ᵀʳ alpha dt = e·Tr⁴/4 + f·Tr³/3 + g·Tr²/2
+//                 = e·Tr⁴/4 + f·Tr³/3 + (-e·Tr² - f·Tr)·Tr²/2
+//                 = e·Tr⁴/4 + f·Tr³/3 - e·Tr⁴/2 - f·Tr³/2
+//                 = e·Tr⁴·(-1/4) + f·Tr³·(-1/6)
+//   Set = -omega0:
+//     -e·Tr⁴/4 - f·Tr³/6 = -omega0   ... (I)
+//
+//   ∫₀ᵀʳ∫₀ᵗ alpha ds dt = e·Tr⁵/20 + f·Tr⁴/12 + g·Tr³/6
+//                        = e·Tr⁵/20 + f·Tr⁴/12 + (-e·Tr²-f·Tr)·Tr³/6
+//                        = e·Tr⁵/20 + f·Tr⁴/12 - e·Tr⁵/6 - f·Tr⁴/6
+//                        = e·Tr⁵·(1/20 - 1/6) + f·Tr⁴·(1/12 - 1/6)
+//                        = e·Tr⁵·(-7/60) + f·Tr⁴·(-1/12)
+//   Set = -theta0:
+//     -7e·Tr⁵/60 - f·Tr⁴/12 = -theta0   ... (II)
+//
+// Solve (I) and (II) for e and f:
+//   From (I):  f = (6/Tr³)·(omega0 - e·Tr⁴/4) / (-1/... let me use matrix
+//
+//   (I):   (-Tr⁴/4)·e  + (-Tr³/6)·f  = -omega0
+//   (II):  (-7Tr⁵/60)·e + (-Tr⁴/12)·f = -theta0
+//
+//   Multiply (I) by Tr/3:   (-Tr⁵/12)·e + (-Tr⁴/18)·f = -omega0·Tr/3
+//   Multiply (II) by 6/5:   (-7Tr⁵/50)·e + (-Tr⁴/10)·f = -6·theta0/5  ← messy
+//
+// Let's use substitution. From (I):
+//   f = [ -omega0 + e·Tr⁴/4 ] · (-6/Tr³)
+//     = 6·omega0/Tr³ - 3e·Tr/2
+//
+// Substitute into (II):
+//   -7e·Tr⁵/60 - (Tr⁴/12)·(6·omega0/Tr³ - 3e·Tr/2) = -theta0
+//   -7e·Tr⁵/60 - Tr·omega0/2 + e·Tr⁵/8 = -theta0
+//   e·Tr⁵·(-7/60 + 1/8) = -theta0 + Tr·omega0/2
+//   e·Tr⁵·(-14/120 + 15/120) = -theta0 + Tr·omega0/2
+//   e·Tr⁵·(1/120) = -theta0 + Tr·omega0/2
+//   e = 120·(-theta0 + omega0·Tr/2) / Tr⁵
+//     = 60·(omega0·Tr - 2·theta0) / Tr⁵
+//
+//   f = 6·omega0/Tr³ - 3·Tr/2 · 60·(omega0·Tr - 2·theta0)/Tr⁵
+//     = 6·omega0/Tr³ - 90·(omega0·Tr - 2·theta0)/Tr⁴
+//     = [6·omega0·Tr - 90·omega0·Tr + 180·theta0] / Tr⁴
+//     = [-84·omega0·Tr + 180·theta0] / Tr⁴
+//     = 12·(15·theta0 - 7·omega0·Tr) / Tr⁴
+//
+//   g = -e·Tr² - f·Tr
+//
+// Torque = I·alpha  →  Fx_rocket·rC = I·alpha(t)  →  Fx_rocket = I·alpha(t)/rC
+
+function rotationalEquilibrium(a, b, c) {
+  const re = testMode.re;
+
+  if (c <= 1.0) {
+    console.log(`[RE] Skipped — time left ${c.toFixed(3)}s ≤ 1s`);
+    re.active = false;
+    return;
+  }
+
+  // theta0, omega0 in radians
+  // Normalize theta to [-π, +π] so controller always takes the SHORTEST path
+  // (e.g. 270° → -90°, meaning go CCW instead of CW the long way)
+  let theta0 = a * Math.PI / 180;
+  while (theta0 >  Math.PI) theta0 -= 2 * Math.PI;
+  while (theta0 < -Math.PI) theta0 += 2 * Math.PI;
+  const omega0 = b;                    // rad/s, CCW positive
+  const Tr     = 0.25 * c;
+
+  // Already at rest?
+  if (Math.abs(theta0) < 1e-4 && Math.abs(omega0) < 1e-4) {
+    console.log(`[RE] Already at equilibrium — skipping.`);
+    re.active = false;
+    return;
+  }
+
+  const Tr2 = Tr * Tr, Tr3 = Tr2 * Tr, Tr4 = Tr3 * Tr, Tr5 = Tr4 * Tr;
+
+  // Cubic alpha profile coefficients: alpha(t) = e·t³ + f·t² + g·t
+  const e_c = 60 * (omega0 * Tr - 2 * theta0) / Tr5;
+  const f_c = 12 * (15 * theta0 - 7 * omega0 * Tr) / Tr4;
+  const g_c = -e_c * Tr2 - f_c * Tr;
+
+  const rC = state.comH;
+
+  re.active    = true;
+  re.t         = 0;
+  re.Tr        = Tr;
+  re.e         = e_c;
+  re.f         = f_c;
+  re.g         = g_c;
+  re.rC        = rC;
+  re.callCount = (re.callCount || 0) + 1;
+
+  // Verification
+  const delta_omega = e_c*Tr4/4 + f_c*Tr3/3 + g_c*Tr2/2;
+  const delta_theta = e_c*Tr5/20 + f_c*Tr4/12 + g_c*Tr3/6;
+  console.log(`=== RE CALL #${re.callCount} ===`);
+  console.log(`  theta0 : ${(theta0*180/Math.PI).toFixed(4)}°  omega0 : ${omega0.toFixed(4)} rad/s`);
+  console.log(`  Tr     : ${Tr.toFixed(3)} s`);
+  console.log(`  e,f,g  : ${e_c.toExponential(3)}, ${f_c.toExponential(3)}, ${g_c.toExponential(3)}`);
+  console.log(`  Δomega check : ${delta_omega.toFixed(6)} (should be ${(-omega0).toFixed(6)})`);
+  console.log(`  Δtheta check : ${delta_theta.toFixed(6)} (should be ${(-theta0).toFixed(6)})`);
+  console.log(`  rC     : ${rC.toFixed(3)} m`);
+}
+
+function updateStatusUI(s) {
+  const dot = document.getElementById('statusDot');
+  const txt = document.getElementById('statusText');
+  dot.className = 'dot';
+  if (s === 'running') { dot.classList.add('active'); txt.textContent = 'RUNNING'; }
+  else if (s === 'stopped') { dot.classList.add('stopped'); txt.textContent = 'STOPPED'; }
+  else if (s === 'crashed') { dot.classList.add('crashed'); txt.textContent = 'CRASHED'; }
+}
+
+// ===================== PHYSICS STEP =====================
+function physicsStep(dt) {
+  const s = state;
+  if (s.crashed) return;
+
+  // ---- HOVER→LAND: New formula controller ----
+  if (hl.active) stepHL(dt);
+
+  // ---- TEST MODE: Tsiolkovsky F(t) + Hover after V=0 ----
+  //
+  // Phase 1 (t < t*): Decel
+  //   r(t) = M · (2p·t + g) / Ve
+  //   F(t) = r(t) · Ve = M · (2p·t + g)
+  //
+  // Phase 2 (t ≥ t*): Hover — V already ~0, thrust = weight
+  //   F(t) = state.mass · g   (live mass, taaki actual weight balance ho)
+  if (testMode.active) {
+    if (!testMode.locked) {
+      testMode.t += dt;
+
+      // ── RE sub-controller: advance local timer ──
+      const re = testMode.re;
+      if (re.active) {
+        re.t += dt;
+
+        // At end of RE window → check if equilibrium achieved, possibly re-call
+        if (re.t >= re.Tr) {
+          re.t = re.Tr;   // clamp
+          re.active = false;
+
+          const timeLeft = testMode.T - testMode.t;   // seconds left in landing
+          const thetaDeg = state.theta * 180 / Math.PI;
+          const omegaNow = state.omega;
+          const torqNow  = state._torq_net || 0;
+
+          const notEquilibrium = (
+            Math.abs(thetaDeg)  > 0.001 ||   // theta not zero
+            Math.abs(omegaNow)  > 0.001 ||   // omega not zero
+            Math.abs(torqNow)   > 0.001       // torque not zero
+          );
+
+          console.log(`[RE #${re.callCount} END] theta=${thetaDeg.toFixed(4)}° omega=${omegaNow.toFixed(4)}rad/s torq=${torqNow.toFixed(4)}N·m | timeLeft=${timeLeft.toFixed(3)}s`);
+
+          if (notEquilibrium && timeLeft > 1.0) {
+            // Re-call with current state and remaining time
+            rotationalEquilibrium(thetaDeg, omegaNow, timeLeft);
+          } else {
+            console.log(`[RE] Done — ${timeLeft <= 1.0 ? 'time ≤ 1s, accepting' : 'equilibrium achieved ✅'}`);
+          }
+        }
+      }
+
+      // Phase check (Y-axis: decel / hover)
+      const inHover = testMode.t >= testMode.t_hover;
+      if (inHover && !testMode.hovering) {
+        testMode.hovering = true;
+        console.log(`=== HOVER MODE START === t=${testMode.t.toFixed(3)}s | vy_sim=${state.vy.toFixed(3)}m/s | alt=${state.y.toFixed(2)}m`);
+        document.getElementById('testStatus').textContent = "HOVERING — V≈0, F=Mg";
+      }
+
+      const prevHalf = Math.floor((testMode.t - dt) * 2);
+      const currHalf = Math.floor(testMode.t * 2);
+      if (currHalf > prevHalf) {
+        const t_    = testMode.t;
+        const Vt_   = testMode.p*t_*t_ + testMode.V0;
+        const inH_  = t_ >= testMode.t_hover;
+        const Ft_   = inH_
+                        ? state.mass * testMode.g
+                        : Math.max(0, testMode.M * (2*testMode.p*t_ + testMode.g));
+        const fuel_ = testMode._fuelAtActivation - state.fuelMass;
+        const mode_ = inH_ ? "HOVER" : "DECEL";
+        console.log(`[${mode_}] t=${t_.toFixed(2)}s | V(t)=${Vt_.toFixed(3)}m/s | F=${Ft_.toFixed(1)}N | vy_sim=${state.vy.toFixed(3)}m/s | alt=${state.y.toFixed(1)}m | fuel=${fuel_.toFixed(2)}kg`);
+      }
+
+      // ── Fy (Y-axis thrust magnitude) ──
+      let Fy_ctrl;
+      if (testMode.t >= testMode.T && !testMode.hovering) {
+        testMode.t       = testMode.T;
+        testMode.locked  = true;
+        ctrl.mainThrust  = 0;
+        testMode.F_final = 0;
+        Fy_ctrl = 0;
+      } else if (inHover) {
+        const Kp = 2.0, Kd = 0.5;
+        const vy_err = -state.vy;
+        const pd_correction = state.mass * (Kp * vy_err - Kd * state.ay);
+        Fy_ctrl = Math.max(0, state.mass * testMode.g + pd_correction);
+      } else {
+        // FIX 1: live state.mass use karo, frozen M_init nahi
+        // Fuel burn hoti hai → mass ghatti hai → same force se zyada accel
+        const t = testMode.t;
+        Fy_ctrl = Math.max(0, state.mass * (2*testMode.p*t + testMode.g));
+      }
+
+      // ── Fx: rotation torque + vx drift correction ──
+
+      // Rotation torque from RE cubic alpha profile
+      let Fx_rotation = 0;
+      if (re.active && re.rC > 0) {
+        const t_loc = re.t;
+        const alpha_t = re.e * t_loc*t_loc*t_loc + re.f * t_loc*t_loc + re.g * t_loc;
+        Fx_rotation = (state.I / re.rC) * alpha_t;
+      }
+
+      // X-axis drift correction (hover only)
+      // SIRF vx use karo — ax bilkul nahi, woh khud thrust ka output hai (circular loop)
+      // Fx_world = world-frame force needed to kill lateral drift
+      let Fx_world_ctrl = 0;
+      if (inHover) {
+        const Kpx = 0.8;   // gentle P-only — D term (ax) algebraic loop banata hai
+        Fx_world_ctrl = state.mass * (-Kpx * state.vx);
+        // Max ~10° tilt equivalent — near ground zyada nahi chahiye
+        const maxFx = state.mass * testMode.g * Math.tan(10 * Math.PI / 180);
+        Fx_world_ctrl = Math.max(-maxFx, Math.min(maxFx, Fx_world_ctrl));
+      }
+
+      // Fx_world_ctrl world frame mein hai, Fx_rotation rocket frame mein hai
+      // Gimbal composition mein Fx_rocket = rocket-perpendicular component chahiye
+      // World-X force ko rocket-perp mein project karo:
+      //   Fx_rocket_frame = Fx_world · cos(θ) - Fy_world · sin(θ)
+      //   lekin Fy_world contribution yahan zero (sirf X correction)
+      //   → Fx_rocket_from_world = Fx_world_ctrl · cos(s.theta)
+      const Fx_rocket = Fx_rotation + Fx_world_ctrl * Math.cos(s.theta);
+
+      // ── Compose: world-Y requirement + rocket-perp torque requirement ──
+      //
+      // The thruster sits at the bottom of the rocket.
+      // Let:
+      //   γ  = gimbal angle (from rocket axis, CCW positive)
+      //   F  = thrust magnitude
+      //
+      // Forces in WORLD frame from main thruster:
+      //   F_world_X = F · sin(θ + γ)
+      //   F_world_Y = F · cos(θ + γ)
+      //
+      // Torque about CoM:
+      //   τ = F · sin(γ) · rC        [perpendicular component in rocket frame]
+      //     = Fx_rocket · rC          [by definition of Fx_rocket]
+      //   so:  F · sin(γ) = Fx_rocket
+      //
+      // We need:  F · cos(θ + γ) = Fy_ctrl   [world-Y constraint]
+      //
+      // From torque:  γ = asin(Fx_rocket / F)
+      // Expand cos(θ+γ):
+      //   F·cos(θ)·cos(γ) - F·sin(θ)·sin(γ) = Fy_ctrl
+      //   F·cos(θ)·cos(γ) - Fx_rocket·sin(θ) = Fy_ctrl
+      //   F·cos(γ)·cos(θ) = Fy_ctrl + Fx_rocket·sin(θ)
+      //
+      // Also:  F·cos(γ) = F_along_rocket   (component along rocket axis)
+      //   F_along = (Fy_ctrl + Fx_rocket · sin(θ)) / cos(θ)
+      //
+      // Then:
+      //   F_total = sqrt(F_along² + Fx_rocket²)
+      //   γ       = atan2(Fx_rocket, F_along)     [in rocket frame]
+      //
+      // Special case θ≈90°: cos(θ)→0, rocket is horizontal → F_along blows up.
+      // Clamp: if |cos(θ)| < 0.1, use F_along = Fy_ctrl (degenerate, gimbal handles rest).
+
+      const cosTheta = Math.cos(s.theta);
+      const sinTheta = Math.sin(s.theta);
+
+      let F_along;
+      if (Math.abs(cosTheta) > 0.1) {
+        F_along = (Fy_ctrl + Fx_rocket * sinTheta) / cosTheta;
+      } else {
+        // Rocket nearly horizontal — can't solve cleanly; just use Fy_ctrl along axis
+        F_along = Fy_ctrl;
+      }
+      // F_along must be ≥ 0 (thruster can only push, not pull)
+      F_along = Math.max(0, F_along);
+
+      const thrustMag  = Math.sqrt(F_along * F_along + Fx_rocket * Fx_rocket);
+      const gimbalRad_ctrl = (F_along !== 0 || Fx_rocket !== 0)
+        ? Math.atan2(Fx_rocket, F_along)   // angle from rocket axis → CCW positive
+        : 0;
+
+      ctrl.mainThrust = thrustMag;
+      ctrl.gimbalDeg  = gimbalRad_ctrl * 180 / Math.PI;
+
+      // Update gimbal slider + needle display
+      document.getElementById('sl_gimbal').value = Math.max(-90, Math.min(90, ctrl.gimbalDeg));
+      document.getElementById('lbl_gimbal').textContent = ctrl.gimbalDeg.toFixed(1);
+      document.getElementById('gimbalNeedle').style.transform =
+        `translateX(-50%) rotate(${ctrl.gimbalDeg}deg)`;
+
+    } else {
+      ctrl.mainThrust = testMode.F_final;
+    }
+
+    // ---- Decompose mainThrust into world-frame Fx, Fy for display ----
+    // thrustAngle = theta + gimbalDeg → world frame
+    const _gimbalRad   = ctrl.gimbalDeg * Math.PI / 180;
+    const _thrustAngle = s.theta + _gimbalRad;
+    testMode.Fx = ctrl.mainThrust * Math.sin(_thrustAngle);  // world-X component
+    testMode.Fy = ctrl.mainThrust * Math.cos(_thrustAngle);  // world-Y component (≈ Fy_ctrl)
+  }
+
+  // --- Mass flow rates (r = F / Ve, from thrust equation F = r * Ve) ---
+  const mainThrust = (s.fuelMass > 0) ? ctrl.mainThrust : 0;
+  const sideThrust = (s.fuelMass > 0) ? ctrl.sideThrust : 0;
+  const sideEach   = sideThrust / 2;
+
+  const rMain = mainThrust / Ve_MAIN;   // kg/s
+  const rSide = sideThrust / Ve_SIDE;   // kg/s
+  const rTotal = rMain + rSide;
+
+  // Consume fuel
+  const dFuel = rTotal * dt;
+  s.fuelMass = Math.max(0, s.fuelMass - dFuel);
+  s.mass = s.dryMass + s.fuelMass;
+
+  // Update CoM and Inertia (dynamic)
+  s.comH = computeCoM(s.fuelMass, s.mass, s.H);
+  s.I = momentOfInertia(s.mass, s.H, s.W, s.comH);
+
+  // ---- Gimbal angle in world frame ----
+  // Main thruster is at bottom, pointing "up" along rocket axis.
+  // Gimbal rotates thrust vector by gimbalDeg relative to rocket axis.
+  const gimbalRad = ctrl.gimbalDeg * Math.PI / 180;
+  // Rocket angle: theta is CCW from vertical (Y-up world)
+  // Rocket axis direction: (sin(theta), cos(theta)) in world (upward)
+  // Thrust direction (gimbal): rotated by -gimbalRad from rocket axis
+  const thrustAngle = s.theta + gimbalRad; // angle from world vertical
+  const Ftx_main = mainThrust * Math.sin(thrustAngle);
+  const Fty_main = mainThrust * Math.cos(thrustAngle);
+
+  // Side thrusters: fixed along rocket axis (pure upthrust in rocket frame)
+  const Ftx_side = sideThrust * Math.sin(s.theta);
+  const Fty_side = sideThrust * Math.cos(s.theta);
+
+  // Total thrust force
+  const Ftx = Ftx_main + Ftx_side;
+  const Fty = Fty_main + Fty_side;
+
+  // Gravity
+  const Fg = s.mass * s.gravity;
+  const Fgx = 0, Fgy = -Fg;
+
+  // Drag (opposing velocity) — only if drag toggle is ON
+  const speed = Math.sqrt(s.vx * s.vx + s.vy * s.vy);
+  let Fdrag = 0, Fdx = 0, Fdy = 0;
+  if (opts.drag && speed > 0) {
+    const area = s.W * s.H * 0.3;
+    Fdrag = 0.5 * RHO_AIR * Cd * area * speed * speed;
+    Fdx = -Fdrag * s.vx / speed;
+    Fdy = -Fdrag * s.vy / speed;
+  }
+
+  // Net force: F_net = F_thrust + F_gravity + F_drag
+  const Fnx = Ftx + Fgx + Fdx;
+  const Fny = Fty + Fgy + Fdy;
+
+  // Linear acceleration
+  s.ax = Fnx / s.mass;
+  s.ay = Fny / s.mass;
+
+  // ---- Torques about CoM ----
+  // Main thruster at bottom of rocket (distance from CoM = comH)
+  // Torque = r × F (perpendicular component)
+  // In 2D: τ = rx * Fy - ry * Fx (where r is lever arm from CoM to force application)
+
+  // Main thruster position relative to CoM (in rocket frame, pointing down)
+  // In world frame: bottom of rocket
+  const comToMainX = -s.comH * Math.sin(s.theta); // position of thruster from CoM in world X
+  const comToMainY = -s.comH * Math.cos(s.theta);
+  const torque_main = comToMainX * Fty_main - comToMainY * Ftx_main;
+
+  // Side thrusters: Left at (-W/2, -comH), Right at (W/2, -comH) in rocket frame
+  // Convert to world frame
+  const half_w = s.W / 2;
+  const dist_down = s.comH; // from CoM to thruster position vertically (bottom)
+  // Left thruster world position relative to CoM:
+  const rLx = -half_w * Math.cos(s.theta) - dist_down * (-Math.sin(s.theta));
+  const rLy = -half_w * (-Math.sin(s.theta)) + dist_down * (-Math.cos(s.theta));
+  // Wait, let me simplify: side thruster positions in rocket frame: (±W/2, -comH)
+  // Rotation: (rx_w, ry_w) = (rx*cos(θ) - ry*sin(θ), rx*sin(θ) + ry*cos(θ))
+  // Left: rx=-W/2, ry=-comH
+  const rLx_w = (-half_w)*Math.cos(s.theta) - (-dist_down)*Math.sin(s.theta);
+  const rLy_w = (-half_w)*Math.sin(s.theta) + (-dist_down)*Math.cos(s.theta);
+  // Right: rx=+W/2, ry=-comH
+  const rRx_w = (half_w)*Math.cos(s.theta) - (-dist_down)*Math.sin(s.theta);
+  const rRy_w = (half_w)*Math.sin(s.theta) + (-dist_down)*Math.cos(s.theta);
+
+  // Side thrust force direction = along rocket axis upward
+  const FsX = sideEach * Math.sin(s.theta);
+  const FsY = sideEach * Math.cos(s.theta);
+  const torque_sideL = rLx_w * FsY - rLy_w * FsX;
+  const torque_sideR = rRx_w * FsY - rRy_w * FsX;
+  const torque_net = torque_main + torque_sideL + torque_sideR;
+
+  // Angular acceleration
+  s.alpha = (s.I > 0) ? torque_net / s.I : 0;
+
+  // ---- RK4 Integration (replaces Euler vx+=ax*dt) ----
+  // RK4: error O(dt^4) vs Euler O(dt) — ~1000x more accurate same timestep
+  // We integrate [x, y, vx, vy, theta, omega] with RK4
+
+  function derivatives(st, thrust, gimbalRad_, t_hl) {
+    const mass_ = st.mass;
+    let thrust_ = thrust;
+    let gimbalRad_use = gimbalRad_;
+
+    // HL active: recompute thrust/gimbal at t_hl using same Fx_rocket/Fy_rocket logic
+    if (hl.active && !hl.hovering && t_hl !== undefined && t_hl <= hl.T) {
+      const T_f_ = hl.T / 4;
+      const fX_ = hlFormula(t_hl, T_f_, hl.Z_X);
+      const fY_ = hlFormula(t_hl, T_f_, -hl.Z_Y);
+      const Fx_w   = mass_ * fX_.A;
+      const Fy_w   = mass_ * (fY_.A + s.gravity);
+      const sinT_  = Math.sin(st.theta);
+      const cosT_  = Math.cos(st.theta);
+      const Fy_r   = Fx_w * sinT_ + Fy_w * cosT_;
+      const Fx_r   = Fx_w * cosT_ - Fy_w * sinT_;
+      thrust_       = Math.sqrt(Fx_r * Fx_r + Fy_r * Fy_r);
+      gimbalRad_use = Math.atan2(Fx_r, Fy_r);
+    }
+    const thrustAngle_ = st.theta + gimbalRad_use;
+    const Ftx_ = thrust_ * Math.sin(thrustAngle_) + sideThrust * Math.sin(st.theta);
+    const Fty_ = thrust_ * Math.cos(thrustAngle_) + sideThrust * Math.cos(st.theta);
+    const Fg_  = mass_ * s.gravity;
+    const spd_ = Math.sqrt(st.vx*st.vx + st.vy*st.vy);
+    let Fdx_ = 0, Fdy_ = 0;
+    if (opts.drag && spd_ > 0) {
+      const area_ = s.W * s.H * 0.3;
+      const Fd_ = 0.5 * RHO_AIR * Cd * area_ * spd_ * spd_;
+      Fdx_ = -Fd_ * st.vx / spd_;
+      Fdy_ = -Fd_ * st.vy / spd_;
+    }
+    const ax_ = (Ftx_ + Fdx_) / mass_;
+    const ay_ = (Fty_ - Fg_ + Fdy_) / mass_;
+
+    // Torque
+    const comToMx = -s.comH * Math.sin(st.theta);
+    const comToMy = -s.comH * Math.cos(st.theta);
+    const tq_main = comToMx * (thrust_ * Math.cos(thrustAngle_)) - comToMy * (thrust_ * Math.sin(thrustAngle_));
+    const alpha_  = (s.I > 0) ? tq_main / s.I : 0;
+
+    return { dx: st.vx, dy: st.vy, dvx: ax_, dvy: ay_, dtheta: st.omega, domega: alpha_ };
+  }
+
+  const curThrust = ctrl.mainThrust;
+  const gRad = ctrl.gimbalDeg * Math.PI / 180;
+  const st0 = { x: s.x, y: s.y, vx: s.vx, vy: s.vy, theta: s.theta, omega: s.omega, mass: s.mass };
+
+  const hl_t = (hl.active && !hl.hovering) ? hl.t : undefined;
+
+  const k1 = derivatives(st0, curThrust, gRad, hl_t);
+  const st2 = {
+    x: st0.x + 0.5*dt*k1.dx, y: st0.y + 0.5*dt*k1.dy,
+    vx: st0.vx + 0.5*dt*k1.dvx, vy: st0.vy + 0.5*dt*k1.dvy,
+    theta: st0.theta + 0.5*dt*k1.dtheta, omega: st0.omega + 0.5*dt*k1.domega,
+    mass: st0.mass
+  };
+  const k2 = derivatives(st2, curThrust, gRad, hl_t !== undefined ? hl_t + 0.5*dt : undefined);
+  const st3 = {
+    x: st0.x + 0.5*dt*k2.dx, y: st0.y + 0.5*dt*k2.dy,
+    vx: st0.vx + 0.5*dt*k2.dvx, vy: st0.vy + 0.5*dt*k2.dvy,
+    theta: st0.theta + 0.5*dt*k2.dtheta, omega: st0.omega + 0.5*dt*k2.domega,
+    mass: st0.mass
+  };
+  const k3 = derivatives(st3, curThrust, gRad, hl_t !== undefined ? hl_t + 0.5*dt : undefined);
+  const st4 = {
+    x: st0.x + dt*k3.dx, y: st0.y + dt*k3.dy,
+    vx: st0.vx + dt*k3.dvx, vy: st0.vy + dt*k3.dvy,
+    theta: st0.theta + dt*k3.dtheta, omega: st0.omega + dt*k3.domega,
+    mass: st0.mass
+  };
+  const k4 = derivatives(st4, curThrust, gRad, hl_t !== undefined ? hl_t + dt : undefined);
+
+  s.vx += (dt/6) * (k1.dvx + 2*k2.dvx + 2*k3.dvx + k4.dvx);
+  s.vy += (dt/6) * (k1.dvy + 2*k2.dvy + 2*k3.dvy + k4.dvy);
+  s.x  += (dt/6) * (k1.dx  + 2*k2.dx  + 2*k3.dx  + k4.dx );
+  s.y  += (dt/6) * (k1.dy  + 2*k2.dy  + 2*k3.dy  + k4.dy );
+  s.omega += (dt/6) * (k1.domega + 2*k2.domega + 2*k3.domega + k4.domega);
+  s.theta += (dt/6) * (k1.dtheta + 2*k2.dtheta + 2*k3.dtheta + k4.dtheta);
+
+  // ── Soft Landing Cutoff ──
+  // Jab altitude bahut kam ho aur total velocity zero ke paas ho
+  // toh saare thrusts aur forces turant band karo
+  if (testMode.active && !testMode.locked) {
+    const totalVel = Math.sqrt(s.vx * s.vx + s.vy * s.vy);
+    if (s.y < 5 && totalVel < 3) {
+      ctrl.mainThrust    = 0;
+      ctrl.gimbalDeg     = 0;
+      ctrl.sideThrust    = 0;
+      testMode.locked    = true;
+      testMode.re.active = false;
+      s.vx = 0; s.vy = 0; s.omega = 0;
+      s.ax = 0; s.ay = 0; s.alpha = 0;
+      document.getElementById('sl_mt').value     = 0;
+      document.getElementById('sl_gimbal').value = 0;
+      document.getElementById('sl_st').value     = 0;
+      document.getElementById('lbl_mt').textContent    = '0';
+      document.getElementById('lbl_gimbal').textContent = '0';
+      document.getElementById('lbl_st').textContent    = '0';
+      document.getElementById('testStatus').textContent = 'LANDED \u2705 \u2014 thrust cut';
+      document.getElementById('testStatus').style.color = '#00ff88';
+      console.log(`[SOFT LANDING] alt=${s.y.toFixed(2)}m | vel=${totalVel.toFixed(3)}m/s -> all thrust CUT`);
+    }
+  }
+
+  // Ground collision
+  if (s.y <= 0 && s.vy <= 0) {
+    // Log fuel usage — only once at first impact
+    if (testMode.active && !testMode._impactLogged) {
+      testMode._impactLogged = true;
+      const fuelSpent = testMode._fuelAtActivation - s.fuelMass;
+      console.log("=== IMPACT DEBUG ===");
+      console.log("vy at impact            : " + s.vy.toFixed(4) + " m/s  ← should be ~0 for perfect landing");
+      console.log("Fuel actually spent     : " + fuelSpent.toFixed(4) + " kg");
+      console.log("testMode.t at impact    : " + testMode.t.toFixed(4) + " s");
+      console.log("testMode.T              : " + testMode.T.toFixed(4) + " s");
+      console.log("Was locked?             : " + testMode.locked);
+    }
+    s.y = 0;
+    s.vy = 0;
+    s.vx *= 0.3;
+    s.omega *= 0.1;
+    if (Math.abs(s.vy) > 20 || Math.abs(s.vx) > 20) {
+      s.crashed = true;
+      running = false;
+      updateStatusUI('crashed');
+    }
+  }
+
+  // Track max alt
+  if (s.y > maxAlt) maxAlt = s.y;
+
+  // Store forces for display
+  s._Fg = Fg;
+  s._Ft = mainThrust + sideThrust;
+  s._Fd = Fdrag;
+  s._Fnx = Fnx;
+  s._Fny = Fny;
+  s._torq_main = torque_main;
+  s._torq_sideL = torque_sideL;
+  s._torq_sideR = torque_sideR;
+  s._torq_net = torque_net;
+  s._rMain = rMain;
+  s._rSide = rSide;
+}
+
+// ===================== TRAJECTORY / IMPACT PREDICTION =====================
+function predictImpact() {
+  // Simple ballistic prediction from current state (ignore thrust)
+  const s = state;
+  if (s.vy >= 0 && s.y > 0) return null; // going up
+  if (s.y <= 0) return null;
+  // y(t) = y + vy*t - 0.5*g*t²
+  // solve for y=0: 0.5g*t² - vy*t - y = 0
+  const a = -0.5 * s.gravity;
+  const b = s.vy;
+  const c = s.y;
+  const disc = b*b - 4*a*c;
+  if (disc < 0) return null;
+  const t1 = (-b + Math.sqrt(disc)) / (2*a);
+  const t2 = (-b - Math.sqrt(disc)) / (2*a);
+  const t = Math.max(t1, t2);
+  if (t < 0) return null;
+  return s.x + s.vx * t;
+}
+
+// ===================== RENDER =====================
+function getCanvas() { return document.getElementById('sim'); }
+
+function worldToCanvas(wx, wy) {
+  const canvas = getCanvas();
+  const cx = canvas.width / 2 + wx * SCALE_PIX_PER_M;
+  const cy = canvas.height - 60 - wy * SCALE_PIX_PER_M;
+  return [cx, cy];
+}
+
+function drawFrame() {
+  const canvas = getCanvas();
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+
+  ctx.clearRect(0, 0, W, H);
+
+  // Background gradient
+  const bg = ctx.createLinearGradient(0, 0, 0, H);
+  bg.addColorStop(0, '#000510');
+  bg.addColorStop(0.7, '#010a18');
+  bg.addColorStop(1, '#020f20');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, H);
+
+  // Stars
+  ctx.fillStyle = 'rgba(200,220,255,0.5)';
+  const seed = 42;
+  for (let i = 0; i < 120; i++) {
+    const sx = ((i * 1731 + seed * 37) % W);
+    const sy = ((i * 2371 + seed * 17) % (H * 0.8));
+    const sr = (i % 3 === 0) ? 1.2 : 0.6;
+    ctx.beginPath();
+    ctx.arc(sx, sy, sr, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Ground
+  const [gx0] = worldToCanvas(-10000, 0);
+  const [gx1] = worldToCanvas(10000, 0);
+  const groundY = H - 60;
+  ctx.fillStyle = '#0a1a0d';
+  ctx.fillRect(0, groundY, W, H - groundY);
+  ctx.strokeStyle = '#1a4a1a';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(0, groundY);
+  ctx.lineTo(W, groundY);
+  ctx.stroke();
+
+  // Grid
+  if (opts.grid) {
+    ctx.strokeStyle = 'rgba(10,40,64,0.4)';
+    ctx.lineWidth = 0.5;
+    const gridSzM = 50;
+    const gridSzPx = gridSzM * SCALE_PIX_PER_M;
+    const [ox, oy] = worldToCanvas(0, 0);
+    for (let x = ox % gridSzPx; x < W; x += gridSzPx) {
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, groundY); ctx.stroke();
+      const worldX = Math.round((x - ox) / SCALE_PIX_PER_M);
+      ctx.fillStyle = 'rgba(60,90,110,0.6)';
+      ctx.font = '9px Share Tech Mono';
+      ctx.fillText(worldX + 'm', x + 2, groundY - 4);
+    }
+    for (let y = groundY % gridSzPx; y < groundY; y += gridSzPx) {
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+      const worldY = Math.round((groundY - y) / SCALE_PIX_PER_M);
+      ctx.fillStyle = 'rgba(60,90,110,0.6)';
+      ctx.fillText(worldY + 'm', 4, y - 2);
+    }
+  }
+
+  // Trajectory
+  if (opts.traj && trajectory.length > 1) {
+    ctx.strokeStyle = 'rgba(0,180,220,0.5)';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    for (let i = 0; i < trajectory.length; i++) {
+      const [px, py] = worldToCanvas(trajectory[i][0], trajectory[i][1]);
+      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // Impact prediction
+  if (opts.impact && running) {
+    const impX = predictImpact();
+    if (impX !== null) {
+      const [px, py] = worldToCanvas(impX, 0);
+      ctx.strokeStyle = '#ff2244';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([5, 3]);
+      ctx.beginPath();
+      const [cx2, cy2] = worldToCanvas(state.x, state.y);
+      ctx.moveTo(cx2, cy2);
+      ctx.lineTo(px, py);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      // X marker
+      ctx.strokeStyle = '#ff2244';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(px - 8, py - 8); ctx.lineTo(px + 8, py + 8);
+      ctx.moveTo(px + 8, py - 8); ctx.lineTo(px - 8, py + 8);
+      ctx.stroke();
+      ctx.fillStyle = '#ff2244';
+      ctx.font = '10px Share Tech Mono';
+      ctx.fillText('IMPACT', px + 10, py - 5);
+      document.getElementById('d_impactX').textContent = impX.toFixed(1) + ' m';
+    } else {
+      document.getElementById('d_impactX').textContent = '—';
+    }
+  }
+
+  // Draw rocket
+  drawRocket(ctx);
+
+  // Forces
+  if (opts.forces) drawForces(ctx);
+
+  // HL Land Target marker
+  if (hl.T > 0) {
+    const [tx, ty] = worldToCanvas(hl.targetX, hl.targetY);
+    const r = 12;
+    // Outer glowing circle
+    ctx.save();
+    ctx.strokeStyle = '#00ffcc';
+    ctx.lineWidth = 2;
+    ctx.shadowColor = '#00ffcc';
+    ctx.shadowBlur = 8;
+    ctx.globalAlpha = 0.3;
+    ctx.beginPath();
+    ctx.arc(tx, ty, r, 0, Math.PI * 2);
+    ctx.stroke();
+    // Inner crosshair
+    ctx.beginPath();
+    ctx.moveTo(tx - r, ty); ctx.lineTo(tx + r, ty);
+    ctx.moveTo(tx, ty - r); ctx.lineTo(tx, ty + r);
+    ctx.globalAlpha = 0.3;
+    ctx.stroke();
+    // Center dot
+    ctx.fillStyle = '#00ffcc';
+    ctx.globalAlpha = 0.3;
+    ctx.beginPath();
+    ctx.arc(tx, ty, 3, 0, Math.PI * 2);
+    ctx.fill();
+    // Label
+    ctx.shadowBlur = 0;
+    ctx.font = '10px Share Tech Mono';
+    ctx.fillStyle = '#00ffcc';
+    ctx.fillText(`TARGET (${hl.targetX.toFixed(0)}, ${hl.targetY.toFixed(0)})`, tx + r + 4, ty - 4);
+    ctx.restore();
+  }
+
+  // Velocity vector
+  if (opts.vel) drawVelocity(ctx);
+
+  // Telemetry overlay
+  drawTelemetry(ctx, W, H);
+}
+
+function drawRocket(ctx) {
+  const s = state;
+  const [cx, cy] = worldToCanvas(s.x, s.y + s.comH);
+  const H_px = s.H * SCALE_PIX_PER_M;
+  const W_px = s.W * SCALE_PIX_PER_M;
+  const theta = s.theta;
+
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(-theta); // canvas Y is inverted
+
+  // Body (relative to CoM origin at canvas translate point)
+  // In canvas: Y goes DOWN. Rocket is drawn upward (nose at negative Y, bottom at positive Y).
+  // comH_px = distance from bottom of rocket to CoM, in pixels
+  const comH_px = s.comH * SCALE_PIX_PER_M;
+  // topY_local: how far the nose-end of body is above CoM (negative = up in canvas)
+  const topY_local  = -(H_px - comH_px);
+  // botY_local: how far the bottom of body is below CoM (positive = down in canvas)
+  const botY_local  = comH_px;
+
+  // Rocket body — solid fill (no gradient: avoids createLinearGradient crashes)
+  ctx.fillStyle = '#2a5a7a';
+  ctx.strokeStyle = '#00d4ff';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.rect(-W_px/2, topY_local, W_px, H_px);
+  ctx.fill();
+  ctx.stroke();
+
+  // Body highlight stripe
+  ctx.fillStyle = 'rgba(90,154,204,0.35)';
+  ctx.fillRect(-W_px * 0.15, topY_local, W_px * 0.3, H_px);
+
+  // Nose cone
+  ctx.fillStyle = '#5abadd';
+  ctx.strokeStyle = '#00d4ff';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(-W_px/2, topY_local);
+  ctx.lineTo(0, topY_local - W_px * 1.8);
+  ctx.lineTo(W_px/2, topY_local);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  // Windows
+  for (let i = 0; i < 2; i++) {
+    const wy = topY_local + H_px * (0.25 + i * 0.25);
+    ctx.fillStyle = '#00d4ff';
+    ctx.beginPath();
+    ctx.arc(0, wy, W_px * 0.12, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Fuel tank indicator (visual)
+  const fuelFrac = s.fuelMass / s.fuelMassInit;
+  const tankH = H_px * 0.5;
+  const tankY = botY_local - tankH * 0.9;
+  ctx.fillStyle = 'rgba(255,200,0,0.15)';
+  ctx.fillRect(-W_px/2 + 2, tankY, W_px - 4, tankH);
+  ctx.fillStyle = `rgba(255,${Math.floor(100 + fuelFrac*155)},0,0.5)`;
+  ctx.fillRect(-W_px/2 + 2, tankY + tankH*(1 - fuelFrac), W_px - 4, tankH * fuelFrac);
+  ctx.strokeStyle = 'rgba(255,180,0,0.4)';
+  ctx.lineWidth = 0.5;
+  ctx.strokeRect(-W_px/2 + 2, tankY, W_px - 4, tankH);
+
+  // Fins
+  ctx.fillStyle = '#2a5a7a';
+  ctx.strokeStyle = '#00aadd';
+  ctx.lineWidth = 1;
+  // Left fin
+  ctx.beginPath();
+  ctx.moveTo(-W_px/2, botY_local);
+  ctx.lineTo(-W_px/2 - W_px*0.8, botY_local + H_px * 0.25);
+  ctx.lineTo(-W_px/2, botY_local - H_px * 0.2);
+  ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  // Right fin
+  ctx.beginPath();
+  ctx.moveTo(W_px/2, botY_local);
+  ctx.lineTo(W_px/2 + W_px*0.8, botY_local + H_px * 0.25);
+  ctx.lineTo(W_px/2, botY_local - H_px * 0.2);
+  ctx.closePath();
+  ctx.fill(); ctx.stroke();
+
+  // -------- THRUSTERS --------
+  const thrusterH = W_px * 0.8;
+  const thrusterW = W_px * 0.35;
+  const gimbalRad = ctrl.gimbalDeg * Math.PI / 180;
+  const mainThr = (s.fuelMass > 0) ? ctrl.mainThrust : 0;
+  const sideThr = (s.fuelMass > 0) ? ctrl.sideThrust : 0;
+  const sideEach = sideThr / 2;
+
+  // LEFT SIDE THRUSTER (fixed)
+  ctx.save();
+  ctx.translate(-W_px / 2 + thrusterW * 0.3, botY_local);
+  drawThrusterNozzle(ctx, thrusterW * 0.9, thrusterH * 0.9, 0, sideEach > 0);
+  if (sideEach > 0) drawFlame(ctx, thrusterW * 0.8, sideEach / 50000);
+  ctx.restore();
+
+  // RIGHT SIDE THRUSTER (fixed)
+  ctx.save();
+  ctx.translate(W_px / 2 - thrusterW * 0.3, botY_local);
+  drawThrusterNozzle(ctx, thrusterW * 0.9, thrusterH * 0.9, 0, sideEach > 0);
+  if (sideEach > 0) drawFlame(ctx, thrusterW * 0.8, sideEach / 50000);
+  ctx.restore();
+
+  // MAIN CENTRE THRUSTER (gimballed)
+  ctx.save();
+  ctx.translate(0, botY_local);
+  ctx.rotate(gimbalRad);
+  drawThrusterNozzle(ctx, thrusterW * 1.4, thrusterH * 1.2, 1, mainThr > 0);
+  if (mainThr > 0) drawFlame(ctx, thrusterW * 1.2, mainThr / 100000);
+  ctx.restore();
+
+  // CoM marker
+  if (opts.com) {
+    ctx.strokeStyle = '#cc44ff';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(0, 0, 5, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(-8, 0); ctx.lineTo(8, 0);
+    ctx.moveTo(0, -8); ctx.lineTo(0, 8);
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+function drawThrusterNozzle(ctx, w, h, isMain, firing) {
+  const col = isMain ? '#ff6b00' : '#00ff88';
+  const col2 = isMain ? '#cc4400' : '#009966';
+  ctx.fillStyle = firing ? col : col2;
+  ctx.strokeStyle = col;
+  ctx.lineWidth = 1;
+  // Bell nozzle shape
+  ctx.beginPath();
+  ctx.moveTo(-w/2, 0);
+  ctx.bezierCurveTo(-w/2, h/2, -w*0.7, h, -w*0.8, h);
+  ctx.lineTo(w*0.8, h);
+  ctx.bezierCurveTo(w*0.7, h, w/2, h/2, w/2, 0);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  // Gimbal joint for main
+  if (isMain) {
+    ctx.fillStyle = '#ffaa44';
+    ctx.beginPath();
+    ctx.arc(0, -2, 4, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function drawFlame(ctx, w, intensity) {
+  if (w < 0.5) return; // guard: too small to draw
+  intensity = Math.min(intensity, 3);
+  const flameH = Math.max(2, w * 12 * (0.5 + intensity + Math.random() * 0.3));
+  const thrusterH = w * 0.9;
+
+  // Only create gradient if height is non-zero (avoids DOMException)
+  let flameColor;
+  try {
+    const grad = ctx.createLinearGradient(0, thrusterH, 0, thrusterH + flameH);
+    grad.addColorStop(0,    'rgba(255,255,200,0.95)');
+    grad.addColorStop(0.15, 'rgba(255,160,20,0.9)');
+    grad.addColorStop(0.5,  'rgba(255,60,10,0.7)');
+    grad.addColorStop(0.8,  'rgba(255,30,0,0.3)');
+    grad.addColorStop(1,    'rgba(255,10,0,0)');
+    flameColor = grad;
+  } catch(e) {
+    flameColor = 'rgba(255,120,20,0.7)'; // fallback solid
+  }
+  ctx.fillStyle = flameColor;
+
+  ctx.beginPath();
+  ctx.moveTo(-w/2, thrusterH);
+  ctx.bezierCurveTo(-w * 0.6, thrusterH + flameH * 0.3, -w * 0.3 * Math.random(), thrusterH + flameH * 0.7, 0, thrusterH + flameH);
+  ctx.bezierCurveTo( w * 0.3 * Math.random(), thrusterH + flameH * 0.7,  w * 0.6, thrusterH + flameH * 0.3, w/2, thrusterH);
+  ctx.closePath();
+  ctx.fill();
+}
+
+function drawForces(ctx) {
+  const s = state;
+  if (!s._Fg) return;
+  const scale = 0.0002; // N to pixels
+  const [cx, cy] = worldToCanvas(s.x, s.y + s.comH);
+
+  function drawArrow(color, fx, fy, label) {
+    const len = Math.sqrt(fx*fx + fy*fy) * scale;
+    if (len < 2) return;
+    const ang = Math.atan2(-fy, fx); // canvas Y inverted
+    const endX = cx + Math.cos(ang) * len;
+    const endY = cy + Math.sin(ang) * len;
+    ctx.strokeStyle = color;
+    ctx.fillStyle = color;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(endX, endY);
+    ctx.stroke();
+    // Arrowhead
+    const aSize = 6;
+    ctx.beginPath();
+    ctx.moveTo(endX, endY);
+    ctx.lineTo(endX - aSize*Math.cos(ang - 0.4), endY - aSize*Math.sin(ang - 0.4));
+    ctx.lineTo(endX - aSize*Math.cos(ang + 0.4), endY - aSize*Math.sin(ang + 0.4));
+    ctx.closePath();
+    ctx.fill();
+    ctx.font = '10px Share Tech Mono';
+    ctx.fillText(label, endX + 4, endY - 4);
+  }
+
+  drawArrow('#ff2244', 0, -s._Fg, 'Fg');
+  drawArrow('#ff6b00', s._Fnx - 0, s._Fny + s._Fg, 'Ft');
+  drawArrow('#00d4ff', -(state.vx > 0 ? 1 : -1) * s._Fd * 0.5, -(state.vy > 0 ? 1 : -1) * s._Fd * 0.5, 'Fd');
+  drawArrow('#00ff88', s._Fnx, s._Fny, 'Fn');
+}
+
+function drawVelocity(ctx) {
+  const s = state;
+  const [cx, cy] = worldToCanvas(s.x, s.y + s.comH);
+  const scale = 3;
+  const vLen = Math.sqrt(s.vx*s.vx + s.vy*s.vy) * scale;
+  if (vLen < 2) return;
+  const ang = Math.atan2(-s.vy, s.vx);
+  const ex = cx + Math.cos(ang) * vLen;
+  const ey = cy + Math.sin(ang) * vLen;
+  ctx.strokeStyle = '#ffcc00';
+  ctx.fillStyle = '#ffcc00';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([4, 2]);
+  ctx.beginPath();
+  ctx.moveTo(cx, cy);
+  ctx.lineTo(ex, ey);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.beginPath();
+  ctx.moveTo(ex, ey);
+  ctx.lineTo(ex - 8*Math.cos(ang-0.4), ey - 8*Math.sin(ang-0.4));
+  ctx.lineTo(ex - 8*Math.cos(ang+0.4), ey - 8*Math.sin(ang+0.4));
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = '#ffcc00';
+  ctx.font = '10px Share Tech Mono';
+  ctx.fillText('V', ex + 4, ey);
+}
+
+function drawTelemetry(ctx, W, H) {
+  const s = state;
+  const groundY = H - 60;
+  // Angle of inclination indicator
+  ctx.save();
+  ctx.translate(W - 40, 40);
+  ctx.strokeStyle = '#00d4ff';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.arc(0, 0, 28, 0, Math.PI * 2);
+  ctx.stroke();
+  // Horizon line
+  ctx.strokeStyle = 'rgba(0,212,255,0.3)';
+  ctx.beginPath(); ctx.moveTo(-28, 0); ctx.lineTo(28, 0); ctx.stroke();
+  // Rocket indicator
+  ctx.strokeStyle = '#ffcc00';
+  ctx.lineWidth = 2;
+  const ang = -s.theta;
+  ctx.beginPath();
+  ctx.moveTo(0, 14);
+  ctx.lineTo(Math.sin(ang) * 22, -Math.cos(ang) * 22);
+  ctx.stroke();
+  ctx.fillStyle = '#ffcc00';
+  ctx.font = '8px Orbitron';
+  ctx.textAlign = 'center';
+  ctx.fillText((s.theta * 180 / Math.PI).toFixed(1) + '°', 0, 44);
+  ctx.restore();
+}
+
+// ===================== DATA PANEL UPDATE =====================
+function updateDataPanel() {
+  const s = state;
+  const fuelFrac = s.fuelMassInit > 0 ? s.fuelMass / s.fuelMassInit : 0;
+
+  // Fuel
+  document.getElementById('d_fuelTotal').textContent = s.fuelMassInit.toFixed(0) + ' kg';
+  document.getElementById('d_fuelRem').textContent = s.fuelMass.toFixed(1) + ' kg';
+  document.getElementById('fuelBar').style.width = (fuelFrac * 100).toFixed(1) + '%';
+
+  const mainThr = (s.fuelMass > 0) ? ctrl.mainThrust : 0;
+  const sideThr = (s.fuelMass > 0) ? ctrl.sideThrust : 0;
+  const rMain = mainThr / Ve_MAIN;
+  const rSide = sideThr / Ve_SIDE;
+
+  document.getElementById('d_mdotMain').textContent = rMain.toFixed(3);
+  document.getElementById('d_mdotSide').textContent = rSide.toFixed(3);
+  document.getElementById('d_mdotTotal').textContent = (rMain + rSide).toFixed(3);
+  document.getElementById('d_veMain').textContent = Ve_MAIN.toFixed(0);
+  document.getElementById('d_veSide').textContent = Ve_SIDE.toFixed(0);
+  document.getElementById('d_rMain').textContent = rMain.toFixed(3);
+  document.getElementById('d_rSide').textContent = rSide.toFixed(3);
+
+  // Kinematics
+  document.getElementById('d_x').textContent = s.x.toFixed(2);
+  document.getElementById('d_y').textContent = s.y.toFixed(2);
+  document.getElementById('d_vx').textContent = s.vx.toFixed(3);
+  document.getElementById('d_vy').textContent = s.vy.toFixed(3);
+  document.getElementById('d_vmod').textContent = Math.sqrt(s.vx*s.vx + s.vy*s.vy).toFixed(3);
+  document.getElementById('d_ax').textContent = s.ax.toFixed(4);
+  document.getElementById('d_ay').textContent = s.ay.toFixed(4);
+  document.getElementById('d_theta').textContent = (s.theta * 180 / Math.PI).toFixed(3);
+  document.getElementById('d_omega').textContent = (s.omega * 180 / Math.PI).toFixed(3);
+  document.getElementById('d_alpha').textContent = (s.alpha * 180 / Math.PI).toFixed(4);
+
+  // Forces & Torques
+  if (s._Fg !== undefined) {
+    document.getElementById('d_fg').textContent = s._Fg.toFixed(1);
+    document.getElementById('d_ft').textContent = s._Ft.toFixed(1);
+    document.getElementById('d_fd').textContent = s._Fd.toFixed(3);
+    document.getElementById('d_fnx').textContent = s._Fnx.toFixed(2);
+    document.getElementById('d_fny').textContent = s._Fny.toFixed(2);
+    document.getElementById('d_tm').textContent = s._torq_main.toFixed(2);
+    document.getElementById('d_tsl').textContent = s._torq_sideL.toFixed(2);
+    document.getElementById('d_tsr').textContent = s._torq_sideR.toFixed(2);
+    document.getElementById('d_tn').textContent = s._torq_net.toFixed(2);
+  }
+  document.getElementById('d_mass').textContent = s.mass.toFixed(1);
+  document.getElementById('d_com').textContent = s.comH.toFixed(3);
+  document.getElementById('d_inertia').textContent = s.I.toFixed(1);
+
+  // Trajectory
+  document.getElementById('d_alt').textContent = Math.max(0, s.y).toFixed(2);
+  document.getElementById('d_range').textContent = s.x.toFixed(2);
+  document.getElementById('d_maxAlt').textContent = maxAlt.toFixed(2);
+  document.getElementById('d_time').textContent = simTime.toFixed(2);
+
+  // Time display
+  const mins = Math.floor(simTime / 60).toString().padStart(2, '0');
+  const secs = Math.floor(simTime % 60).toString().padStart(2, '0');
+  const tenths = Math.floor((simTime * 10) % 10);
+  document.getElementById('timeDisplay').textContent = `T+${mins}:${secs}.${tenths}`;
+
+  // ---- Test Mode Panel ----
+  if (testMode.active) {
+    const t      = testMode.t;
+    const T      = testMode.T;
+    const inHover = t >= testMode.t_hover;
+    const Vt     = testMode.p*t*t + testMode.V0;
+    const Kp = 2.0, Kd = 0.5;
+    const pd_corr = inHover ? state.mass * (Kp * (-state.vy) - Kd * state.ay) : 0;
+    const baseF  = inHover
+                     ? state.mass * testMode.g + pd_corr
+                     : state.mass * (2*testMode.p*t + testMode.g);
+    const Fnow   = testMode.locked ? 0 : Math.max(0, baseF);
+    const rt     = Fnow / testMode.Ve;
+
+    document.getElementById('sl_mt').value = Math.min(300000, Fnow);
+    document.getElementById('lbl_mt').textContent = Fnow.toFixed(0);
+    document.getElementById('td_T').textContent  = T.toFixed(3) + ' s';
+    document.getElementById('td_t').textContent  = t.toFixed(3) + ' s';
+    document.getElementById('td_tr').textContent = inHover ? "HOVERING" : Math.max(0, testMode.t_hover - t).toFixed(3) + ' s';
+    document.getElementById('td_s').textContent  = inHover ? "HOVER" : (2*testMode.p*t + testMode.g).toFixed(4);
+    document.getElementById('td_K').textContent  = (testMode._fuelAtActivation - state.fuelMass).toFixed(3) + ' kg';
+    document.getElementById('td_a').textContent  = Vt.toFixed(3) + ' m/s';
+    document.getElementById('td_b').textContent  = Math.max(0, rt).toFixed(4) + ' kg/s';
+    document.getElementById('td_F').textContent  = Fnow.toFixed(1) + ' N';
+    document.getElementById('td_Ff').textContent = (state.mass * testMode.g).toFixed(1) + ' N';
+    // F_x and F_y — decomposed from mainThrust magnitude via current thrustAngle
+    document.getElementById('td_Fx').textContent = testMode.Fx.toFixed(2) + ' N';
+    document.getElementById('td_Fy').textContent = testMode.Fy.toFixed(2) + ' N';
+    // Rotational Equilibrium sub-controller display
+    const re = testMode.re;
+    document.getElementById('td_re_active').textContent = re.active ? 'YES' : 'NO';
+    document.getElementById('td_re_t').textContent      = re.active ? re.t.toFixed(3) + ' s' : '—';
+    document.getElementById('td_re_Tr').textContent     = re.Tr > 0  ? re.Tr.toFixed(3) + ' s' : '—';
+    document.getElementById('td_re_e').textContent      = re.e !== 0 ? re.e.toExponential(3) : '—';
+    document.getElementById('td_re_f').textContent      = re.f !== 0 ? re.f.toExponential(3) : '—';
+    document.getElementById('td_re_calls').textContent  = re.callCount;
+    if (testMode.locked) {
+      document.getElementById('testStatus').textContent = "DONE — thrust cut at T";
+    }
+  }
+
+  // ---- Hover→Land Live Panel ----
+  if (hl.active || hl.t > 0) {
+    const fmt = (v, d=2) => isNaN(v) ? 'ERR' : v.toFixed(d);
+    document.getElementById('hl_t').textContent    = fmt(hl.t,2) + ' / ' + fmt(hl.T,1) + ' s';
+    document.getElementById('hl_S').textContent    = fmt(hl._S,4);
+    document.getElementById('hl_aX').textContent   = fmt(hl._aX,4) + ' m/s²';
+    document.getElementById('hl_vX').textContent   = fmt(hl._vX,3) + ' m/s';
+    document.getElementById('hl_dX').textContent   = fmt(hl._dX,2) + ' m';
+    document.getElementById('hl_Fxw').textContent  = fmt(hl._Fxw,1) + ' N';
+    document.getElementById('hl_aY').textContent   = fmt(hl._aY,4) + ' m/s²';
+    document.getElementById('hl_vY').textContent   = fmt(hl._vY,3) + ' m/s';
+    document.getElementById('hl_dY').textContent   = fmt(hl._dY,2) + ' m';
+    document.getElementById('hl_Fyw').textContent  = fmt(hl._Fyw,1) + ' N';
+    document.getElementById('hl_alph').textContent = fmt(hl._alpha,3) + ' °/s²';
+    document.getElementById('hl_omeg').textContent = fmt(hl._omega,3) + ' °/s';
+    document.getElementById('hl_thet').textContent = fmt(hl._theta_disp,3) + '°';
+    document.getElementById('hl_Fxr').textContent  = fmt(hl._Fxr,1) + ' N';
+    document.getElementById('hl_Fyr').textContent  = fmt(hl._Fyr,1) + ' N';
+    document.getElementById('hl_Tmag').textContent = fmt(hl._Tmag,1) + ' N';
+    document.getElementById('hl_gimb').textContent = fmt(hl._gimbal,2) + '°';
+    document.getElementById('hl_Xerr').textContent = fmt(state.x - hl.targetX, 2) + ' m';
+    document.getElementById('hl_Yerr').textContent = fmt(state.y - hl.targetY, 2) + ' m';
+
+    // ---- Formula vs Actual Comparison (landing phase only) ----
+    if (!hl.hovering && hl.startX !== undefined) {
+      const fmtC = (v, d=4) => isNaN(v) ? 'ERR' : v.toFixed(d);
+      const diff = (a, b) => {
+        const d = a - b;
+        const el_id_suffix = ''; // just return value
+        return d;
+      };
+
+      // Formula values (already computed in stepHL, stored in hl._*)
+      const aX_f = hl._aX;       // formula: net desired aX
+      const vX_f = hl._vX;       // formula: vX from t=0
+      const dX_f = hl._dX;       // formula: displacement from start
+
+      // Actual rocket values (relative to landing start)
+      const aX_r = state.ax;                        // actual ax from physics
+      const vX_r = state.vx;                        // actual vx
+      const dX_r = state.x - hl.startX;            // actual displacement from start
+
+      // Y axis
+      // formula aY = net desired (fY.A) — gravity already excluded
+      const aY_f = hl._aY;       // net aY (not including gravity)
+      const vY_f = hl._vY;       // formula vY from t=0
+      const dY_f = hl._dY;       // formula displacement (negative = downward)
+
+      // Actual: ay includes gravity in physics, so net = ay (since ay = Fnet_y/m = thrust_y/m - g)
+      const aY_r = state.ay;     // already net (thrust/m - g)
+      const vY_r = state.vy;
+      const dY_r = state.y - hl.startY;
+
+      const c = (id, val, d=4) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = fmtC(val, d);
+      };
+      const cd = (id, val) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.textContent = fmtC(val, 4);
+        el.style.color = Math.abs(val) < 0.01 ? '#00ff88' : Math.abs(val) < 0.1 ? '#ffcc00' : '#ff2244';
+      };
+
+      c('cmp_aX_f', aX_f);  c('cmp_aX_r', aX_r);  cd('cmp_aX_d', aX_r - aX_f);
+      c('cmp_vX_f', vX_f, 3);  c('cmp_vX_r', vX_r, 3);  cd('cmp_vX_d', vX_r - vX_f);
+      c('cmp_X_f',  dX_f, 2);  c('cmp_X_r',  dX_r, 2);  cd('cmp_X_d',  dX_r - dX_f);
+
+      c('cmp_aY_f', aY_f);  c('cmp_aY_r', aY_r);  cd('cmp_aY_d', aY_r - aY_f);
+      c('cmp_vY_f', vY_f, 3);  c('cmp_vY_r', vY_r, 3);  cd('cmp_vY_d', vY_r - vY_f);
+      c('cmp_Y_f',  dY_f, 2);  c('cmp_Y_r',  dY_r, 2);  cd('cmp_Y_d',  dY_r - dY_f);
+
+      // Rotational
+      const al_f = hl._alpha;
+      const al_r = state.alpha * 180 / Math.PI;
+      const om_f = hl._omega;
+      const om_r = state.omega * 180 / Math.PI;
+      const th_f = hl._theta_disp;
+      const th_r = state.theta * 180 / Math.PI;
+
+      c('cmp_al_f', al_f);  c('cmp_al_r', al_r);  cd('cmp_al_d', al_r - al_f);
+      c('cmp_om_f', om_f);  c('cmp_om_r', om_r);  cd('cmp_om_d', om_r - om_f);
+      c('cmp_th_f', th_f);  c('cmp_th_r', th_r);  cd('cmp_th_d', th_r - th_f);
+    }
+  }
+}
+
+// ===================== MAIN LOOP =====================
+function loop(timestamp) {
+  if (!running) return;
+
+  if (lastTime === null) lastTime = timestamp;
+  let dt = (timestamp - lastTime) / 1000;
+  lastTime = timestamp;
+
+  // Cap dt to avoid instability
+  dt = Math.min(dt, 0.05);
+
+  // Sub-steps for accuracy (RK4 + 100 steps = very high precision)
+  const steps = 100;
+  const subDt = dt / steps;
+  for (let i = 0; i < steps; i++) {
+    physicsStep(subDt);
+    simTime += subDt;
+    if (state.crashed) break;
+  }
+
+  // Record trajectory every ~0.2s
+  if (trajectory.length === 0 || simTime - (trajectory._lastT || 0) > 0.1) {
+    trajectory.push([state.x, state.y]);
+    trajectory._lastT = simTime;
+    if (trajectory.length > 2000) trajectory.splice(0, 100);
+  }
+
+  drawFrame();
+  updateDataPanel();
+
+  if (!state.crashed) {
+    animId = requestAnimationFrame(loop);
+  }
+}
+
+// ===================== CONTROLS =====================
+function updateThrusters() {
+  ctrl.mainThrust = parseFloat(document.getElementById('sl_mt').value);
+  ctrl.gimbalDeg = parseFloat(document.getElementById('sl_gimbal').value);
+  ctrl.sideThrust = parseFloat(document.getElementById('sl_st').value);
+  document.getElementById('lbl_mt').textContent = ctrl.mainThrust.toFixed(0);
+  document.getElementById('lbl_gimbal').textContent = ctrl.gimbalDeg.toFixed(1);
+  document.getElementById('lbl_st').textContent = ctrl.sideThrust.toFixed(0);
+  // Update gimbal needle
+  document.getElementById('gimbalNeedle').style.transform = `translateX(-50%) rotate(${ctrl.gimbalDeg}deg)`;
+  if (!running) { drawFrame(); updateDataPanel(); }
+}
+
+function updateInitConfig() {
+  initCfg.dryMass = parseFloat(document.getElementById('sl_mass').value);
+  initCfg.fuelMass = parseFloat(document.getElementById('sl_fuel').value);
+  initCfg.rocketH = parseFloat(document.getElementById('sl_rh').value);
+  initCfg.rocketW = parseFloat(document.getElementById('sl_rw').value);
+  initCfg.initAngle = parseFloat(document.getElementById('sl_ang').value);
+  initCfg.gravity = parseFloat(document.getElementById('sl_grav').value);
+  document.getElementById('lbl_mass').textContent = initCfg.dryMass;
+  document.getElementById('lbl_fuel').textContent = initCfg.fuelMass;
+  document.getElementById('lbl_rh').textContent = initCfg.rocketH;
+  document.getElementById('lbl_rw').textContent = initCfg.rocketW;
+  document.getElementById('lbl_ang').textContent = initCfg.initAngle;
+  document.getElementById('lbl_grav').textContent = initCfg.gravity;
+  if (!running) {
+    state = buildInitState();
+    drawFrame();
+    updateDataPanel();
+  }
+}
+
+function updateLabels() {
+  document.getElementById('lbl_mass').textContent = initCfg.dryMass;
+  document.getElementById('lbl_fuel').textContent = initCfg.fuelMass;
+  document.getElementById('lbl_rh').textContent = initCfg.rocketH;
+  document.getElementById('lbl_rw').textContent = initCfg.rocketW;
+  document.getElementById('lbl_ang').textContent = initCfg.initAngle;
+  document.getElementById('lbl_grav').textContent = initCfg.gravity;
+  document.getElementById('lbl_mt').textContent = '0';
+  document.getElementById('lbl_gimbal').textContent = '0';
+  document.getElementById('lbl_st').textContent = '0';
+}
+
+function toggleOpt(key) {
+  opts[key] = !opts[key];
+  const el = document.getElementById('tog_' + key);
+  if (opts[key]) el.classList.add('on'); else el.classList.remove('on');
+  if (!running) drawFrame();
+}
+
+// ===================== CANVAS RESIZE =====================
+function resizeCanvas() {
+  const canvas = document.getElementById('sim');
+  const area = document.getElementById('canvasArea');
+  canvas.width = area.clientWidth;
+  canvas.height = area.clientHeight;
+  if (!running) drawFrame();
+}
+
+// ===================== KEYBOARD =====================
+document.addEventListener('keydown', (e) => {
+  switch(e.code) {
+    case 'Space':
+      e.preventDefault();
+      if (running) stopSim(); else startSim();
+      break;
+    case 'KeyR':
+      resetSim();
+      break;
+    case 'ArrowUp':
+      e.preventDefault();
+      document.getElementById('sl_mt').value = Math.min(300000, ctrl.mainThrust + 5000);
+      updateThrusters();
+      break;
+    case 'ArrowDown':
+      e.preventDefault();
+      document.getElementById('sl_mt').value = Math.max(0, ctrl.mainThrust - 5000);
+      updateThrusters();
+      break;
+    case 'ArrowLeft':
+      e.preventDefault();
+      document.getElementById('sl_gimbal').value = Math.max(-90, ctrl.gimbalDeg - 1);
+      updateThrusters();
+      break;
+    case 'ArrowRight':
+      e.preventDefault();
+      document.getElementById('sl_gimbal').value = Math.min(90, ctrl.gimbalDeg + 1);
+      updateThrusters();
+      break;
+  }
+});
+
+// ===================== INIT =====================
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+state = buildInitState();
+updateInitConfig();
+updateThrusters();
+drawFrame();
+updateDataPanel();
+updateStatusUI('stopped');
+</script>
+</body>
+</html>

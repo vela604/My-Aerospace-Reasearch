@@ -1,0 +1,1430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced 2D Rocket Physics with Automated Landing Test</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
+            color: #fff;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            gap: 20px;
+        }
+
+        h1 {
+            text-align: center;
+            color: #00d4ff;
+            text-shadow: 0 0 20px rgba(0, 212, 255, 0.5);
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .main-layout {
+            display: flex;
+            gap: 20px;
+            width: 100%;
+            max-width: 1400px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .canvas-container {
+            position: relative;
+            border: 3px solid #00d4ff;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 0 30px rgba(0, 212, 255, 0.3);
+            background: #000;
+        }
+
+        #simulationCanvas {
+            display: block;
+            background: radial-gradient(ellipse at center bottom, #1a1a3e 0%, #000 70%);
+        }
+
+        .controls-panel {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 20px;
+            width: 380px;
+            max-height: 700px;
+            overflow-y: auto;
+        }
+
+        .control-group {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            border-left: 3px solid #00d4ff;
+        }
+
+        .control-group.test-mode {
+            border-left-color: #ff6b6b;
+            background: rgba(255, 107, 107, 0.1);
+        }
+
+        .control-group h3 {
+            color: #00d4ff;
+            margin-bottom: 10px;
+            font-size: 1.1em;
+        }
+
+        .control-group.test-mode h3 {
+            color: #ff6b6b;
+        }
+
+        .slider-container {
+            margin: 10px 0;
+        }
+
+        .slider-container label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.9em;
+            margin-bottom: 5px;
+            color: #aaa;
+        }
+
+        .slider-container span {
+            color: #00d4ff;
+            font-weight: bold;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 8px;
+            border-radius: 4px;
+            background: #333;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #00d4ff;
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(0, 212, 255, 0.5);
+        }
+
+        .stats-panel {
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 10px;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            font-size: 0.85em;
+        }
+
+        .stat-row:last-child {
+            border-bottom: none;
+        }
+
+        .stat-label {
+            color: #888;
+        }
+
+        .stat-value {
+            color: #00ff88;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+        }
+
+        .stat-value.warning {
+            color: #ffaa00;
+        }
+
+        .stat-value.danger {
+            color: #ff4757;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            min-width: 100px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #00d4ff, #0099cc);
+            color: #000;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(0, 212, 255, 0.4);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #ff4757, #cc0033);
+            color: #fff;
+        }
+
+        .btn-danger:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(255, 71, 87, 0.4);
+        }
+
+        .btn-test {
+            background: linear-gradient(135deg, #ff6b6b, #ee5a6f);
+            color: #fff;
+            font-size: 1.1em;
+            padding: 15px;
+            width: 100%;
+        }
+
+        .btn-test:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(255, 107, 107, 0.4);
+        }
+
+        .btn-test:disabled {
+            background: #555;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .legend {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-top: 10px;
+            font-size: 0.9em;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .legend-color {
+            width: 20px;
+            height: 3px;
+            border-radius: 2px;
+        }
+
+        .thruster-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-left: 5px;
+        }
+
+        .thruster-active {
+            background: #00ff00;
+            box-shadow: 0 0 10px #00ff00;
+        }
+
+        .thruster-inactive {
+            background: #333;
+        }
+
+        .test-status {
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 10px;
+            border: 1px solid rgba(255, 107, 107, 0.3);
+        }
+
+        .test-status h4 {
+            color: #ff6b6b;
+            margin-bottom: 10px;
+        }
+
+        .test-phase {
+            padding: 8px;
+            margin: 5px 0;
+            border-radius: 5px;
+            background: rgba(255, 255, 255, 0.05);
+            font-size: 0.9em;
+        }
+
+        .test-phase.active {
+            background: rgba(255, 107, 107, 0.2);
+            border-left: 3px solid #ff6b6b;
+        }
+
+        .test-phase.completed {
+            opacity: 0.6;
+            text-decoration: line-through;
+        }
+
+        .timer-display {
+            font-size: 2em;
+            color: #ff6b6b;
+            text-align: center;
+            font-family: 'Courier New', monospace;
+            margin: 10px 0;
+        }
+
+        .formula-box {
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(255, 107, 107, 0.3);
+            border-radius: 8px;
+            padding: 10px;
+            margin: 10px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85em;
+            color: #ff6b6b;
+            overflow-x: auto;
+        }
+
+        .controls-panel::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .controls-panel::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.3);
+        }
+
+        .controls-panel::-webkit-scrollbar-thumb {
+            background: #00d4ff;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 2D Rocket Physics with Automated Landing Test</h1>
+        
+        <div class="main-layout">
+            <div class="canvas-container">
+                <canvas id="simulationCanvas" width="800" height="600"></canvas>
+            </div>
+            
+            <div class="controls-panel">
+                <div class="control-group">
+                    <h3>🎯 Main Thruster (Rotatable)</h3>
+                    <div class="slider-container">
+                        <label>Thrust Force: <span id="mainThrustVal">0</span> N</label>
+                        <input type="range" id="mainThrust" min="0" max="50000" value="0" step="10">
+                    </div>
+                    <div class="slider-container">
+                        <label>Rotation Angle: <span id="mainAngleVal">0</span>°</label>
+                        <input type="range" id="mainAngle" min="-30" max="30" value="0" step="1">
+                    </div>
+                    <div class="thruster-indicator" id="mainIndicator"></div>
+                </div>
+
+                <div class="control-group">
+                    <h3>⚡ Side Thrusters (Fixed)</h3>
+                    <div class="slider-container">
+                        <label>Combined Thrust: <span id="sideThrustVal">0</span> N</label>
+                        <input type="range" id="sideThrust" min="0" max="10000" value="0" step="10">
+                    </div>
+                    <small style="color: #888; font-size: 0.8em;">Left & Right thrusters fire equally</small>
+                    <div class="thruster-indicator" id="sideIndicator"></div>
+                </div>
+
+                <div class="control-group">
+                    <h3>🌍 Environment</h3>
+                    <div class="slider-container">
+                        <label>Gravity: <span id="gravityVal">9.8</span> m/s²</label>
+                        <input type="range" id="gravity" min="0" max="20" value="9.8" step="0.1">
+                    </div>
+                    <div class="slider-container">
+                        <label>Time Scale: <span id="timeScaleVal">1.0</span>x</label>
+                        <input type="range" id="timeScale" min="0.1" max="3" value="1" step="0.1">
+                    </div>
+                </div>
+
+                <div class="control-group test-mode">
+                    <h3>🧪 Automated Landing Test</h3>
+                    <button class="btn-test" id="testBtn" onclick="startLandingTest()">
+                        🚀 START LANDING TEST
+                    </button>
+                    <div class="formula-box">
+                        F = (V × r) / ln(M₀ / (M₀ - rT))
+                    </div>
+                    
+                    <div class="test-status" id="testStatus" style="display: none;">
+                        <h4>Test Progress</h4>
+                        <div class="timer-display" id="testTimer">0.000s</div>
+                        <div class="test-phase" id="phase1">1. Impact Detection (Vy > 0)</div>
+                        <div class="test-phase" id="phase2">2. Zero All Forces</div>
+                        <div class="test-phase" id="phase3">3. Calculate Impact Time</div>
+                        <div class="test-phase" id="phase4">4. Apply Custom Force F</div>
+                        <div class="test-phase" id="phase5">5. Monitor Until V=0</div>
+                        <div class="test-phase" id="phase6">6. Auto-Balance (F = mg)</div>
+                    </div>
+                </div>
+
+                <div class="button-group">
+                    <button class="btn-primary" onclick="resetSimulation()">🔄 Reset</button>
+                    <button class="btn-danger" onclick="emergencyStop()">🛑 Stop</button>
+                </div>
+
+                <div class="stats-panel">
+                    <h3 style="color: #00d4ff; margin-bottom: 10px;">📊 Real-time Telemetry</h3>
+                    <div class="stat-row">
+                        <span class="stat-label">Velocity X (Vx):</span>
+                        <span class="stat-value" id="vx">0.00</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Velocity Y (Vy):</span>
+                        <span class="stat-value" id="vy">0.00</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Acceleration X (Ax):</span>
+                        <span class="stat-value" id="ax">0.00</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Acceleration Y (Ay):</span>
+                        <span class="stat-value" id="ay">0.00</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Angle of Inclination:</span>
+                        <span class="stat-value" id="angle">0.00°</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Angular Velocity:</span>
+                        <span class="stat-value" id="angVel">0.00</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Realtime Height:</span>
+                        <span class="stat-value" id="realtimeHeight">0 m</span>
+                    </div>
+
+                    <div class="stat-row">
+                        <span class="stat-label">Center of Mass:</span>
+                        <span class="stat-value" id="com">Calculating...</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Total Mass:</span>
+                        <span class="stat-value" id="mass">0 kg</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Fuel Remaining:</span>
+                        <span class="stat-value" id="fuel">100%</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Altitude:</span>
+                        <span class="stat-value" id="altitude">0 m</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Net Force:</span>
+                        <span class="stat-value" id="netForce">0 N</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Total Torque:</span>
+                        <span class="stat-value" id="torque">0 Nm</span>
+                    </div>
+                    <div class="stat-row" id="impactTimeRow" style="display: none;">
+                        <span class="stat-label">Impact Time (T):</span>
+                        <span class="stat-value danger" id="impactTime">0.00 s</span>
+                    </div>
+                    <div class="stat-row" id="calculatedForceRow" style="display: none;">
+                        <span class="stat-label">Calculated Force F:</span>
+                        <span class="stat-value danger" id="calculatedForce">0 N</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="legend">
+            <div class="legend-item">
+                <div class="legend-color" style="background: #ff6b6b;"></div>
+                <span>Main Thruster Force</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #4ecdc4;"></div>
+                <span>Side Thruster Force</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #ffe66d;"></div>
+                <span>Gravity Force</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #a8e6cf;"></div>
+                <span>Trajectory Path</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #ff8b94;"></div>
+                <span>Impact Point</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #fff;"></div>
+                <span>Center of Mass</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('simulationCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // ============================================
+        // PHYSICS CONSTANTS
+        // ============================================
+        const PIXELS_PER_METER = 1;  // 1 pixel = 1 meter
+        const DT = 1/60;              // Time step (60 FPS)
+
+        // ============================================
+        // LANDING TEST PHASES
+        // ============================================
+        const TestPhase = {
+            IDLE: 'idle',
+            DETECTING: 'detecting',
+            ZERO_FORCES: 'zero_forces',
+            CALCULATE: 'calculate',
+            APPLY_FORCE: 'apply_force',
+            MONITOR: 'monitor',
+            AUTO_BALANCE: 'auto_balance',
+            COMPLETED: 'completed'
+        };
+
+        // ============================================
+        // ROCKET CLASS
+        // ============================================
+        class Rocket {
+            constructor() {
+                // --- Physical Dimensions ---
+                this.width = 30;        // meters
+                this.height = 60;       // meters
+                this.dryMass = 1000;    // kg (without fuel)
+                this.fuelCapacity = 5000;
+                this.exhaustVelocity = 2500; // m/s (typical rocket exhaust velocity)
+                this.fuel = this.fuelCapacity;
+                this.fuelConsumptionRate = 2; // kg per Newton per second
+                
+                // --- Position & Velocity ---
+                this.x = canvas.width / 2 / PIXELS_PER_METER;
+                this.y = canvas.height - 150 / PIXELS_PER_METER;
+                this.vx = 0;
+                this.vy = 0;
+                
+                // --- Rotation ---
+                this.angle = 0;
+                this.angularVelocity = 0;
+                this.angularAcceleration = 0;
+                this.momentOfInertia = this.calculateMOI();
+                
+                // --- Thruster Configuration ---
+                // Main thruster (center, rotatable)
+                this.mainThrusterOffset = { x: 0, y: this.height/2 };
+                // Side thrusters (fixed, for stability)
+                this.leftThrusterOffset = { x: -this.width/3, y: this.height/2 + 2 };
+                this.rightThrusterOffset = { x: this.width/3, y: this.height/2 + 2 };
+                
+                // --- Thruster Controls ---
+                this.mainThrust = 0;
+                this.mainAngle = 0;     // degrees
+                this.sideThrust = 0;    // combined left+right
+                
+                // --- Trajectory Tracking ---
+                this.trajectory = [];
+                this.maxTrajectoryPoints = 200;
+                
+                // --- Force Vectors (for visualization) ---
+                this.forces = {
+                    main: { x: 0, y: 0 },
+                    left: { x: 0, y: 0 },
+                    right: { x: 0, y: 0 },
+                    gravity: { x: 0, y: 0 },
+                    total: { x: 0, y: 0 }
+                };
+                
+                this.torques = {
+                    main: 0,
+                    left: 0,
+                    right: 0,
+                    total: 0
+                };
+
+                // --- Landing Test Data ---
+                this.testState = {
+                    phase: TestPhase.IDLE,
+                    startTime: 0,
+                    recordedHeight: 0,      // h: altitude at trigger
+                    recordedVelocity: 0,    // V: downward velocity at trigger
+                    impactTime: 0,          // T: time to impact
+                    calculatedForce: 0,     // F: required thrust force
+                    fuelRate: 0,            // r: fuel consumption rate (kg/s)
+                    timerStart: 0,
+                    timerValue: 0
+                };
+            }
+            
+            // Moment of Inertia: I = m(w² + h²)/12
+            calculateMOI() {
+                const totalMass = this.dryMass + this.fuel;
+                return totalMass * (this.width * this.width + this.height * this.height) / 12;
+            }
+            
+            get totalMass() {
+                return this.dryMass + this.fuel;
+            }
+            
+            get centerOfMass() {
+                return { x: 0, y: 0 };
+            }
+            
+            // ============================================
+            // MAIN PHYSICS UPDATE
+            // ============================================
+            update(dt, gravity) {
+                // --- Fuel Consumption ---
+                // Real physics: F = ṁ × vₑ, so ṁ = F / vₑ
+                const massFlowRate = this.mainThrust / this.exhaustVelocity; // kg/s
+                const mainFuelUsed = massFlowRate * dt;
+                // Side thrusters: same exhaust velocity, ṁ = F / vₑ
+                const sideMassFlowRate = this.sideThrust / this.exhaustVelocity;
+                const sideFuelUsed = sideMassFlowRate * dt;
+
+
+                const totalFuelUsed = mainFuelUsed + sideFuelUsed;
+                
+                if (this.fuel > 0) {
+                    this.fuel = Math.max(0, this.fuel - totalFuelUsed);
+                } else {
+                    this.mainThrust = 0;
+                    this.sideThrust = 0;
+                }
+                
+                this.momentOfInertia = this.calculateMOI();
+                
+                // --- Reset Forces & Torques ---
+                this.forces = {
+                    main: { x: 0, y: 0 },
+                    left: { x: 0, y: 0 },
+                    right: { x: 0, y: 0 },
+                    gravity: { x: 0, y: 0 },
+                    total: { x: 0, y: 0 }
+                };
+                this.torques = { main: 0, left: 0, right: 0, total: 0 };
+                
+                // --- Main Thruster Force ---
+                if (this.mainThrust > 0 && this.fuel > 0) {
+                    const mainAngleRad = (this.mainAngle * Math.PI / 180) + this.angle;
+                    this.forces.main.x = this.mainThrust * Math.sin(mainAngleRad);
+                    this.forces.main.y = -this.mainThrust * Math.cos(mainAngleRad);
+                    
+                    // Torque: τ = r × F
+                    const leverArmX = this.mainThrusterOffset.x * Math.cos(this.angle) - 
+                                     this.mainThrusterOffset.y * Math.sin(this.angle);
+                    const leverArmY = this.mainThrusterOffset.x * Math.sin(this.angle) + 
+                                     this.mainThrusterOffset.y * Math.cos(this.angle);
+                    
+                    this.torques.main = leverArmX * this.forces.main.y - leverArmY * this.forces.main.x;
+                }
+                
+                // --- Side Thruster Forces ---
+                if (this.sideThrust > 0 && this.fuel > 0) {
+                    const sideThrustEach = this.sideThrust / 2;
+                    
+                    this.forces.left.x = -sideThrustEach * Math.sin(this.angle);
+                    this.forces.left.y = -sideThrustEach * Math.cos(this.angle);
+                    
+                    this.forces.right.x = sideThrustEach * Math.sin(this.angle);
+                    this.forces.right.y = -sideThrustEach * Math.cos(this.angle);
+                    
+                    // Torques from side thrusters
+                    const leftLeverX = this.leftThrusterOffset.x * Math.cos(this.angle) - 
+                                      this.leftThrusterOffset.y * Math.sin(this.angle);
+                    const leftLeverY = this.leftThrusterOffset.x * Math.sin(this.angle) + 
+                                      this.leftThrusterOffset.y * Math.cos(this.angle);
+                    
+                    const rightLeverX = this.rightThrusterOffset.x * Math.cos(this.angle) - 
+                                       this.rightThrusterOffset.y * Math.sin(this.angle);
+                    const rightLeverY = this.rightThrusterOffset.x * Math.sin(this.angle) + 
+                                       this.rightThrusterOffset.y * Math.cos(this.angle);
+                    
+                    this.torques.left = leftLeverX * this.forces.left.y - leftLeverY * this.forces.left.x;
+                    this.torques.right = rightLeverX * this.forces.right.y - rightLeverY * this.forces.right.x;
+                }
+                
+                // --- Gravity ---
+                this.forces.gravity.y = this.totalMass * gravity;
+                
+                // --- Total Force & Torque ---
+                this.forces.total.x = this.forces.main.x + this.forces.left.x + this.forces.right.x;
+                this.forces.total.y = this.forces.main.y + this.forces.left.y + this.forces.right.y + this.forces.gravity.y;
+                this.torques.total = this.torques.main + this.torques.left + this.torques.right;
+                
+                // --- Accelerations (F = ma, τ = Iα) ---
+                this.ax = this.forces.total.x / this.totalMass;
+                this.ay = this.forces.total.y / this.totalMass;
+                this.angularAcceleration = this.torques.total / this.momentOfInertia;
+                
+                // --- Update Velocities ---
+                this.vx += this.ax * dt;
+                this.vy += this.ay * dt;
+                this.angularVelocity += this.angularAcceleration * dt;
+                
+                // Air resistance damping
+                this.angularVelocity *= 0.995;
+                
+                // --- Update Position ---
+                this.x += this.vx * dt;
+                this.y += this.vy * dt;
+                this.angle += this.angularVelocity * dt;
+                
+                // --- Ground Collision ---
+                const groundY = canvas.height / PIXELS_PER_METER - 2;
+                if (this.y + this.height/2 > groundY) {
+                    this.y = groundY - this.height/2;
+                    this.vy = Math.max(0, this.vy * -0.3);
+                    this.vx *= 0.9;
+                    this.angularVelocity *= 0.8;
+                    
+                    // Stop test if landed
+                    if (this.testState.phase !== TestPhase.IDLE && 
+                        this.testState.phase !== TestPhase.COMPLETED) {
+                        this.testState.phase = TestPhase.COMPLETED;
+                        document.getElementById('testBtn').disabled = false;
+                        document.getElementById('testBtn').textContent = '🚀 START LANDING TEST';
+                        updateTestUI();
+                    }
+                }
+                
+                // --- Wall Collisions ---
+                if (this.x - this.width/2 < 0) {
+                    this.x = this.width/2;
+                    this.vx = Math.abs(this.vx) * 0.5;
+                }
+                if (this.x + this.width/2 > canvas.width / PIXELS_PER_METER) {
+                    this.x = canvas.width / PIXELS_PER_METER - this.width/2;
+                    this.vx = -Math.abs(this.vx) * 0.5;
+                }
+                
+                // --- Update Trajectory ---
+                this.trajectory.push({ x: this.x, y: this.y });
+                if (this.trajectory.length > this.maxTrajectoryPoints) {
+                    this.trajectory.shift();
+                }
+            }
+            
+            // ============================================
+            // AUTOMATED LANDING TEST LOGIC
+            // ============================================
+            updateLandingTest(dt, gravity) {
+                const state = this.testState;
+                
+                switch(state.phase) {
+                    case TestPhase.IDLE:
+                        // Waiting for test start
+                        break;
+                        
+                    case TestPhase.DETECTING:
+                        // PHASE 1: Detect downward motion (Vy > 0)
+                        if (this.vy > 0) {
+                            state.phase = TestPhase.ZERO_FORCES;
+                            state.recordedHeight = this.getAltitude();
+                            state.recordedVelocity = this.vy;
+                            updateTestUI();
+                        }
+                        break;
+                        
+                    case TestPhase.ZERO_FORCES:
+                        // PHASE 2: Zero all forces instantly
+                        this.mainThrust = 0;
+                        this.sideThrust = 0;
+                        this.mainAngle = 0;
+                        this.vx = 0;
+                        this.vy = state.recordedVelocity;  // Keep vertical velocity
+                        this.angularVelocity = 0;
+                        
+                        // Update UI sliders
+                        document.getElementById('mainThrust').value = 0;
+                        document.getElementById('sideThrust').value = 0;
+                        document.getElementById('mainAngle').value = 0;
+                        
+                        state.phase = TestPhase.CALCULATE;
+                        updateTestUI();
+                        break;
+                        
+                    case TestPhase.CALCULATE:
+                        // PHASE 3: Calculate impact time using Newton's equations
+                        // h = v₀T + ½gT²  →  ½gT² + v₀T - h = 0
+                        const h = state.recordedHeight;
+                        const v0 = state.recordedVelocity;
+                        const g = gravity;
+                        
+                        // Quadratic formula: aT² + bT + c = 0
+                        const a = 0.5 * g;
+                        const b = v0;
+                        const c = -h;
+                        
+                        const discriminant = b*b - 4*a*c;
+                        if (discriminant >= 0) {
+                            const t1 = (-b + Math.sqrt(discriminant)) / (2*a);
+                            const t2 = (-b - Math.sqrt(discriminant)) / (2*a);
+                            state.impactTime = Math.max(t1, t2);  // Take positive root
+                        } else {
+                            state.impactTime = Math.sqrt(2*h/g);  // Fallback
+                        }
+                        
+                        // Fuel consumption rate: r (kg/s)
+                        // Total mass flow rate = main + side thrusters
+                        state.fuelRate = (this.mainThrust + this.sideThrust) / this.exhaustVelocity;
+
+
+                        
+                        // PHASE 4: Calculate required thrust force F
+                        // Using rocket propulsion equation (HC Verma):
+                        // F = (V × r) / ln(M₀ / (M₀ - rT))
+                        // where:
+                        //   V = recorded velocity
+                        //   r = fuel consumption rate (kg/s)
+                        //   M₀ = initial total mass
+                        //   T = time to impact
+                        const M = this.totalMass;
+                        const T = state.impactTime;
+                        const V = state.recordedVelocity;
+                        const r = state.fuelRate > 0 ? state.fuelRate : 1;
+                        
+                        state.calculatedForce = (V * r) / (Math.log((M) / (M - (r * T))));
+                        
+                        state.phase = TestPhase.APPLY_FORCE;
+                        updateTestUI();
+                        break;
+                        
+                    case TestPhase.APPLY_FORCE:
+                        // PHASE 4: Apply calculated force
+                        this.mainThrust = state.calculatedForce;
+                        this.mainAngle = 0;  // Vertical thrust only
+                        
+                        document.getElementById('mainThrust').value = state.calculatedForce;
+                        
+                        state.timerStart = Date.now();
+                        state.phase = TestPhase.MONITOR;
+                        updateTestUI();
+                        break;
+                        
+                    case TestPhase.MONITOR:
+                        // PHASE 5: Monitor until velocity reaches zero
+                        state.timerValue = (Date.now() - state.timerStart) / 1000;
+                        
+                        // Check if velocity is near zero or reversed
+                        if (this.vy <= 0.1) {
+                            state.phase = TestPhase.AUTO_BALANCE;
+                            updateTestUI();
+                        }
+                        
+                        // Check ground collision
+                        const groundY = canvas.height / PIXELS_PER_METER - 2;
+                        if (this.y + this.height/2 >= groundY - 1) {
+                            state.phase = TestPhase.COMPLETED;
+                            document.getElementById('testBtn').disabled = false;
+                            document.getElementById('testBtn').textContent = '🚀 START LANDING TEST';
+                            updateTestUI();
+                        }
+                        break;
+                        
+                    case TestPhase.AUTO_BALANCE:
+                        // PHASE 6: Auto-balance thrust to hover (F = mg)
+                        const targetForce = this.totalMass * gravity;
+                        this.mainThrust = targetForce;
+                        document.getElementById('mainThrust').value = targetForce;
+                        
+                        // Continue until fuel out or ground hit
+                        if (this.fuel <= 0) {
+                            state.phase = TestPhase.COMPLETED;
+                            document.getElementById('testBtn').disabled = false;
+                            document.getElementById('testBtn').textContent = '🚀 START LANDING TEST';
+                            updateTestUI();
+                        }
+                        break;
+                        
+                    case TestPhase.COMPLETED:
+                        // Test finished
+                        break;
+                }
+            }
+            
+            // Get altitude above ground
+            getAltitude() {
+                const groundY = canvas.height / PIXELS_PER_METER - 2;
+                return Math.max(0, groundY - (this.y + this.height/2));
+            }
+            
+            // ============================================
+            // RENDERING
+            // ============================================
+            draw() {
+                this.drawTrajectory();
+                
+                ctx.save();
+                
+                const canvasX = this.x * PIXELS_PER_METER;
+                const canvasY = this.y * PIXELS_PER_METER;
+                
+                ctx.translate(canvasX, canvasY);
+                ctx.rotate(this.angle);
+                
+                // --- Rocket Body ---
+                ctx.fillStyle = '#e0e0e0';
+                ctx.strokeStyle = '#666';
+                ctx.lineWidth = 2;
+                
+                ctx.beginPath();
+                ctx.rect(-this.width/2 * PIXELS_PER_METER, -this.height/2 * PIXELS_PER_METER, 
+                         this.width * PIXELS_PER_METER, this.height * PIXELS_PER_METER);
+                ctx.fill();
+                ctx.stroke();
+                
+                // --- Nose Cone ---
+                ctx.fillStyle = '#ff6b6b';
+                ctx.beginPath();
+                ctx.moveTo(-this.width/2 * PIXELS_PER_METER, -this.height/2 * PIXELS_PER_METER);
+                ctx.lineTo(0, (-this.height/2 - 10) * PIXELS_PER_METER);
+                ctx.lineTo(this.width/2 * PIXELS_PER_METER, -this.height/2 * PIXELS_PER_METER);
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+                
+                // --- Center of Mass ---
+                const com = this.centerOfMass;
+                ctx.fillStyle = '#fff';
+                ctx.beginPath();
+                ctx.arc(com.x * PIXELS_PER_METER, com.y * PIXELS_PER_METER, 4, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // --- Thrusters ---
+                this.drawThrusters();
+                
+                ctx.restore();
+                
+                // --- Force Vectors ---
+                this.drawForceVectors(canvasX, canvasY);
+                
+                // --- Test Info Overlay ---
+                if (this.testState.phase !== TestPhase.IDLE) {
+                    this.drawTestInfo();
+                }
+            }
+            
+            drawThrusters() {
+                // Main thruster (rotatable)
+                ctx.save();
+                ctx.translate(this.mainThrusterOffset.x * PIXELS_PER_METER, 
+                             this.mainThrusterOffset.y * PIXELS_PER_METER);
+                ctx.rotate(this.mainAngle * Math.PI / 180);
+                
+                ctx.fillStyle = '#444';
+                ctx.beginPath();
+                ctx.moveTo(-5, 0);
+                ctx.lineTo(-8, 10);
+                ctx.lineTo(8, 10);
+                ctx.lineTo(5, 0);
+                ctx.closePath();
+                ctx.fill();
+                
+                // Main flame
+                if (this.mainThrust > 0 && this.fuel > 0) {
+                    const flameLength = (this.mainThrust / 50000) * 40;
+                    const flicker = Math.random() * 5;
+                    
+                    const gradient = ctx.createLinearGradient(0, 10, 0, 10 + flameLength + flicker);
+                    gradient.addColorStop(0, '#ffff00');
+                    gradient.addColorStop(0.3, '#ff8800');
+                    gradient.addColorStop(1, 'transparent');
+                    
+                    ctx.fillStyle = gradient;
+                    ctx.beginPath();
+                    ctx.moveTo(-8, 10);
+                    ctx.lineTo(0, 10 + flameLength + flicker);
+                    ctx.lineTo(8, 10);
+                    ctx.closePath();
+                    ctx.fill();
+                }
+                
+                ctx.restore();
+                
+                // Side thrusters
+                this.drawSideThruster(this.leftThrusterOffset, this.sideThrust > 0 && this.fuel > 0);
+                this.drawSideThruster(this.rightThrusterOffset, this.sideThrust > 0 && this.fuel > 0);
+            }
+            
+            drawSideThruster(offset, active) {
+                ctx.save();
+                ctx.translate(offset.x * PIXELS_PER_METER, offset.y * PIXELS_PER_METER);
+                
+                ctx.fillStyle = '#444';
+                ctx.fillRect(-4, 0, 8, 8);
+                
+                if (active) {
+                    const flameLength = (this.sideThrust / 10000) * 25;
+                    const flicker = Math.random() * 3;
+                    
+                    const gradient = ctx.createLinearGradient(0, 8, 0, 8 + flameLength + flicker);
+                    gradient.addColorStop(0, '#00ffff');
+                    gradient.addColorStop(0.5, '#0088ff');
+                    gradient.addColorStop(1, 'transparent');
+                    
+                    ctx.fillStyle = gradient;
+                    ctx.beginPath();
+                    ctx.moveTo(-4, 8);
+                    ctx.lineTo(0, 8 + flameLength + flicker);
+                    ctx.lineTo(4, 8);
+                    ctx.closePath();
+                    ctx.fill();
+                }
+                
+                ctx.restore();
+            }
+            
+            drawForceVectors(canvasX, canvasY) {
+                const scale = 0.05;
+                
+                if (this.forces.main.x !== 0 || this.forces.main.y !== 0) {
+                    this.drawArrow(canvasX, canvasY, 
+                        this.forces.main.x * scale, this.forces.main.y * scale, '#ff6b6b', 'Main');
+                }
+                
+                if (this.forces.left.x !== 0 || this.forces.left.y !== 0) {
+                    this.drawArrow(canvasX, canvasY,
+                        this.forces.left.x * scale, this.forces.left.y * scale, '#4ecdc4', 'Left');
+                }
+                if (this.forces.right.x !== 0 || this.forces.right.y !== 0) {
+                    this.drawArrow(canvasX, canvasY,
+                        this.forces.right.x * scale, this.forces.right.y * scale, '#4ecdc4', 'Right');
+                }
+                
+                this.drawArrow(canvasX, canvasY, 0, this.forces.gravity.y * scale, '#ffe66d', 'Gravity');
+                this.drawArrow(canvasX, canvasY, 
+                    this.forces.total.x * scale, this.forces.total.y * scale, '#ff00ff', 'Net');
+            }
+            
+            drawArrow(x, y, fx, fy, color, label) {
+                const len = Math.sqrt(fx * fx + fy * fy);
+                if (len < 1) return;
+                
+                ctx.save();
+                ctx.strokeStyle = color;
+                ctx.fillStyle = color;
+                ctx.lineWidth = 2;
+                
+                ctx.beginPath();
+                ctx.moveTo(x, y);
+                ctx.lineTo(x + fx, y + fy);
+                ctx.stroke();
+                
+                const angle = Math.atan2(fy, fx);
+                const headLen = 8;
+                
+                ctx.beginPath();
+                ctx.moveTo(x + fx, y + fy);
+                ctx.lineTo(x + fx - headLen * Math.cos(angle - Math.PI/6), 
+                          y + fy - headLen * Math.sin(angle - Math.PI/6));
+                ctx.lineTo(x + fx - headLen * Math.cos(angle + Math.PI/6), 
+                          y + fy - headLen * Math.sin(angle + Math.PI/6));
+                ctx.closePath();
+                ctx.fill();
+                
+                ctx.font = '10px Arial';
+                ctx.fillText(label, x + fx + 10, y + fy);
+                
+                ctx.restore();
+            }
+            
+            drawTrajectory() {
+                if (this.trajectory.length < 2) return;
+                
+                ctx.save();
+                ctx.strokeStyle = 'rgba(168, 230, 207, 0.6)';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([5, 5]);
+                
+                ctx.beginPath();
+                for (let i = 0; i < this.trajectory.length; i++) {
+                    const point = this.trajectory[i];
+                    const px = point.x * PIXELS_PER_METER;
+                    const py = point.y * PIXELS_PER_METER;
+                    
+                    if (i === 0) {
+                        ctx.moveTo(px, py);
+                    } else {
+                        ctx.lineTo(px, py);
+                    }
+                }
+                ctx.stroke();
+                ctx.restore();
+            }
+            
+            drawTestInfo() {
+                ctx.save();
+                ctx.fillStyle = 'rgba(255, 107, 107, 0.9)';
+                ctx.font = 'bold 14px Arial';
+                ctx.fillText(`Height: ${this.getAltitude().toFixed(1)}m`, 10, 70);
+
+                
+                const state = this.testState;
+                let statusText = '';
+                
+                switch(state.phase) {
+                    case TestPhase.DETECTING:
+                        statusText = 'TEST: Detecting downward motion...';
+                        break;
+                    case TestPhase.ZERO_FORCES:
+                        statusText = 'TEST: Forces zeroed! Recording data...';
+                        break;
+                    case TestPhase.CALCULATE:
+                        statusText = `TEST: Calculating... T=${state.impactTime.toFixed(2)}s`;
+                        break;
+                    case TestPhase.APPLY_FORCE:
+                        statusText = `TEST: Applying F=${state.calculatedForce.toFixed(0)}N`;
+                        break;
+                    case TestPhase.MONITOR:
+                        statusText = `TEST: Monitoring... t=${state.timerValue.toFixed(3)}s`;
+                        break;
+                    case TestPhase.AUTO_BALANCE:
+                        statusText = `TEST: Auto-balancing F=${(this.totalMass * gravity).toFixed(0)}N`;
+                        break;
+                    case TestPhase.COMPLETED:
+                        statusText = 'TEST: Completed!';
+                        break;
+                }
+                
+                ctx.fillText(statusText, 10, 30);
+                
+                // Show recorded data
+                if (state.phase !== TestPhase.IDLE && state.phase !== TestPhase.DETECTING) {
+                    ctx.font = '12px Arial';
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+                    ctx.fillText(`Recorded: h=${state.recordedHeight.toFixed(1)}m, v=${state.recordedVelocity.toFixed(2)}m/s`, 10, 50);
+                }
+                
+                ctx.restore();
+            }
+        }
+
+        // ============================================
+        // SIMULATION STATE
+        // ============================================
+        let rocket = new Rocket();
+        let gravity = 9.8;
+        let timeScale = 1.0;
+        let animationId;
+        let isRunning = true;
+
+        // UI Elements
+        const mainThrustSlider = document.getElementById('mainThrust');
+        const mainAngleSlider = document.getElementById('mainAngle');
+        const sideThrustSlider = document.getElementById('sideThrust');
+        const gravitySlider = document.getElementById('gravity');
+        const timeScaleSlider = document.getElementById('timeScale');
+
+        // ============================================
+        // UI UPDATE FUNCTIONS
+        // ============================================
+        function updateDisplays() {
+            document.getElementById('mainThrustVal').textContent = Math.round(mainThrustSlider.value);
+            document.getElementById('mainAngleVal').textContent = mainAngleSlider.value;
+            document.getElementById('sideThrustVal').textContent = Math.round(sideThrustSlider.value);
+            document.getElementById('gravityVal').textContent = gravitySlider.value;
+            document.getElementById('realtimeHeight').textContent = rocket.getAltitude().toFixed(2) + ' m';
+            document.getElementById('timeScaleVal').textContent = timeScaleSlider.value;
+            
+            document.getElementById('mainIndicator').className = 
+                'thruster-indicator ' + (parseInt(mainThrustSlider.value) > 0 ? 'thruster-active' : 'thruster-inactive');
+            document.getElementById('sideIndicator').className = 
+                'thruster-indicator ' + (parseInt(sideThrustSlider.value) > 0 ? 'thruster-active' : 'thruster-inactive');
+            
+            document.getElementById('vx').textContent = rocket.vx.toFixed(2);
+            document.getElementById('vy').textContent = (-rocket.vy).toFixed(2);
+            document.getElementById('ax').textContent = rocket.ax.toFixed(2);
+            document.getElementById('ay').textContent = (-rocket.ay).toFixed(2);
+            document.getElementById('angle').textContent = (-rocket.angle * 180 / Math.PI).toFixed(2) + '°';
+            document.getElementById('angVel').textContent = (-rocket.angularVelocity).toFixed(3);
+            document.getElementById('com').textContent = `(${rocket.centerOfMass.x.toFixed(2)}, ${rocket.centerOfMass.y.toFixed(2)})`;
+            document.getElementById('mass').textContent = rocket.totalMass.toFixed(1) + ' kg';
+            document.getElementById('fuel').textContent = ((rocket.fuel / rocket.fuelCapacity) * 100).toFixed(1) + '%';
+            
+            const altitude = rocket.getAltitude();
+            document.getElementById('altitude').textContent = altitude.toFixed(1) + ' m';
+            
+            const netForceMag = Math.sqrt(rocket.forces.total.x**2 + rocket.forces.total.y**2);
+            document.getElementById('netForce').textContent = netForceMag.toFixed(1) + ' N';
+            document.getElementById('torque').textContent = rocket.torques.total.toFixed(1) + ' Nm';
+            
+            // Test data display
+            const state = rocket.testState;
+            if (state.phase !== TestPhase.IDLE) {
+                document.getElementById('impactTimeRow').style.display = 'flex';
+                document.getElementById('calculatedForceRow').style.display = 'flex';
+                document.getElementById('impactTime').textContent = state.impactTime.toFixed(3) + ' s';
+                document.getElementById('calculatedForce').textContent = Math.round(state.calculatedForce) + ' N';
+                document.getElementById('testTimer').textContent = state.timerValue.toFixed(3) + 's';
+            } else {
+                document.getElementById('impactTimeRow').style.display = 'none';
+                document.getElementById('calculatedForceRow').style.display = 'none';
+            }
+        }
+
+        function updateTestUI() {
+            const state = rocket.testState;
+            const phases = ['phase1', 'phase2', 'phase3', 'phase4', 'phase5', 'phase6'];
+            
+            phases.forEach((id, index) => {
+                const el = document.getElementById(id);
+                el.classList.remove('active', 'completed');
+                
+                const phaseNum = index + 1;
+                let currentPhaseNum = 0;
+                
+                switch(state.phase) {
+                    case TestPhase.DETECTING: currentPhaseNum = 1; break;
+                    case TestPhase.ZERO_FORCES: currentPhaseNum = 2; break;
+                    case TestPhase.CALCULATE: currentPhaseNum = 3; break;
+                    case TestPhase.APPLY_FORCE: currentPhaseNum = 4; break;
+                    case TestPhase.MONITOR: currentPhaseNum = 5; break;
+                    case TestPhase.AUTO_BALANCE: currentPhaseNum = 6; break;
+                    case TestPhase.COMPLETED: currentPhaseNum = 7; break;
+                }
+                
+                if (phaseNum < currentPhaseNum) {
+                    el.classList.add('completed');
+                } else if (phaseNum === currentPhaseNum) {
+                    el.classList.add('active');
+                }
+            });
+        }
+
+        // ============================================
+        // TEST CONTROL
+        // ============================================
+        function startLandingTest() {
+            if (rocket.testState.phase !== TestPhase.IDLE && 
+                rocket.testState.phase !== TestPhase.COMPLETED) {
+                return;
+            }
+            
+            // Reset test state
+            rocket.testState = {
+                phase: TestPhase.DETECTING,
+                startTime: Date.now(),
+                recordedHeight: 0,
+                recordedVelocity: 0,
+                impactTime: 0,
+                calculatedForce: 0,
+                fuelRate: 0,
+                timerStart: 0,
+                timerValue: 0
+            };
+            
+            document.getElementById('testStatus').style.display = 'block';
+            document.getElementById('testBtn').disabled = true;
+            document.getElementById('testBtn').textContent = '⏳ TEST RUNNING...';
+            
+            updateTestUI();
+        }
+
+        // ============================================
+        // EVENT LISTENERS
+        // ============================================
+        mainThrustSlider.addEventListener('input', (e) => {
+            if (rocket.testState.phase === TestPhase.IDLE || 
+                rocket.testState.phase === TestPhase.COMPLETED) {
+                rocket.mainThrust = parseFloat(e.target.value);
+            }
+        });
+
+        mainAngleSlider.addEventListener('input', (e) => {
+            if (rocket.testState.phase === TestPhase.IDLE || 
+                rocket.testState.phase === TestPhase.COMPLETED) {
+                rocket.mainAngle = parseFloat(e.target.value);
+            }
+        });
+
+        sideThrustSlider.addEventListener('input', (e) => {
+            if (rocket.testState.phase === TestPhase.IDLE || 
+                rocket.testState.phase === TestPhase.COMPLETED) {
+                rocket.sideThrust = parseFloat(e.target.value);
+            }
+        });
+
+        gravitySlider.addEventListener('input', (e) => {
+            gravity = parseFloat(e.target.value);
+        });
+
+        timeScaleSlider.addEventListener('input', (e) => {
+            timeScale = parseFloat(e.target.value);
+        });
+
+        function resetSimulation() {
+            rocket = new Rocket();
+            mainThrustSlider.value = 0;
+            sideThrustSlider.value = 0;
+            mainAngleSlider.value = 0;
+            document.getElementById('testStatus').style.display = 'none';
+            document.getElementById('testBtn').disabled = false;
+            document.getElementById('testBtn').textContent = '🚀 START LANDING TEST';
+        }
+
+        function emergencyStop() {
+            rocket.vx = 0;
+            rocket.vy = 0;
+            rocket.angularVelocity = 0;
+            rocket.mainThrust = 0;
+            rocket.sideThrust = 0;
+            rocket.testState.phase = TestPhase.IDLE;
+            mainThrustSlider.value = 0;
+            sideThrustSlider.value = 0;
+            document.getElementById('testBtn').disabled = false;
+            document.getElementById('testBtn').textContent = '🚀 START LANDING TEST';
+        }
+
+        // ============================================
+        // RENDERING HELPERS
+        // ============================================
+        function drawGrid() {
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+            ctx.lineWidth = 1;
+            
+            const gridSize = 50;
+            
+            for (let x = 0; x < canvas.width; x += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+                ctx.stroke();
+            }
+            
+            for (let y = 0; y < canvas.height; y += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+            }
+        }
+
+        function drawGround() {
+            const groundY = canvas.height - 20;
+            
+            ctx.strokeStyle = '#4a4a4a';
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.moveTo(0, groundY);
+            ctx.lineTo(canvas.width, groundY);
+            ctx.stroke();
+            
+            ctx.fillStyle = '#2a2a2a';
+            ctx.fillRect(0, groundY, canvas.width, canvas.height - groundY);
+            
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+            ctx.lineWidth = 1;
+            for (let x = 0; x < canvas.width; x += 30) {
+                ctx.beginPath();
+                ctx.moveTo(x, groundY);
+                ctx.lineTo(x - 20, canvas.height);
+                ctx.stroke();
+            }
+        }
+
+        // ============================================
+        // MAIN LOOP
+        // ============================================
+        function animate() {
+            if (!isRunning) return;
+            
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            drawGrid();
+            drawGround();
+            
+            const dt = DT * timeScale;
+            
+            // Update landing test logic
+            rocket.updateLandingTest(dt, gravity);
+            
+            // Update physics
+            rocket.update(dt, gravity);
+            
+            rocket.draw();
+            
+            updateDisplays();
+            
+            animationId = requestAnimationFrame(animate);
+        }
+
+        animate();
+
+        // ============================================
+        // KEYBOARD CONTROLS
+        // ============================================
+        window.addEventListener('keydown', (e) => {
+            // Disable manual control during test
+            if (rocket.testState.phase !== TestPhase.IDLE && 
+                rocket.testState.phase !== TestPhase.COMPLETED) {
+                return;
+            }
+            
+            switch(e.key) {
+                case 'ArrowUp':
+                    mainThrustSlider.value = Math.min(50000, parseInt(mainThrustSlider.value) + 100);
+                    rocket.mainThrust = parseInt(mainThrustSlider.value);
+                    break;
+                case 'ArrowDown':
+                    mainThrustSlider.value = Math.max(0, parseInt(mainThrustSlider.value) - 100);
+                    rocket.mainThrust = parseInt(mainThrustSlider.value);
+                    break;
+                case 'ArrowLeft':
+                    mainAngleSlider.value = Math.max(-30, parseInt(mainAngleSlider.value) - 2);
+                    rocket.mainAngle = parseInt(mainAngleSlider.value);
+                    break;
+                case 'ArrowRight':
+                    mainAngleSlider.value = Math.min(30, parseInt(mainAngleSlider.value) + 2);
+                    rocket.mainAngle = parseInt(mainAngleSlider.value);
+                    break;
+                case ' ':
+                    e.preventDefault();
+                    emergencyStop();
+                    break;
+                case 'r':
+                case 'R':
+                    resetSimulation();
+                    break;
+                case 't':
+                case 'T':
+                    startLandingTest();
+                    break;
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,2567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>3D Rocket Simulation</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap');
+
+  :root {
+    --bg: #030b14;
+    --panel: #050f1c;
+    --border: #0a2840;
+    --accent: #00d4ff;
+    --accent2: #ff6b00;
+    --accent3: #00ff88;
+    --warn: #ffcc00;
+    --danger: #ff2244;
+    --text: #a8d8ea;
+    --dim: #3a5a6a;
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  header {
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    padding: 6px 16px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-shrink: 0;
+  }
+
+  header h1 {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 14px;
+    font-weight: 900;
+    color: var(--accent);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+  }
+
+  .status-bar {
+    display: flex;
+    gap: 16px;
+    margin-left: auto;
+    align-items: center;
+    font-size: 11px;
+  }
+
+  .status-indicator {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--dim);
+  }
+  .dot.active { background: var(--accent3); box-shadow: 0 0 6px var(--accent3); animation: pulse 1s infinite; }
+  .dot.stopped { background: var(--warn); }
+  .dot.crashed { background: var(--danger); }
+
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  .main-layout {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* LEFT PANEL */
+  .left-panel {
+    width: 220px;
+    flex-shrink: 0;
+    background: var(--panel);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    padding: 8px;
+    gap: 8px;
+  }
+
+  /* CANVAS AREA */
+  .canvas-area {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    background: #010810;
+  }
+
+  canvas#sim {
+    display: block;
+  }
+
+  /* RIGHT PANEL */
+  .right-panel {
+    width: 230px;
+    flex-shrink: 0;
+    background: var(--panel);
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    padding: 8px;
+    gap: 8px;
+  }
+
+  .panel-section {
+    background: rgba(0,20,40,0.6);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 8px;
+  }
+
+  .section-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 9px;
+    letter-spacing: 2px;
+    color: var(--accent);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 4px;
+  }
+
+  .ctrl-row {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    margin-bottom: 8px;
+  }
+
+  .ctrl-label {
+    font-size: 10px;
+    color: var(--dim);
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .ctrl-label span { color: var(--accent2); }
+
+  input[type=range] {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    outline: none;
+  }
+
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    box-shadow: 0 0 4px var(--accent);
+  }
+
+  input[type=range].orange::-webkit-slider-thumb { background: var(--accent2); box-shadow: 0 0 4px var(--accent2); }
+  input[type=range].green::-webkit-slider-thumb { background: var(--accent3); box-shadow: 0 0 4px var(--accent3); }
+
+  .data-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    padding: 2px 0;
+    border-bottom: 1px solid rgba(10,40,64,0.5);
+  }
+
+  .data-row .key { color: var(--dim); }
+  .data-row .val { color: var(--accent3); font-weight: bold; }
+  .data-row .val.warn { color: var(--warn); }
+  .data-row .val.danger { color: var(--danger); }
+
+  .btn {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 10px;
+    letter-spacing: 1px;
+    border: 1px solid;
+    border-radius: 3px;
+    padding: 6px 10px;
+    cursor: pointer;
+    text-transform: uppercase;
+    background: transparent;
+    transition: all 0.15s;
+    width: 100%;
+    margin-bottom: 4px;
+  }
+
+  .btn-start {
+    border-color: var(--accent3);
+    color: var(--accent3);
+  }
+  .btn-start:hover { background: var(--accent3); color: #000; }
+
+  .btn-stop {
+    border-color: var(--warn);
+    color: var(--warn);
+  }
+  .btn-stop:hover { background: var(--warn); color: #000; }
+
+  .btn-reset {
+    border-color: var(--danger);
+    color: var(--danger);
+  }
+  .btn-reset:hover { background: var(--danger); color: #fff; }
+
+  /* Thruster angle display */
+  .angle-display {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 4px;
+  }
+
+  .angle-dial {
+    width: 36px; height: 36px;
+    border: 2px solid var(--accent2);
+    border-radius: 50%;
+    position: relative;
+    flex-shrink: 0;
+  }
+
+  .angle-needle {
+    position: absolute;
+    width: 2px;
+    height: 14px;
+    background: var(--accent2);
+    left: 50%;
+    bottom: 50%;
+    transform-origin: bottom center;
+    transform: translateX(-50%) rotate(0deg);
+    border-radius: 2px;
+  }
+
+  .fuel-bar-wrap {
+    margin-bottom: 6px;
+  }
+
+  .fuel-bar-bg {
+    width: 100%;
+    height: 8px;
+    background: var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .fuel-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--danger), var(--warn), var(--accent3));
+    border-radius: 4px;
+    transition: width 0.1s;
+  }
+
+  .input-num {
+    background: rgba(0,20,40,0.8);
+    border: 1px solid var(--border);
+    color: var(--accent);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    padding: 3px 6px;
+    border-radius: 3px;
+    width: 100%;
+  }
+
+  .time-display {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 18px;
+    color: var(--accent);
+    text-align: center;
+    letter-spacing: 3px;
+    padding: 4px 0;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .force-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    font-size: 9px;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+  }
+
+  .legend-dot {
+    width: 8px; height: 3px;
+    border-radius: 1px;
+  }
+
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 10px;
+    margin-bottom: 4px;
+  }
+
+  .toggle {
+    width: 28px; height: 14px;
+    background: var(--border);
+    border-radius: 7px;
+    position: relative;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+
+  .toggle.on { background: var(--accent); }
+
+  .toggle::after {
+    content: '';
+    position: absolute;
+    width: 10px; height: 10px;
+    background: #fff;
+    border-radius: 50%;
+    top: 2px; left: 2px;
+    transition: left 0.2s;
+  }
+
+  .toggle.on::after { left: 16px; }
+
+  .section-title.orange { color: var(--accent2); }
+  .section-title.green { color: var(--accent3); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🚀 Rocket Sim 2D</h1>
+  <div class="status-bar">
+    <div class="status-indicator">
+      <div class="dot" id="statusDot"></div>
+      <span id="statusText">STOPPED</span>
+    </div>
+    <div class="time-display" id="timeDisplay">T+00:00.0</div>
+  </div>
+</header>
+
+<div class="main-layout">
+
+  <!-- LEFT PANEL: Controls -->
+  <div class="left-panel">
+
+    <div class="panel-section">
+      <div class="section-title">Simulation</div>
+      <button class="btn btn-start" id="btnStart" onclick="startSim()">▶ START</button>
+      <button class="btn btn-stop" id="btnStop" onclick="stopSim()">⏸ STOP</button>
+      <button class="btn btn-reset" onclick="resetSim()">↺ RESET</button>
+      <button class="btn" id="btnTest" onclick="activateTestMode()"
+        style="border-color:#cc44ff;color:#cc44ff;margin-top:4px;">
+        🎯 LANDING TEST
+      </button>
+      <button class="btn" onclick="activateHLMode()"
+        style="border-color:#00ffcc;color:#00ffcc;margin-top:4px;">
+        🎯 HL LANDING
+      </button>
+      <button class="btn" onclick="loadPreset()"
+        style="border-color:#ffaa00;color:#ffaa00;margin-top:4px;">
+        🧪 PRESET TEST
+      </button>
+      <button class="btn" onclick="showHLPanel()"
+        style="border-color:#00ffcc;color:#00ffcc;margin-top:4px;">
+        🚀 HOVER→LAND
+      </button>
+    </div>
+
+    <div class="panel-section" id="hlConfigPanel" style="display:none; border-color:#00ffcc;">
+      <div class="section-title" style="color:#00ffcc;">Hover → Land Config</div>
+      <div class="ctrl-row">
+        <div class="ctrl-label">Total Time T (s)</div>
+        <input type="number" min="5" max="120" step="1" value="20" id="sl_hl_T" class="input-num">
+      </div>
+      <div style="font-size:9px;color:#00ffcc;margin:6px 0 3px;border-top:1px solid #0a2840;padding-top:4px;">Z values (dist to target)</div>
+      <div class="ctrl-row">
+        <div class="ctrl-label">Z_X horiz dist (m)</div>
+        <input type="number" min="0" step="10" value="200" id="sl_hl_ZX" class="input-num">
+      </div>
+      <div class="ctrl-row">
+        <div class="ctrl-label">Z_Y vert dist (m)</div>
+        <input type="number" min="0" step="10" value="200" id="sl_hl_ZY" class="input-num">
+      </div>
+      <div class="ctrl-row">
+        <div class="ctrl-label">Z_Z depth dist (m)</div>
+        <input type="number" min="0" step="10" value="100" id="sl_hl_ZZ" class="input-num">
+      </div>
+      <div style="font-size:9px;color:#00ffcc;margin:6px 0 3px;border-top:1px solid #0a2840;padding-top:4px;">Land Target (absolute)</div>
+      <div class="ctrl-row">
+        <div class="ctrl-label">Target X (m)</div>
+        <input type="number" step="10" value="100" id="hl_targetX_inp" class="input-num">
+      </div>
+      <div class="ctrl-row">
+        <div class="ctrl-label">Target Y (m)</div>
+        <input type="number" step="1" value="0" id="hl_targetY_inp" class="input-num">
+      </div>
+      <div class="ctrl-row">
+        <div class="ctrl-label">Target Z (m)</div>
+        <input type="number" step="10" value="0" id="hl_targetZ_inp" class="input-num">
+      </div>
+      <div style="font-size:9px;color:var(--dim);margin-top:4px;">
+        θ₀ = 0° (upright) · Z_θ = 0.001 rad (fixed)
+      </div>
+      <button class="btn" onclick="loadHLPreset()"
+        style="border-color:#00ffcc;color:#00ffcc;margin-top:6px;">① LOAD PRESET</button>
+      <button class="btn" id="btnHL2" onclick="hlBtn2Click()"
+        style="border-color:#00ff88;color:#00ff88;margin-top:2px;">② HOVER (then land)</button>
+      <div id="hlStatus" style="font-size:9px;color:var(--dim);margin-top:4px;">Not loaded</div>
+    </div>
+
+    <div class="panel-section">
+      <div class="section-title">Initial Config</div>
+      <div class="ctrl-row">
+        <div class="ctrl-label">Dry Mass (kg) <span id="lbl_mass">5000</span></div>
+        <input type="range" min="500" max="20000" value="5000" id="sl_mass" oninput="updateInitConfig()">
+      </div>
+      <div class="ctrl-row">
+        <div class="ctrl-label">Fuel Mass (kg) <span id="lbl_fuel">3000</span></div>
+        <input type="range" min="100" max="15000" value="3000" id="sl_fuel" oninput="updateInitConfig()">
+      </div>
+      <div class="ctrl-row">
+        <div class="ctrl-label">Rocket Height (m) <span id="lbl_rh">20</span></div>
+        <input type="range" min="5" max="60" value="20" id="sl_rh" oninput="updateInitConfig()">
+      </div>
+      <div class="ctrl-row">
+        <div class="ctrl-label">Rocket Width (m) <span id="lbl_rw">4</span></div>
+        <input type="range" min="1" max="12" value="4" id="sl_rw" oninput="updateInitConfig()">
+      </div>
+      <div class="ctrl-row">
+        <div class="ctrl-label">Init Angle (°) <span id="lbl_ang">0</span></div>
+        <input type="range" min="-45" max="45" value="0" id="sl_ang" oninput="updateInitConfig()">
+      </div>
+      <div class="ctrl-row">
+        <div class="ctrl-label">Gravity (m/s²) <span id="lbl_grav">9.81</span></div>
+        <input type="range" min="0" max="25" step="0.1" value="9.81" id="sl_grav" oninput="updateInitConfig()">
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <div class="section-title">Display</div>
+      <div class="toggle-row">
+        <span>Trajectory</span>
+        <div class="toggle on" id="tog_traj" onclick="toggleOpt('traj')"></div>
+      </div>
+      <div class="toggle-row">
+        <span>Forces</span>
+        <div class="toggle on" id="tog_forces" onclick="toggleOpt('forces')"></div>
+      </div>
+      <div class="toggle-row">
+        <span>CoM Marker</span>
+        <div class="toggle on" id="tog_com" onclick="toggleOpt('com')"></div>
+      </div>
+      <div class="toggle-row">
+        <span>Impact Point</span>
+        <div class="toggle on" id="tog_impact" onclick="toggleOpt('impact')"></div>
+      </div>
+      <div class="toggle-row">
+        <span>Velocity Vec</span>
+        <div class="toggle on" id="tog_vel" onclick="toggleOpt('vel')"></div>
+      </div>
+      <div class="toggle-row">
+        <span>Grid</span>
+        <div class="toggle on" id="tog_grid" onclick="toggleOpt('grid')"></div>
+      </div>
+      <div class="toggle-row">
+        <span>Drag Force</span>
+        <div class="toggle" id="tog_drag" onclick="toggleOpt('drag')"></div>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <div class="section-title">Force Legend</div>
+      <div class="force-legend">
+        <div class="legend-item"><div class="legend-dot" style="background:#ff2244"></div><span>Gravity</span></div>
+        <div class="legend-item"><div class="legend-dot" style="background:#ff6b00"></div><span>Thrust</span></div>
+        <div class="legend-item"><div class="legend-dot" style="background:#00d4ff"></div><span>Drag</span></div>
+        <div class="legend-item"><div class="legend-dot" style="background:#00ff88"></div><span>Net Force</span></div>
+        <div class="legend-item"><div class="legend-dot" style="background:#ffcc00"></div><span>Velocity</span></div>
+        <div class="legend-item"><div class="legend-dot" style="background:#cc44ff"></div><span>CoM</span></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- CANVAS: 3 views -->
+  <div class="canvas-area" id="canvasArea" style="display:flex; flex-direction:column;">
+    <div style="display:flex; flex:2; overflow:hidden;">
+      <div style="flex:1; position:relative; border-right:1px solid #0a2840;">
+        <div style="position:absolute;top:4px;left:8px;font-family:Orbitron,sans-serif;font-size:9px;color:#00d4ff;letter-spacing:2px;z-index:1;">X-Y FRONT</div>
+        <canvas id="simXY" style="display:block;"></canvas>
+      </div>
+      <div style="flex:1; position:relative;">
+        <div style="position:absolute;top:4px;left:8px;font-family:Orbitron,sans-serif;font-size:9px;color:#ff6b00;letter-spacing:2px;z-index:1;">Z-Y SIDE</div>
+        <canvas id="simZY" style="display:block;"></canvas>
+      </div>
+    </div>
+    <div style="flex:1; position:relative; border-top:1px solid #0a2840;">
+      <div style="position:absolute;top:4px;left:8px;font-family:Orbitron,sans-serif;font-size:9px;color:#00ff88;letter-spacing:2px;z-index:1;">X-Z TOP</div>
+      <canvas id="simXZ" style="display:block;"></canvas>
+    </div>
+  </div>
+
+  <!-- RIGHT PANEL: Thruster controls + Data -->
+  <div class="right-panel">
+
+    <div class="panel-section">
+      <div class="section-title orange">Main Thruster (Centre)</div>
+      <div class="ctrl-row">
+        <div class="ctrl-label">Thrust Force (N) <span id="lbl_mt" style="color:var(--accent2)">0</span></div>
+        <input type="range" class="orange" min="0" max="300000" step="1000" value="0" id="sl_mt" oninput="updateThrusters()">
+      </div>
+      <div class="ctrl-row">
+        <div class="ctrl-label">Gimbal X (°) <span id="lbl_gimbal" style="color:var(--accent2)">0</span></div>
+        <input type="range" class="orange" min="-90" max="90" step="0.5" value="0" id="sl_gimbal" oninput="updateThrusters()">
+      </div>
+      <div class="angle-display">
+        <div class="angle-dial">
+          <div class="angle-needle" id="gimbalNeedle"></div>
+        </div>
+        <div style="font-size:9px; color:var(--dim)">Gimbal X<br>Direction</div>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <div class="section-title orange">Gimbal Z (Z-Y plane °) <span id="lbl_gimbalZ" style="color:var(--accent2)">0</span></div>
+      <input type="range" class="orange" min="-90" max="90" step="0.5" value="0" id="sl_gimbalZ" oninput="updateThrusters()">
+      <div class="angle-display" style="margin-top:4px;">
+        <div class="angle-dial">
+          <div class="angle-needle" id="gimbalNeedleZ"></div>
+        </div>
+        <div style="font-size:9px; color:var(--dim)">Gimbal Z<br>Direction</div>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <div class="section-title green">Side Thrusters L+R (theta)</div>
+      <div class="ctrl-row">
+        <div class="ctrl-label">Combined (N) <span id="lbl_st" style="color:var(--accent3)">0</span></div>
+        <input type="range" class="green" min="0" max="100000" step="500" value="0" id="sl_st" oninput="updateThrusters()">
+      </div>
+      <div style="font-size:9px; color:var(--dim); margin-top:2px;">L+R thrusters → torque_z (theta control)</div>
+    </div>
+
+    <div class="panel-section">
+      <div class="section-title green">Side Thrusters F+B (phi)</div>
+      <div class="ctrl-row">
+        <div class="ctrl-label">Combined (N) <span id="lbl_stFB" style="color:var(--accent3)">0</span></div>
+        <input type="range" class="green" min="0" max="100000" step="500" value="0" id="sl_stFB" oninput="updateThrusters()">
+      </div>
+      <div style="font-size:9px; color:var(--dim); margin-top:2px;">F+B thrusters → torque_x (phi control)</div>
+    </div>
+
+    <div class="panel-section">
+      <div class="section-title">Fuel Status</div>
+      <div class="data-row"><span class="key">Total Fuel</span><span class="val" id="d_fuelTotal">3000.0 kg</span></div>
+      <div class="data-row"><span class="key">Remaining</span><span class="val" id="d_fuelRem">3000.0 kg</span></div>
+      <div class="fuel-bar-wrap">
+        <div class="fuel-bar-bg"><div class="fuel-bar-fill" id="fuelBar" style="width:100%"></div></div>
+      </div>
+      <div class="data-row"><span class="key">ṁ main (kg/s)</span><span class="val" id="d_mdotMain">0.000</span></div>
+      <div class="data-row"><span class="key">ṁ side (kg/s)</span><span class="val" id="d_mdotSide">0.000</span></div>
+      <div class="data-row"><span class="key">ṁ total (kg/s)</span><span class="val" id="d_mdotTotal">0.000</span></div>
+      <div class="data-row"><span class="key">Ve main (m/s)</span><span class="val" id="d_veMain">3000</span></div>
+      <div class="data-row"><span class="key">Ve side (m/s)</span><span class="val" id="d_veSide">2800</span></div>
+      <div class="data-row"><span class="key">r main (kg/s)</span><span class="val" id="d_rMain">0.000</span></div>
+      <div class="data-row"><span class="key">r side (kg/s)</span><span class="val" id="d_rSide">0.000</span></div>
+    </div>
+
+    <div class="panel-section">
+      <div class="section-title">Kinematics</div>
+      <div class="data-row"><span class="key">X (m)</span><span class="val" id="d_x">0.0</span></div>
+      <div class="data-row"><span class="key">Y (m)</span><span class="val" id="d_y">0.0</span></div>
+      <div class="data-row"><span class="key">Z (m)</span><span class="val" id="d_z">0.0</span></div>
+      <div class="data-row"><span class="key">Vx (m/s)</span><span class="val" id="d_vx">0.0</span></div>
+      <div class="data-row"><span class="key">Vy (m/s)</span><span class="val" id="d_vy">0.0</span></div>
+      <div class="data-row"><span class="key">Vz (m/s)</span><span class="val" id="d_vz">0.0</span></div>
+      <div class="data-row"><span class="key">|V| (m/s)</span><span class="val" id="d_vmod">0.0</span></div>
+      <div class="data-row"><span class="key">Ax (m/s²)</span><span class="val" id="d_ax">0.0</span></div>
+      <div class="data-row"><span class="key">Ay (m/s²)</span><span class="val" id="d_ay">0.0</span></div>
+      <div class="data-row"><span class="key">Az (m/s²)</span><span class="val" id="d_az">0.0</span></div>
+      <div style="font-size:9px;color:#00ffcc;margin:3px 0 1px;">— Orientation (quaternion → dir cosines) —</div>
+      <div class="data-row"><span class="key">α (°, w/ X)</span><span class="val" id="d_alpha_dc">—</span></div>
+      <div class="data-row"><span class="key">β (°, w/ Y)</span><span class="val" id="d_beta_dc">—</span></div>
+      <div class="data-row"><span class="key">γ (°, w/ Z)</span><span class="val" id="d_gamma_dc">—</span></div>
+      <div style="font-size:9px;color:#00ffcc;margin:3px 0 1px;">— Angular Velocity (rad/s) —</div>
+      <div class="data-row"><span class="key">ωx (°/s)</span><span class="val" id="d_omx">0.0</span></div>
+      <div class="data-row"><span class="key">ωy (°/s)</span><span class="val" id="d_omy">0.0</span></div>
+      <div class="data-row"><span class="key">ωz (°/s)</span><span class="val" id="d_omz">0.0</span></div>
+      <div class="data-row"><span class="key">αx (°/s²)</span><span class="val" id="d_alx">0.0</span></div>
+      <div class="data-row"><span class="key">αy (°/s²)</span><span class="val" id="d_aly">0.0</span></div>
+      <div class="data-row"><span class="key">αz (°/s²)</span><span class="val" id="d_alz">0.0</span></div>
+    </div>
+
+    <div class="panel-section">
+      <div class="section-title">Forces & Torques</div>
+      <div class="data-row"><span class="key">F_gravity (N)</span><span class="val" id="d_fg">0.0</span></div>
+      <div class="data-row"><span class="key">F_thrust (N)</span><span class="val" id="d_ft">0.0</span></div>
+      <div class="data-row"><span class="key">F_drag (N)</span><span class="val" id="d_fd">0.0</span></div>
+      <div class="data-row"><span class="key">F_net_x (N)</span><span class="val" id="d_fnx">0.0</span></div>
+      <div class="data-row"><span class="key">F_net_y (N)</span><span class="val" id="d_fny">0.0</span></div>
+      <div class="data-row"><span class="key">F_net_z (N)</span><span class="val" id="d_fnz">0.0</span></div>
+      <div class="data-row"><span class="key">τ_x (N·m)</span><span class="val" id="d_tx">0.0</span></div>
+      <div class="data-row"><span class="key">τ_y (N·m)</span><span class="val" id="d_ty">0.0</span></div>
+      <div class="data-row"><span class="key">τ_z (N·m)</span><span class="val" id="d_tz">0.0</span></div>
+      <div class="data-row"><span class="key">τ_net (N·m)</span><span class="val" id="d_tn">0.0</span></div>
+      <div class="data-row"><span class="key">Mass (kg)</span><span class="val" id="d_mass">8000.0</span></div>
+      <div class="data-row"><span class="key">CoM height (m)</span><span class="val" id="d_com">10.0</span></div>
+      <div class="data-row"><span class="key">I_x (kg·m²)</span><span class="val" id="d_ix">0.0</span></div>
+      <div class="data-row"><span class="key">I_y (kg·m²)</span><span class="val" id="d_iy">0.0</span></div>
+      <div class="data-row"><span class="key">I_z (kg·m²)</span><span class="val" id="d_iz">0.0</span></div>
+    </div>
+
+    <div class="panel-section">
+      <div class="section-title">Trajectory</div>
+      <div class="data-row"><span class="key">Alt Y (m)</span><span class="val" id="d_alt">0.0</span></div>
+      <div class="data-row"><span class="key">Range X (m)</span><span class="val" id="d_range">0.0</span></div>
+      <div class="data-row"><span class="key">Range Z (m)</span><span class="val" id="d_rangez">0.0</span></div>
+      <div class="data-row"><span class="key">Impact X (m)</span><span class="val" id="d_impactX">—</span></div>
+      <div class="data-row"><span class="key">Impact Z (m)</span><span class="val" id="d_impactZ">—</span></div>
+      <div class="data-row"><span class="key">Max Alt (m)</span><span class="val" id="d_maxAlt">0.0</span></div>
+      <div class="data-row"><span class="key">Time (s)</span><span class="val" id="d_time">0.0</span></div>
+    </div>
+
+    <div class="panel-section" id="testPanel" style="border-color:#cc44ff;">
+      <div class="section-title" style="color:#cc44ff;">🎯 Landing Test</div>
+      <div style="font-size:9px;color:var(--dim);margin-bottom:6px;" id="testStatus">
+        Inactive — activate when vy &lt; 0
+      </div>
+      <div class="data-row"><span class="key">T (s)</span><span class="val" id="td_T">—</span></div>
+      <div class="data-row"><span class="key">t elapsed (s)</span><span class="val" id="td_t">—</span></div>
+      <div class="data-row"><span class="key">t remaining (s)</span><span class="val" id="td_tr">—</span></div>
+      <div class="data-row"><span class="key">s=(g·T−vy)/Ve</span><span class="val" id="td_s">—</span></div>
+      <div class="data-row"><span class="key">K fuel (kg)</span><span class="val" id="td_K">—</span></div>
+      <div class="data-row"><span class="key">a coeff r(t)</span><span class="val" id="td_a">—</span></div>
+      <div class="data-row"><span class="key">b coeff r(t)</span><span class="val" id="td_b">—</span></div>
+      <div class="data-row"><span class="key">F(t) now (N)</span><span class="val" id="td_F">—</span></div>
+      <div class="data-row"><span class="key">F hover (N)</span><span class="val" id="td_Ff">—</span></div>
+      <div class="data-row"><span class="key">F_x (N)</span><span class="val" id="td_Fx">—</span></div>
+      <div class="data-row"><span class="key">F_y (N)</span><span class="val" id="td_Fy">—</span></div>
+      <div style="font-size:9px;color:#cc44ff;margin:4px 0 2px;">— Rotational EQ —</div>
+      <div class="data-row"><span class="key">RE active</span><span class="val" id="td_re_active">—</span></div>
+      <div class="data-row"><span class="key">RE t_local (s)</span><span class="val" id="td_re_t">—</span></div>
+      <div class="data-row"><span class="key">RE Tr (s)</span><span class="val" id="td_re_Tr">—</span></div>
+      <div class="data-row"><span class="key">RE e coeff</span><span class="val" id="td_re_e">—</span></div>
+      <div class="data-row"><span class="key">RE f coeff</span><span class="val" id="td_re_f">—</span></div>
+      <div class="data-row"><span class="key">RE calls</span><span class="val" id="td_re_calls">0</span></div>
+    </div>
+
+    <!-- HOVER→LAND LIVE DATA -->
+    <div class="panel-section" id="hlDataPanel" style="display:none; border-color:#00ffcc;">
+      <div class="section-title" style="color:#00ffcc;">🚀 H→L Live Data</div>
+      <div style="font-size:9px;color:var(--dim);margin-bottom:4px;" id="hlLiveStatus">Inactive</div>
+      <div class="data-row"><span class="key">t / T (s)</span><span class="val" id="hl_t">—</span></div>
+      <div class="data-row"><span class="key">S (rad)</span><span class="val" id="hl_S">—</span></div>
+      <div style="font-size:9px;color:#00ffcc;margin:3px 0 1px;">— Translational X —</div>
+      <div class="data-row"><span class="key">aX (m/s²)</span><span class="val" id="hl_aX">—</span></div>
+      <div class="data-row"><span class="key">vX (m/s)</span><span class="val" id="hl_vX">—</span></div>
+      <div class="data-row"><span class="key">dX (m)</span><span class="val" id="hl_dX">—</span></div>
+      <div class="data-row"><span class="key">Fx_world (N)</span><span class="val" id="hl_Fxw">—</span></div>
+      <div style="font-size:9px;color:#00ffcc;margin:3px 0 1px;">— Vertical Y —</div>
+      <div class="data-row"><span class="key">aY (m/s²)</span><span class="val" id="hl_aY">—</span></div>
+      <div class="data-row"><span class="key">vY (m/s)</span><span class="val" id="hl_vY">—</span></div>
+      <div class="data-row"><span class="key">dY (m)</span><span class="val" id="hl_dY">—</span></div>
+      <div class="data-row"><span class="key">Fy_world (N)</span><span class="val" id="hl_Fyw">—</span></div>
+      <div style="font-size:9px;color:#00ffcc;margin:3px 0 1px;">— Translational Z —</div>
+      <div class="data-row"><span class="key">aZ (m/s²)</span><span class="val" id="hl_aZ">—</span></div>
+      <div class="data-row"><span class="key">vZ (m/s)</span><span class="val" id="hl_vZ">—</span></div>
+      <div class="data-row"><span class="key">dZ (m)</span><span class="val" id="hl_dZ">—</span></div>
+      <div class="data-row"><span class="key">Fz_world (N)</span><span class="val" id="hl_Fzw">—</span></div>
+      <div style="font-size:9px;color:#00ffcc;margin:3px 0 1px;">— Rotational phi (X-axis) —</div>
+      <div class="data-row"><span class="key">alpha_phi (°/s²)</span><span class="val" id="hl_alphPhi">—</span></div>
+      <div class="data-row"><span class="key">omega_phi (°/s)</span><span class="val" id="hl_omegPhi">—</span></div>
+      <div class="data-row"><span class="key">phi (°)</span><span class="val" id="hl_phi">—</span></div>
+      <div class="data-row"><span class="key">Gimbal X (°)</span><span class="val" id="hl_gimbalX_disp">—</span></div>
+      <div class="data-row"><span class="key">Gimbal Z (°)</span><span class="val" id="hl_gimbalZ_disp">—</span></div>
+      <div class="data-row"><span class="key">Thrust mag (N)</span><span class="val" id="hl_Tmag">—</span></div>
+      <div class="data-row"><span class="key">X err (m)</span><span class="val" id="hl_Xerr">—</span></div>
+      <div class="data-row"><span class="key">Y err (m)</span><span class="val" id="hl_Yerr">—</span></div>
+
+      <!-- COMPARISON: Formula vs Actual -->
+      <div style="font-size:9px;color:#ffcc00;margin:6px 0 2px;border-top:1px solid #0a2840;padding-top:4px;">— Formula vs Actual (X) —</div>
+      <div class="data-row"><span class="key" style="color:#00ffcc;">aX formula</span><span class="val" id="cmp_aX_f">—</span></div>
+      <div class="data-row"><span class="key" style="color:#ffcc00;">aX actual</span><span class="val" id="cmp_aX_r">—</span></div>
+      <div class="data-row"><span class="key" style="color:#ff6b00;">aX diff</span><span class="val" id="cmp_aX_d">—</span></div>
+      <div class="data-row"><span class="key" style="color:#00ffcc;">vX formula</span><span class="val" id="cmp_vX_f">—</span></div>
+      <div class="data-row"><span class="key" style="color:#ffcc00;">vX actual</span><span class="val" id="cmp_vX_r">—</span></div>
+      <div class="data-row"><span class="key" style="color:#ff6b00;">vX diff</span><span class="val" id="cmp_vX_d">—</span></div>
+      <div class="data-row"><span class="key" style="color:#00ffcc;">X formula (rel)</span><span class="val" id="cmp_X_f">—</span></div>
+      <div class="data-row"><span class="key" style="color:#ffcc00;">X actual (rel)</span><span class="val" id="cmp_X_r">—</span></div>
+      <div class="data-row"><span class="key" style="color:#ff6b00;">X diff</span><span class="val" id="cmp_X_d">—</span></div>
+
+      <div style="font-size:9px;color:#ffcc00;margin:6px 0 2px;border-top:1px solid #0a2840;padding-top:4px;">— Formula vs Actual (Y) —</div>
+      <div class="data-row"><span class="key" style="color:#00ffcc;">aY formula</span><span class="val" id="cmp_aY_f">—</span></div>
+      <div class="data-row"><span class="key" style="color:#ffcc00;">aY actual</span><span class="val" id="cmp_aY_r">—</span></div>
+      <div class="data-row"><span class="key" style="color:#ff6b00;">aY diff</span><span class="val" id="cmp_aY_d">—</span></div>
+      <div class="data-row"><span class="key" style="color:#00ffcc;">vY formula</span><span class="val" id="cmp_vY_f">—</span></div>
+      <div class="data-row"><span class="key" style="color:#ffcc00;">vY actual</span><span class="val" id="cmp_vY_r">—</span></div>
+      <div class="data-row"><span class="key" style="color:#ff6b00;">vY diff</span><span class="val" id="cmp_vY_d">—</span></div>
+      <div class="data-row"><span class="key" style="color:#00ffcc;">Y formula (rel)</span><span class="val" id="cmp_Y_f">—</span></div>
+      <div class="data-row"><span class="key" style="color:#ffcc00;">Y actual (rel)</span><span class="val" id="cmp_Y_r">—</span></div>
+      <div class="data-row"><span class="key" style="color:#ff6b00;">Y diff</span><span class="val" id="cmp_Y_d">—</span></div>
+
+      <div style="font-size:9px;color:#ffcc00;margin:6px 0 2px;border-top:1px solid #0a2840;padding-top:4px;">— Formula vs Actual (θ rotation) —</div>
+      <div class="data-row"><span class="key" style="color:#00ffcc;">α formula (°/s²)</span><span class="val" id="cmp_al_f">—</span></div>
+      <div class="data-row"><span class="key" style="color:#ffcc00;">α actual (°/s²)</span><span class="val" id="cmp_al_r">—</span></div>
+      <div class="data-row"><span class="key" style="color:#ff6b00;">α diff</span><span class="val" id="cmp_al_d">—</span></div>
+      <div class="data-row"><span class="key" style="color:#00ffcc;">ω formula (°/s)</span><span class="val" id="cmp_om_f">—</span></div>
+      <div class="data-row"><span class="key" style="color:#ffcc00;">ω actual (°/s)</span><span class="val" id="cmp_om_r">—</span></div>
+      <div class="data-row"><span class="key" style="color:#ff6b00;">ω diff</span><span class="val" id="cmp_om_d">—</span></div>
+      <div class="data-row"><span class="key" style="color:#00ffcc;">θ formula (°)</span><span class="val" id="cmp_th_f">—</span></div>
+      <div class="data-row"><span class="key" style="color:#ffcc00;">θ actual (°)</span><span class="val" id="cmp_th_r">—</span></div>
+      <div class="data-row"><span class="key" style="color:#ff6b00;">θ diff</span><span class="val" id="cmp_th_d">—</span></div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ===================== PHYSICS CONSTANTS =====================
+const Ve_MAIN = 3000;
+const Ve_SIDE = 2800;
+const Cd = 0.4;
+const RHO_AIR = 1.225;
+const SCALE_PIX_PER_M = 2;
+
+// ===================== STATE =====================
+let state = {};
+let running = false;
+let animId = null;
+let lastTime = null;
+let simTime = 0;
+let maxAlt = 0;
+let trajectory = [];
+let opts = { traj: true, forces: true, com: true, impact: true, vel: true, grid: true, drag: false };
+
+// ===================== QUATERNION HELPERS =====================
+// q = {w, x, y, z}  (unit quaternion representing rotation)
+function qMul(a, b) {
+  return {
+    w: a.w*b.w - a.x*b.x - a.y*b.y - a.z*b.z,
+    x: a.w*b.x + a.x*b.w + a.y*b.z - a.z*b.y,
+    y: a.w*b.y - a.x*b.z + a.y*b.w + a.z*b.x,
+    z: a.w*b.z + a.x*b.y - a.y*b.x + a.z*b.w,
+  };
+}
+function qNorm(q) {
+  const n = Math.sqrt(q.w*q.w + q.x*q.x + q.y*q.y + q.z*q.z);
+  return { w:q.w/n, x:q.x/n, y:q.y/n, z:q.z/n };
+}
+// dq/dt = 0.5 * q ⊗ [0, wx, wy, wz]
+function qDeriv(q, wx, wy, wz) {
+  const p = { w:0, x:wx, y:wy, z:wz };
+  const d = qMul(q, p);
+  return { w:0.5*d.w, x:0.5*d.x, y:0.5*d.y, z:0.5*d.z };
+}
+// Rotation matrix from quaternion — returns 3x3 as flat array [row-major]
+function qToMatrix(q) {
+  const {w,x,y,z} = q;
+  return [
+    1-2*(y*y+z*z),   2*(x*y-w*z),   2*(x*z+w*y),
+    2*(x*y+w*z),   1-2*(x*x+z*z),   2*(y*z-w*x),
+    2*(x*z-w*y),     2*(y*z+w*x), 1-2*(x*x+y*y),
+  ];
+}
+// Get rocket nose axis (world frame) — rocket points along body Y-axis initially
+function rocketAxis(q) {
+  const m = qToMatrix(q);
+  // Body Y-axis in world frame = column 1 of R (index 1,4,7)
+  return { x: m[1], y: m[4], z: m[7] };
+}
+// Direction cosine angles from rocket axis
+function dirCosines(q) {
+  const n = rocketAxis(q);
+  return {
+    alpha: Math.acos(Math.max(-1, Math.min(1, n.x))),
+    beta:  Math.acos(Math.max(-1, Math.min(1, n.y))),
+    gamma: Math.acos(Math.max(-1, Math.min(1, n.z))),
+  };
+}
+// Quaternion from axis-angle
+function qFromAxisAngle(ax, ay, az, angle) {
+  const s = Math.sin(angle/2);
+  return { w: Math.cos(angle/2), x: ax*s, y: ay*s, z: az*s };
+}
+
+// ===================== TEST MODE (Landing Controller) =====================
+let testMode = {
+  active: false,
+  T: 0,          // total time to impact at activation instant
+  t: 0,          // elapsed time since activation
+  M: 0,          // total mass at activation instant
+  s: 0,          // v/u = vy / Ve_MAIN at activation
+  K: 0,          // fuel to burn = M*(1 - e^s)
+  a: 0,          // parabolic thrust coeff (t²)
+  b: 0,          // parabolic thrust coeff (t)
+  F_final: 0,    // thrust magnitude locked after t >= T
+  Fx: 0,         // X-component of thrust force (N)
+  Fy: 0,         // Y-component of thrust force (N)
+  locked: false, // true once t >= T
+
+  // ---- Rotational Equilibrium (RE) sub-controller ----
+  re: {
+    active:  false,
+    t:       0,
+    Tr:      0,
+    e:       0,   // cubic alpha coeff  (t³ term)
+    f:       0,   // quadratic alpha coeff (t² term)
+    g:       0,   // linear alpha coeff (t  term)
+    rC:      0,
+    callCount: 0,
+  },
+  // ---- RE for Z-Y plane (phi / omx axis) ----
+  re_phi: {
+    active:  false,
+    t:       0,
+    Tr:      0,
+    e:       0,
+    f:       0,
+    g:       0,
+    rC:      0,
+    callCount: 0,
+  },
+};
+
+// ===================== HOVER→LAND MODE =====================
+// Formula set (same structure for X, Y, theta):
+//   S(t)  = π*t / (2*T)
+//   A(t)  = K * sin(S)                           ← acceleration
+//   B(t)  = (2*K*T/π) * (1 - cos(S))            ← velocity
+//   C(t)  = (2*K*T/π) * (t - (2*T/π)*sin(S))    ← displacement
+//   K     = π*Z / (8*T²)                         ← amplitude constant
+//
+// For X:  Z = initial horizontal dist to target, A=accelX, Fx_world = M*A
+// For Y:  Z = initial vertical dist to target,   A=accelY, Fy_world = M*A
+// For θ:  Z = theta0 (rad),                      A=alpha,  Fx_rocket = I*A/rc
+
+let hl = {
+  active: false,
+  T: 0, t: 0,
+  // 3D displacement to target at landing start
+  Z_X: 0, Z_Y: 0, Z_Z: 0,
+  // Initial velocities at landing start
+  Vi_X: 0, Vi_Y: 0, Vi_Z: 0,
+  // Target positions
+  targetX: 0, targetY: 0, targetZ: 0,
+  // Live display values
+  _S: 0,
+  _aX: 0, _vX: 0, _dX: 0,
+  _aY: 0, _vY: 0, _dY: 0,
+  _aZ: 0, _vZ: 0, _dZ: 0,
+  _Fxw: 0, _Fyw: 0, _Fzw: 0,
+  _Tmag: 0, _gimbalX: 0, _gimbalZ: 0,
+  formulaActive: false,
+  hovering: false,
+};
+
+function hlFormula(t, T, Vi, D) {
+  // New formula: a(t) = -A*sin(ωt - k1) - sin(k2)
+  // Parameters: T = total time, Vi = initial velocity, D = displacement to target
+  //
+  // ω = 2π/T
+  // k1 = arccot( π*(1 - 2D/(Vi*T)) )  = atan2(1, π*(1 - 2D/(Vi*T)))
+  // k2 = arcsin( -Vi/T )               — warns if out of [-1,1]
+  // A  = -Vi / (T * sin(k1))           — warns if sin(k1) near zero
+  //
+  // v(t) = Vi + (Vi/(2π sin(k1)))[cos(ωt-k1) - cos(k1)] - (Vi/T)*t
+  // x(t) = Vi*t + (Vi/(2π sin(k1)))*[(T/2π)*sin(ωt-k1) - t*cos(k1) + (T/2π)*sin(k1)]
+  //        - (Vi/(2T))*t²
+
+  const omega = 2 * Math.PI / T;
+
+  // Vi near-zero guard — agar velocity almost zero hai toh koi acceleration nahi chahiye
+  if (Math.abs(Vi) < 0.01) {
+    return { a: 0, v: 0, x: 0, k1: 0, k2: 0, A: 0, omega };
+  }
+
+  // k1 via arccot: arccot(x) = atan2(1, x)
+  const cotArg = Math.PI * (1 - (2 * D) / (Vi * T));
+  const k1 = Math.atan2(1, cotArg);
+
+  // k2 via arcsin — range check
+  const arcsinArg = -Vi / T;
+  let k2;
+  if (arcsinArg < -1 || arcsinArg > 1) {
+    console.warn(`[hlFormula] arcsin arg out of range: -Vi/T = ${arcsinArg.toFixed(4)}. Vi=${Vi.toFixed(2)}, T=${T.toFixed(2)}. Increase T or reduce Vi. Clamping.`);
+    k2 = Math.asin(Math.max(-1, Math.min(1, arcsinArg)));
+  } else {
+    k2 = Math.asin(arcsinArg);
+  }
+
+  // A — sin(k1) near-zero check
+  const sinK1 = Math.sin(k1);
+  if (Math.abs(sinK1) < 1e-6) {
+    console.warn(`[hlFormula] sin(k1) near zero (${sinK1.toExponential(3)}). k1=${k1.toFixed(6)}. Formula may be unstable.`);
+  }
+  const A = (Math.abs(sinK1) < 1e-6) ? 0 : -Vi / (T * sinK1);
+
+  // a(t)
+  const phase = omega * t - k1;
+  const a = -A * Math.sin(phase) - Math.sin(k2);
+
+  // v(t)
+  const v = Vi
+    + (Vi / (2 * Math.PI * sinK1)) * (Math.cos(phase) - Math.cos(k1))
+    - (Vi / T) * t;
+
+  // x(t)
+  const x = Vi * t
+    + (Vi / (2 * Math.PI * sinK1)) * ((T / (2 * Math.PI)) * Math.sin(phase) - t * Math.cos(k1) + (T / (2 * Math.PI)) * Math.sin(k1))
+    - (Vi / (2 * T)) * t * t;
+
+  return { a, v, x, k1, k2, A, omega };
+}
+
+function showHLPanel() {
+  const p = document.getElementById('hlConfigPanel');
+  p.style.display = p.style.display === 'none' ? 'block' : 'none';
+}
+
+function loadHLPreset() {
+  resetSim();
+
+  // ── Hardcoded Preset ──
+  const PRESET = {
+    dryMass  : 5000,
+    fuelMass : 3000,
+    rocketH  : 20,
+    rocketW  : 4,
+    gravity  : 9.81,
+    x        : -100,   // start position
+    y        : 500,    // altitude 300m
+    vx       : 10,     // rightward drift
+    vy       : -15,    // falling
+    theta    : 15,     // deg tilted
+    omega    : -0.05,  // rad/s spin
+  };
+
+  const T_total = parseFloat(document.getElementById('sl_hl_T').value);
+  const targetX = parseFloat(document.getElementById('hl_targetX_inp').value);
+  const targetY = parseFloat(document.getElementById('hl_targetY_inp').value);
+
+  // Sync sliders
+  initCfg.dryMass  = PRESET.dryMass;
+  initCfg.fuelMass = PRESET.fuelMass;
+  initCfg.rocketH  = PRESET.rocketH;
+  initCfg.rocketW  = PRESET.rocketW;
+  initCfg.gravity  = PRESET.gravity;
+  initCfg.initAngle = 0;
+  document.getElementById('sl_mass').value = PRESET.dryMass;
+  document.getElementById('sl_fuel').value = PRESET.fuelMass;
+  document.getElementById('sl_rh').value   = PRESET.rocketH;
+  document.getElementById('sl_rw').value   = PRESET.rocketW;
+  document.getElementById('sl_grav').value = PRESET.gravity;
+  document.getElementById('sl_ang').value  = 0;
+  updateLabels();
+
+  const totalMass = PRESET.dryMass + PRESET.fuelMass;
+  const comH = computeCoM(PRESET.fuelMass, totalMass, PRESET.rocketH);
+  const moi  = momentOfInertia(totalMass, PRESET.rocketH, PRESET.rocketW, comH);
+  const q0   = qFromAxisAngle(0, 0, 1, PRESET.theta * Math.PI / 180);
+
+  state = {
+    x: PRESET.x, y: PRESET.y, z: 0,
+    vx: PRESET.vx, vy: PRESET.vy, vz: 0,
+    ax: 0, ay: 0, az: 0,
+    qw: q0.w, qx: q0.x, qy: q0.y, qz: q0.z,
+    omx: 0, omy: 0, omz: PRESET.omega,
+    alx: 0, aly: 0, alz: 0,
+    mass: totalMass, dryMass: PRESET.dryMass,
+    fuelMass: PRESET.fuelMass, fuelMassInit: PRESET.fuelMass,
+    H: PRESET.rocketH, W: PRESET.rocketW,
+    gravity: PRESET.gravity,
+    comH: comH, Ix: moi.Ix, Iy: moi.Iy, Iz: moi.Iz,
+    crashed: false, landed: false,
+  };
+
+  maxAlt = PRESET.y;
+  trajectory = [[PRESET.x, PRESET.y, 0]];
+
+  const targetZ = parseFloat(document.getElementById('hl_targetZ_inp')?.value || 0);
+  hl.T = T_total;
+  hl.Z_X = targetX - PRESET.x;
+  hl.Z_Y = PRESET.y - targetY;
+  hl.Z_Z = targetZ - 0;
+  hl.targetX = targetX; hl.targetY = targetY; hl.targetZ = targetZ;
+  hl.active = false; hl.hovering = false; hl.t = 0;
+
+  console.log("=== HOVER→LAND PRESET LOADED ===");
+  console.log(`Start: x=${PRESET.x} y=${PRESET.y} vx=${PRESET.vx} vy=${PRESET.vy} theta=${PRESET.theta}° omega=${PRESET.omega}rad/s`);
+  console.log(`Target: x=${targetX} y=${targetY}  T=${T_total}s`);
+
+  document.getElementById('hlStatus').textContent = `Preset loaded — y=300, tilted ${PRESET.theta}°. Press ② to hover+land.`;
+  updateDataPanel(); drawFrame(); updateStatusUI('stopped');
+}
+
+function hlBtn2Click() {
+  if (!hl.active) {
+    // First press: start hover
+    activateHL();
+    document.getElementById('btnHL2').textContent = '③ BEGIN LANDING';
+    document.getElementById('btnHL2').style.borderColor = '#ffaa00';
+    document.getElementById('btnHL2').style.color = '#ffaa00';
+  } else if (hl.hovering) {
+    // Second press: transition to landing
+    beginHLLanding();
+    document.getElementById('btnHL2').textContent = '— LANDING —';
+    document.getElementById('btnHL2').style.borderColor = '#ff2244';
+    document.getElementById('btnHL2').style.color = '#ff2244';
+  }
+}
+
+function activateHL() {
+  if (hl.T <= 0) {
+    document.getElementById('hlStatus').textContent = 'ERR: Load preset first!';
+    return;
+  }
+  // Auto-start sim if not running
+  if (!running) startSim();
+
+  hl.active   = true;
+  hl.hovering = true;   // start in hover phase — engine on, balance Mg
+  hl.t        = 0;
+  document.getElementById('hlDataPanel').style.display = 'block';
+  document.getElementById('hlLiveStatus').textContent  = 'HOVERING — balancing Mg';
+  document.getElementById('hlStatus').textContent = `Hovering... press again to begin landing`;
+  console.log("=== HOVER→LAND: HOVER PHASE START ===");
+}
+
+// Call this to transition from hover → land
+function beginHLLanding() {
+  if (!hl.active || !hl.hovering) return;
+  hl.hovering = false;
+
+  const s = state;
+  const g  = s.gravity;
+  const H  = s.y - 100;        // target stable at 100m above ground
+  const V0 = s.vy;
+  const M  = s.mass;
+
+  if (H <= 0) { alert("Altitude too low (need > 100m)."); return; }
+  if (V0 >= 0) { alert("Rocket must be falling (vy < 0)."); return; }
+
+  // T = -3H / (2*V0)  — time to reach 100m altitude
+  const T = (-3 * H) / (2 * V0);
+  if (T <= 0.1) { alert("Too close to target altitude."); return; }
+  const p = -V0 / (T * T);
+  const t_hover = Math.sqrt(-V0 / p);
+
+  // Store in testMode — reuse existing controller
+  testMode.active            = true;
+  testMode.locked            = false;
+  testMode.T                 = T;
+  testMode.t                 = 0;
+  testMode.M                 = M;
+  testMode.Ve                = Ve_MAIN;
+  testMode.H                 = H;
+  testMode.V0                = V0;
+  testMode.p                 = p;
+  testMode.q                 = 0;
+  testMode.g                 = g;
+  testMode.t_hover           = t_hover;
+  testMode.hovering          = false;
+  testMode.F_final           = 0;
+  testMode.K                 = 0;
+  testMode.s                 = 0;
+  testMode.Fx                = 0;
+  testMode.Fy                = 0;
+  testMode._fuelAtActivation = s.fuelMass;
+  testMode._impactLogged     = false;
+  testMode._hlHandoff        = false;   // flag: HL hover shuru hua?
+
+  // RE controller — both axes
+  testMode.re.active    = false;
+  testMode.re.t         = 0;
+  testMode.re.g         = 0;
+  testMode.re.callCount = 0;
+  testMode.re_phi.active    = false;
+  testMode.re_phi.t         = 0;
+  testMode.re_phi.g         = 0;
+  testMode.re_phi.callCount = 0;
+  const dc_re   = dirCosines({w:s.qw||1,x:s.qx||0,y:s.qy||0,z:s.qz||0});
+  const tiltXY_ = dc_re.beta  * 180/Math.PI;
+  const tiltZY_ = dc_re.gamma * 180/Math.PI;
+  rotationalEquilibrium(tiltXY_, s.omz||0, T, 'z');
+  rotationalEquilibrium(tiltZY_, s.omx||0, T, 'x');
+
+  // HL formula params — snap Z values for later
+  hl.stab        = null;
+  hl.formulaActive = false;
+  hl.t           = 0;
+
+  console.log(`=== HL STAB via testMode ===`);
+  console.log(`H_eff=${H.toFixed(2)}m  T=${T.toFixed(3)}s  t_hover=${t_hover.toFixed(3)}s`);
+  document.getElementById('hlLiveStatus').textContent = 'STABILIZING — decel + RE';
+  document.getElementById('hlStatus').textContent = `Stabilizing to 100m, then HL formula`;
+}
+
+function stepHL(dt) {
+  if (!hl.active) return;
+  const s = state;
+
+  if (hl.hovering) {
+    ctrl.mainThrust = s.mass * s.gravity;
+    ctrl.gimbalDegX = 0; ctrl.gimbalDegZ = 0;
+    document.getElementById('sl_mt').value = Math.min(300000, ctrl.mainThrust);
+    document.getElementById('lbl_mt').textContent = ctrl.mainThrust.toFixed(0);
+    return;
+  }
+
+  if (!hl.formulaActive) {
+    const dc = dirCosines({ w:s.qw, x:s.qx, y:s.qy, z:s.qz });
+    const betaDeg = dc.beta * 180/Math.PI;
+    const omMag = Math.hypot(s.omx, s.omy, s.omz);
+    const atAlt = Math.abs(s.y - 100) <= 2;
+    if (atAlt && betaDeg < 1.0 && omMag < 0.005 && !testMode._hlHandoff) {
+      testMode._hlHandoff = true; testMode.active = false; testMode.locked = true;
+      s.qw=1; s.qx=0; s.qy=0; s.qz=0;
+      s.omx=0; s.omy=0; s.omz=0;
+      hl.Vi_X = s.vx; hl.Vi_Y = s.vy; hl.Vi_Z = s.vz;
+      hl.Z_X = hl.targetX - s.x;
+      hl.Z_Y = s.y - hl.targetY;
+      hl.Z_Z = hl.targetZ - s.z;
+      hl.t = 0; hl.formulaActive = true;
+      document.getElementById('hlLiveStatus').textContent = 'LANDING — formula active';
+    }
+    return;
+  }
+
+  if (hl.t >= hl.T) {
+    hl.active = false;
+    ctrl.mainThrust = 0; ctrl.gimbalDegX = 0; ctrl.gimbalDegZ = 0;
+    document.getElementById('hlLiveStatus').textContent = '✅ LANDED';
+    document.getElementById('sl_mt').value = 0;
+    document.getElementById('lbl_mt').textContent = '0';
+    return;
+  }
+
+  const t = hl.t, T = hl.T, g = s.gravity, M = s.mass;
+
+  // X, Y, Z formula
+  const fX = hlFormula(t, T, hl.Vi_X, hl.Z_X);
+  const fY = hlFormula(t, T, hl.Vi_Y, -hl.Z_Y);
+  const fZ = hlFormula(t, T, hl.Vi_Z, hl.Z_Z);
+
+  const Fx_w = M * (-fX.a);
+  const Fy_w = M * (g + (-fY.a));
+  const Fz_w = M * (-fZ.a);
+
+  // World-frame force → body frame via R^T (inverse of rotation matrix)
+  // thrustForces() does: world_F = R * body_nb * T
+  // So to invert: body_F = R^T * world_F
+  const mHL = qToMatrix({w:s.qw, x:s.qx, y:s.qy, z:s.qz});
+  // R^T: element [i][j] of R^T = element [j][i] of R (row-major flat array)
+  const Fb_x = mHL[0]*Fx_w + mHL[3]*Fy_w + mHL[6]*Fz_w;
+  const Fb_y = mHL[1]*Fx_w + mHL[4]*Fy_w + mHL[7]*Fz_w;  // along body axis
+  const Fb_z = mHL[2]*Fx_w + mHL[5]*Fy_w + mHL[8]*Fz_w;
+  // Fb_y = along-rocket component (must be >= 0, can't pull)
+  const F_along = Math.max(0, Fb_y);
+  const thrust_mag = Math.sqrt(F_along*F_along + Fb_x*Fb_x + Fb_z*Fb_z);
+  // Gimbal angles in body frame
+  const gX_rad = Math.atan2(Fb_x, F_along);
+  const gZ_rad = Math.atan2(Fb_z, F_along);
+
+  ctrl.mainThrust = Math.max(0, thrust_mag);
+  ctrl.gimbalDegX = gX_rad * 180/Math.PI;
+  ctrl.gimbalDegZ = gZ_rad * 180/Math.PI;
+
+  document.getElementById('sl_mt').value = Math.min(300000, ctrl.mainThrust);
+  document.getElementById('lbl_mt').textContent = ctrl.mainThrust.toFixed(0);
+  document.getElementById('sl_gimbal').value = Math.max(-90,Math.min(90,ctrl.gimbalDegX));
+  document.getElementById('lbl_gimbal').textContent = ctrl.gimbalDegX.toFixed(1);
+  document.getElementById('gimbalNeedle').style.transform = `translateX(-50%) rotate(${ctrl.gimbalDegX}deg)`;
+  document.getElementById('sl_gimbalZ').value = Math.max(-90,Math.min(90,ctrl.gimbalDegZ));
+  document.getElementById('lbl_gimbalZ').textContent = ctrl.gimbalDegZ.toFixed(1);
+  document.getElementById('gimbalNeedleZ').style.transform = `translateX(-50%) rotate(${ctrl.gimbalDegZ}deg)`;
+
+  hl._S  = fX.omega * t;
+  hl._aX = fX.a; hl._vX = fX.v; hl._dX = fX.x;
+  hl._aY = fY.a; hl._vY = fY.v; hl._dY = fY.x;
+  hl._aZ = fZ.a; hl._vZ = fZ.v; hl._dZ = fZ.x;
+  hl._Fxw = Fx_w; hl._Fyw = Fy_w; hl._Fzw = Fz_w;
+  hl._Tmag = thrust_mag; hl._gimbalX = ctrl.gimbalDegX; hl._gimbalZ = ctrl.gimbalDegZ;
+
+  hl.t += dt;
+}
+
+// Thruster controls (runtime)
+let ctrl = {
+  mainThrust: 0,    // N  (magnitude)
+  gimbalDegX: 0,    // degrees (tilt in X-Y plane, was gimbalDeg)
+  gimbalDegZ: 0,    // degrees (tilt in Z-Y plane, new)
+  sideThrustLR: 0,  // N combined (L+R → torque around Z / theta control)
+  sideThrustFB: 0,  // N combined (F+B → torque around X / phi control)
+  // Legacy alias so old display code still works
+  get gimbalDeg()    { return this.gimbalDegX; },
+  set gimbalDeg(v)   { this.gimbalDegX = v; },
+  get sideThrust()   { return this.sideThrustLR; },
+  set sideThrust(v)  { this.sideThrustLR = v; },
+};
+
+// Init config
+let initCfg = {
+  dryMass: 5000,
+  fuelMass: 3000,
+  rocketH: 20,
+  rocketW: 4,
+  initAngle: 0,
+  gravity: 9.81,
+};
+
+// ===================== INIT =====================
+function buildInitState() {
+  const totalMass = initCfg.dryMass + initCfg.fuelMass;
+  const H = initCfg.rocketH;
+  const W = initCfg.rocketW;
+  const thetaDeg = initCfg.initAngle;  // initial tilt in X-Y plane (degrees)
+
+  const comH = computeCoM(initCfg.fuelMass, totalMass, H);
+  const moi  = momentOfInertia(totalMass, H, W, comH);
+
+  // Quaternion: tilt rocket by initAngle around Z-axis (tipping in X-Y plane)
+  const q0 = qFromAxisAngle(0, 0, 1, thetaDeg * Math.PI / 180);
+
+  return {
+    x: 0, y: 0, z: 0,
+    vx: 0, vy: 0, vz: 0,
+    ax: 0, ay: 0, az: 0,
+    // Quaternion orientation
+    qw: q0.w, qx: q0.x, qy: q0.y, qz: q0.z,
+    // Angular velocity in world frame (rad/s)
+    omx: 0, omy: 0, omz: 0,
+    // Angular acceleration
+    alx: 0, aly: 0, alz: 0,
+    mass: totalMass,
+    dryMass: initCfg.dryMass,
+    fuelMass: initCfg.fuelMass,
+    fuelMassInit: initCfg.fuelMass,
+    H: H, W: W,
+    gravity: initCfg.gravity,
+    comH: comH,
+    Ix: moi.Ix, Iy: moi.Iy, Iz: moi.Iz,
+    crashed: false, landed: false,
+  };
+}
+
+function computeCoM(fuelMass, totalMass, H) {
+  // Fuel in bottom 55% of rocket, dry mass uniform
+  const dryMass = totalMass - fuelMass;
+  const fuelCom = 0.275 * H;      // center of fuel section (bottom 55%)
+  const dryCom  = 0.5 * H;        // center of dry mass (uniform)
+  return (fuelMass * fuelCom + dryMass * dryCom) / totalMass;
+}
+
+function momentOfInertia(mass, H, W, comH) {
+  // Cylinder: D = W (same depth as width, as agreed)
+  // I_x = I_z (tipping axes) = m*(H²+W²)/12
+  // I_y (spin axis, along rocket body) = m*W²/6
+  const Ix = mass * (H*H + W*W) / 12;
+  const Iy = mass * W*W / 6;
+  const Iz = Ix;   // symmetric: D = W
+  return { Ix, Iy, Iz };
+}
+
+function resetSim() {
+  running = false;
+  if (animId) cancelAnimationFrame(animId);
+  animId = null; lastTime = null; simTime = 0; maxAlt = 0; trajectory = [];
+  state = buildInitState();
+  ctrl.mainThrust = 0; ctrl.gimbalDegX = 0; ctrl.gimbalDegZ = 0;
+  ctrl.sideThrustLR = 0; ctrl.sideThrustFB = 0;
+  document.getElementById('sl_mt').value = 0;
+  document.getElementById('sl_gimbal').value = 0;
+  document.getElementById('sl_gimbalZ').value = 0;
+  document.getElementById('sl_st').value = 0;
+  document.getElementById('sl_stFB').value = 0;
+  testMode.active = false; testMode.locked = false; testMode.t = 0;
+  testMode.re.active = false; testMode.re.t = 0; testMode.re.callCount = 0;
+  testMode.re_phi.active = false; testMode.re_phi.t = 0; testMode.re_phi.callCount = 0;
+  testMode._impactLogged = false;
+  document.getElementById('testStatus').textContent = "Inactive — activate when vy < 0";
+  document.getElementById('testStatus').style.color = '';
+  hl.active = false; hl.t = 0; hl.T = 0; hl.hovering = false; hl.formulaActive = false;
+  document.getElementById('hlDataPanel').style.display = 'none';
+  if (document.getElementById('hlStatus'))
+    document.getElementById('hlStatus').textContent = 'Not loaded';
+  updateLabels(); updateStatusUI('stopped'); updateDataPanel(); drawFrame();
+}
+
+// ===================== PRESET TEST STATE =====================
+// Injects a mid-air falling rocket with drift + spin for landing test validation.
+function loadPreset() {
+  // First do a clean reset
+  resetSim();
+
+  // ── Preset parameters ──
+  const PRESET = {
+    dryMass  : 5000,   // kg
+    fuelMass : 3000,   // kg
+    rocketH  : 20,     // m
+    rocketW  : 4,      // m
+    gravity  : 9.81,   // m/s²
+    // Mid-air state
+    x        : -100,      // m  (horizontal position)
+    y        : 800,    // m  (altitude — enough time for RE + decel)
+    vx       : 0,      // m/s  (rightward drift)
+    vy       : -0,    // m/s  (falling — negative = downward)
+    theta    : -15,     // deg  (tilted CCW from vertical)
+    omega    : -0.00,    // rad/s  (CCW spin, positive)
+  };
+
+  // ── Sync initCfg sliders to preset values ──
+  initCfg.dryMass  = PRESET.dryMass;
+  initCfg.fuelMass = PRESET.fuelMass;
+  initCfg.rocketH  = PRESET.rocketH;
+  initCfg.rocketW  = PRESET.rocketW;
+  initCfg.initAngle = 0;   // buildInitState handles angle separately
+  initCfg.gravity  = PRESET.gravity;
+
+  document.getElementById('sl_mass').value = PRESET.dryMass;
+  document.getElementById('sl_fuel').value = PRESET.fuelMass;
+  document.getElementById('sl_rh').value   = PRESET.rocketH;
+  document.getElementById('sl_rw').value   = PRESET.rocketW;
+  document.getElementById('sl_ang').value  = 0;
+  document.getElementById('sl_grav').value = PRESET.gravity;
+  updateLabels();
+
+  const totalMass = PRESET.dryMass + PRESET.fuelMass;
+  const comH = computeCoM(PRESET.fuelMass, totalMass, PRESET.rocketH);
+  const moi  = momentOfInertia(totalMass, PRESET.rocketH, PRESET.rocketW, comH);
+
+  // Initial tilt: 30° around Z-axis (X-Y plane tilt)
+  const q0 = qFromAxisAngle(0, 0, 1, PRESET.theta * Math.PI / 180);
+
+  state = {
+    x: PRESET.x, y: PRESET.y, z: 0,
+    vx: PRESET.vx, vy: PRESET.vy, vz: 0,
+    ax: 0, ay: 0, az: 0,
+    qw: q0.w, qx: q0.x, qy: q0.y, qz: q0.z,
+    omx: 0, omy: 0, omz: PRESET.omega,
+    alx: 0, aly: 0, alz: 0,
+    mass: totalMass, dryMass: PRESET.dryMass,
+    fuelMass: PRESET.fuelMass, fuelMassInit: PRESET.fuelMass,
+    H: PRESET.rocketH, W: PRESET.rocketW,
+    gravity: PRESET.gravity,
+    comH: comH,
+    Ix: moi.Ix, Iy: moi.Iy, Iz: moi.Iz,
+    crashed: false, landed: false,
+  };
+
+  // Reset tracking
+  maxAlt     = PRESET.y;
+  trajectory = [[PRESET.x, PRESET.y]];
+
+  // ── Log preset values to console ──
+  console.log("=== PRESET TEST LOADED ===");
+  console.log(`  Alt    : ${PRESET.y} m`);
+  console.log(`  Vx     : ${PRESET.vx} m/s`);
+  console.log(`  Vy     : ${PRESET.vy} m/s`);
+  console.log(`  theta  : ${PRESET.theta}°`);
+  console.log(`  omega  : ${PRESET.omega} rad/s  (CCW)`);
+  console.log(`  mass   : ${totalMass} kg`);
+  console.log(`  comH   : ${comH.toFixed(3)} m`);
+  console.log(`  Ix/Iz  : ${moi.Ix.toFixed(1)} kg·m²  Iy: ${moi.Iy.toFixed(1)} kg·m²`);
+  console.log("Press START then LANDING TEST to begin.");
+
+  updateDataPanel();
+  drawFrame();
+  updateStatusUI('stopped');
+}
+
+function startSim() {
+  if (running) return;
+  if (state.crashed) resetSim();
+  running = true;
+  lastTime = null;
+  updateStatusUI('running');
+  animId = requestAnimationFrame(loop);
+}
+
+function stopSim() {
+  running = false;
+  if (animId) cancelAnimationFrame(animId);
+  animId = null;
+  updateStatusUI('stopped');
+}
+
+function activateTestMode() {
+  const s = state;
+
+  if (s.vy >= 0) { alert("Test mode activates only when rocket is falling (vy < 0)."); return; }
+  if (!running)  { alert("Simulation must be RUNNING to activate landing test."); return; }
+
+  const g  = s.gravity;
+  const H  = s.y;
+  const V0 = s.vy;
+  const M  = s.mass;
+
+  if (H <= 0) { alert("Cannot compute impact time."); return; }
+
+  const T = (-3 * H) / (2 * V0);
+  if (T <= 0.1) { alert("Impact too imminent (T < 0.1s)."); return; }
+  const p_c     = -V0 / (T * T);
+  const t_hover = Math.sqrt(-V0 / p_c);
+
+  testMode.active            = true;
+  testMode.locked            = false;
+  testMode.T                 = T;
+  testMode.t                 = 0;
+  testMode.M                 = M;
+  testMode.Ve                = Ve_MAIN;
+  testMode.H                 = H;
+  testMode.V0                = V0;
+  testMode.p                 = p_c;
+  testMode.q                 = 0;
+  testMode.g                 = g;
+  testMode.t_hover           = t_hover;
+  testMode.hovering          = false;
+  testMode.F_final           = 0;
+  testMode.K                 = 0;
+  testMode.s                 = 0;
+  testMode.Fx                = 0;
+  testMode.Fy                = 0;
+  testMode._fuelAtActivation = s.fuelMass;
+  testMode._impactLogged     = false;
+  testMode._hlHandoff        = false;
+
+  testMode.re.active    = false;
+  testMode.re.t         = 0;
+  testMode.re.g         = 0;
+  testMode.re.callCount = 0;
+  testMode.re_phi.active    = false;
+  testMode.re_phi.t         = 0;
+  testMode.re_phi.g         = 0;
+  testMode.re_phi.callCount = 0;
+  const dc0 = dirCosines({w:s.qw||1,x:s.qx||0,y:s.qy||0,z:s.qz||0});
+  // Z-Y plane: gamma angle (with Z-axis) + omx
+  const gammaDeg0 = dc0.gamma * 180/Math.PI;
+  // X-Y plane: beta angle deviation from 90° → tilt = 90-beta, + omz
+  const tiltXY0   = dc0.beta * 180/Math.PI;
+  rotationalEquilibrium(tiltXY0,  s.omz||0, T, 'z');
+  rotationalEquilibrium(dc0.gamma * 180/Math.PI, s.omx||0, T, 'x');
+  document.getElementById('testStatus').textContent = "ACTIVE — Decel → Hover mode";
+  document.getElementById('testStatus').style.color = '#cc44ff';
+}
+
+// ── HL Landing Mode: same as testMode but H = y-100, then handoff to HL formula ──
+function activateHLMode() {
+  const s = state;
+
+  if (s.vy >= 0) { alert("Rocket must be falling (vy < 0)."); return; }
+  if (!running)  { alert("Simulation must be RUNNING."); return; }
+
+  const g  = s.gravity;
+  const H  = s.y - 200;   // ← sirf yahi fark hai
+  const V0 = s.vy;
+  const M  = s.mass;
+
+  if (H <= 0) { alert("Altitude must be > 100m."); return; }
+
+  const T = (-3 * H) / (2 * V0);
+  if (T <= 0.1) { alert("Too close to 100m target."); return; }
+  const p_c     = -V0 / (T * T);
+  const t_hover = Math.sqrt(-V0 / p_c);
+
+  testMode.active            = true;
+  testMode.locked            = false;
+  testMode.T                 = T;
+  testMode.t                 = 0;
+  testMode.M                 = M;
+  testMode.Ve                = Ve_MAIN;
+  testMode.H                 = H;
+  testMode.V0                = V0;
+  testMode.p                 = p_c;
+  testMode.q                 = 0;
+  testMode.g                 = g;
+  testMode.t_hover           = t_hover;
+  testMode.hovering          = false;
+  testMode.F_final           = 0;
+  testMode.K                 = 0;
+  testMode.s                 = 0;
+  testMode.Fx                = 0;
+  testMode.Fy                = 0;
+  testMode._fuelAtActivation = s.fuelMass;
+  testMode._impactLogged     = false;
+  testMode._hlHandoff        = true;   // ← HL handoff chahiye
+
+  testMode.re.active    = false;
+  testMode.re.t         = 0;
+  testMode.re.g         = 0;
+  testMode.re.callCount = 0;
+  testMode.re_phi.active    = false;
+  testMode.re_phi.t         = 0;
+  testMode.re_phi.g         = 0;
+  testMode.re_phi.callCount = 0;
+  const dc_re = dirCosines({w:s.qw||1,x:s.qx||0,y:s.qy||0,z:s.qz||0});
+  const tiltXY_hl   = (dc_re.beta  * 180/Math.PI);
+  const tiltZY_hl   = (dc_re.gamma * 180/Math.PI);
+  rotationalEquilibrium(tiltXY_hl, s.omz||0, T, 'z');
+  rotationalEquilibrium(tiltZY_hl, s.omx||0, T, 'x');
+
+  console.log("=== HL MODE === H_eff=" + H.toFixed(2) + "m  T=" + T.toFixed(3) + "s");
+  document.getElementById('testStatus').textContent = "HL MODE — stabilizing to 100m";
+  document.getElementById('testStatus').style.color = '#00ffcc';
+}
+
+// ===================== ROTATIONAL EQUILIBRIUM CONTROLLER =====================
+//
+// rotationalEquilibrium(a, b, c)
+//   a = current theta in degrees   (CCW positive, simulation convention)
+//   b = current omega in rad/s     (CCW positive)
+//   c = time remaining until landing (seconds)
+//
+// Goal: design alpha(t) profile over window Tr = 0.7*c
+//       such that at t=Tr: theta = 0 AND omega = 0
+//
+// Let theta0 = initial theta (rad), omega0 = initial omega (rad/s)
+// We integrate:  omega(t) = omega0 + ∫₀ᵗ alpha dt
+//                theta(t) = theta0 + ∫₀ᵗ omega dt
+// Boundary conditions at t = Tr:
+//   omega(Tr) = 0
+//   theta(Tr) = 0
+//
+// Choose alpha(t) = e·t² + f·t   (starts at 0, ends at 0 iff f = -e·Tr)
+//
+// From f = -e·Tr:
+//   ∫₀ᵀʳ alpha dt  = e·Tr³/3 + f·Tr²/2
+//                   = e·Tr³/3 - e·Tr³/2
+//                   = -e·Tr³/6
+//   This must equal -omega0:
+//     -e·Tr³/6 = -omega0  →  e = 6·omega0 / Tr³
+//
+// Verify theta condition:
+//   ∫₀ᵀʳ omega dt = omega0·Tr + ∫₀ᵀʳ∫₀ᵗ alpha ds dt
+//                 = omega0·Tr + e·Tr⁴/12 + f·Tr³/6
+//                 = omega0·Tr + e·Tr⁴/12 - e·Tr⁴/6
+//                 = omega0·Tr - e·Tr⁴/12
+//   This must equal -theta0:
+//     omega0·Tr - e·Tr⁴/12 = -theta0
+//   → This gives e = 12(omega0·Tr + theta0) / Tr⁴
+//
+// Two conditions → two equations → we need BOTH satisfied.
+// But alpha = e·t² + f·t has only 2 free params (e, f) with the constraint f = -e·Tr.
+// So we have 1 free param (e) but 2 conditions (omega=0, theta=0).
+// → We need one more degree of freedom.
+//
+// Solution: use alpha(t) = e·t³ + f·t² + g_coeff·t  (cubic, 3 free params)
+// Boundary conditions:
+//   alpha(0)  = 0   ✅ (no constant term)
+//   alpha(Tr) = 0   → e·Tr³ + f·Tr² + g·Tr = 0  → g = -e·Tr² - f·Tr
+//   ∫ alpha dt|Tr = -omega0  (change in omega = -omega0)
+//   ∫∫ alpha dt²|Tr = -theta0  (change in theta = -theta0)
+//
+// With g = -e·Tr² - f·Tr:
+//   ∫₀ᵀʳ alpha dt = e·Tr⁴/4 + f·Tr³/3 + g·Tr²/2
+//                 = e·Tr⁴/4 + f·Tr³/3 + (-e·Tr² - f·Tr)·Tr²/2
+//                 = e·Tr⁴/4 + f·Tr³/3 - e·Tr⁴/2 - f·Tr³/2
+//                 = e·Tr⁴·(-1/4) + f·Tr³·(-1/6)
+//   Set = -omega0:
+//     -e·Tr⁴/4 - f·Tr³/6 = -omega0   ... (I)
+//
+//   ∫₀ᵀʳ∫₀ᵗ alpha ds dt = e·Tr⁵/20 + f·Tr⁴/12 + g·Tr³/6
+//                        = e·Tr⁵/20 + f·Tr⁴/12 + (-e·Tr²-f·Tr)·Tr³/6
+//                        = e·Tr⁵/20 + f·Tr⁴/12 - e·Tr⁵/6 - f·Tr⁴/6
+//                        = e·Tr⁵·(1/20 - 1/6) + f·Tr⁴·(1/12 - 1/6)
+//                        = e·Tr⁵·(-7/60) + f·Tr⁴·(-1/12)
+//   Set = -theta0:
+//     -7e·Tr⁵/60 - f·Tr⁴/12 = -theta0   ... (II)
+//
+// Solve (I) and (II) for e and f:
+//   From (I):  f = (6/Tr³)·(omega0 - e·Tr⁴/4) / (-1/... let me use matrix
+//
+//   (I):   (-Tr⁴/4)·e  + (-Tr³/6)·f  = -omega0
+//   (II):  (-7Tr⁵/60)·e + (-Tr⁴/12)·f = -theta0
+//
+//   Multiply (I) by Tr/3:   (-Tr⁵/12)·e + (-Tr⁴/18)·f = -omega0·Tr/3
+//   Multiply (II) by 6/5:   (-7Tr⁵/50)·e + (-Tr⁴/10)·f = -6·theta0/5  ← messy
+//
+// Let's use substitution. From (I):
+//   f = [ -omega0 + e·Tr⁴/4 ] · (-6/Tr³)
+//     = 6·omega0/Tr³ - 3e·Tr/2
+//
+// Substitute into (II):
+//   -7e·Tr⁵/60 - (Tr⁴/12)·(6·omega0/Tr³ - 3e·Tr/2) = -theta0
+//   -7e·Tr⁵/60 - Tr·omega0/2 + e·Tr⁵/8 = -theta0
+//   e·Tr⁵·(-7/60 + 1/8) = -theta0 + Tr·omega0/2
+//   e·Tr⁵·(-14/120 + 15/120) = -theta0 + Tr·omega0/2
+//   e·Tr⁵·(1/120) = -theta0 + Tr·omega0/2
+//   e = 120·(-theta0 + omega0·Tr/2) / Tr⁵
+//     = 60·(omega0·Tr - 2·theta0) / Tr⁵
+//
+//   f = 6·omega0/Tr³ - 3·Tr/2 · 60·(omega0·Tr - 2·theta0)/Tr⁵
+//     = 6·omega0/Tr³ - 90·(omega0·Tr - 2·theta0)/Tr⁴
+//     = [6·omega0·Tr - 90·omega0·Tr + 180·theta0] / Tr⁴
+//     = [-84·omega0·Tr + 180·theta0] / Tr⁴
+//     = 12·(15·theta0 - 7·omega0·Tr) / Tr⁴
+//
+//   g = -e·Tr² - f·Tr
+//
+// Torque = I·alpha  →  Fx_rocket·rC = I·alpha(t)  →  Fx_rocket = I·alpha(t)/rC
+
+// rotationalEquilibrium(angleDeg, omega0, timeLeft, axis)
+//   axis = 'z'  → X-Y plane tilt (omz, uses Iz) → sets testMode.re
+//   axis = 'x'  → Z-Y plane tilt (omx, uses Ix) → sets testMode.re_phi
+function rotationalEquilibrium(a, b, c, axis) {
+  axis = axis || 'z';   // default: original X-Y plane behaviour
+  const re = (axis === 'x') ? testMode.re_phi : testMode.re;
+
+  if (c <= 1.0) {
+    console.log(`[RE-${axis}] Skipped — time left ${c.toFixed(3)}s ≤ 1s`);
+    re.active = false;
+    return;
+  }
+
+  let theta0 = a * Math.PI / 180;
+  while (theta0 >  Math.PI) theta0 -= 2 * Math.PI;
+  while (theta0 < -Math.PI) theta0 += 2 * Math.PI;
+  const omega0 = b;
+  const Tr     = 0.6 * c;
+
+  if (Math.abs(theta0) < 1e-4 && Math.abs(omega0) < 1e-4) {
+    console.log(`[RE-${axis}] Already at equilibrium — skipping.`);
+    re.active = false;
+    return;
+  }
+
+  const Tr2 = Tr*Tr, Tr3 = Tr2*Tr, Tr4 = Tr3*Tr, Tr5 = Tr4*Tr;
+
+  const e_c = 60 * (omega0 * Tr - 2 * theta0) / Tr5;
+  const f_c = 12 * (15 * theta0 - 7 * omega0 * Tr) / Tr4;
+  const g_c = -e_c * Tr2 - f_c * Tr;
+
+  const rC = state.comH;
+
+  re.active    = true;
+  re.t         = 0;
+  re.Tr        = Tr;
+  re.e         = e_c;
+  re.f         = f_c;
+  re.g         = g_c;
+  re.rC        = -rC;
+  re.callCount = (re.callCount || 0) + 1;
+
+  const delta_omega = e_c*Tr4/4 + f_c*Tr3/3 + g_c*Tr2/2;
+  const delta_theta = e_c*Tr5/20 + f_c*Tr4/12 + g_c*Tr3/6;
+  console.log(`=== RE-${axis.toUpperCase()} CALL #${re.callCount} ===`);
+  console.log(`  theta0 : ${(theta0*180/Math.PI).toFixed(4)}°  omega0 : ${omega0.toFixed(4)} rad/s`);
+  console.log(`  Tr     : ${Tr.toFixed(3)} s`);
+  console.log(`  e,f,g  : ${e_c.toExponential(3)}, ${f_c.toExponential(3)}, ${g_c.toExponential(3)}`);
+  console.log(`  Δomega check : ${delta_omega.toFixed(6)} (should be ${(-omega0).toFixed(6)})`);
+  console.log(`  Δtheta check : ${delta_theta.toFixed(6)} (should be ${(-theta0).toFixed(6)})`);
+  console.log(`  rC     : ${rC.toFixed(3)} m`);
+}
+
+function updateStatusUI(s) {
+  const dot = document.getElementById('statusDot');
+  const txt = document.getElementById('statusText');
+  dot.className = 'dot';
+  if (s === 'running') { dot.classList.add('active'); txt.textContent = 'RUNNING'; }
+  else if (s === 'stopped') { dot.classList.add('stopped'); txt.textContent = 'STOPPED'; }
+  else if (s === 'crashed') { dot.classList.add('crashed'); txt.textContent = 'CRASHED'; }
+}
+
+// ===================== PHYSICS STEP =====================
+function physicsStep(dt) {
+  const s = state;
+  if (s.crashed) return;
+
+  // Helper: compute thrust world-frame forces + torques given a state snapshot
+  // Returns { Ftx, Fty, Ftz, tau_x, tau_y, tau_z }
+  function thrustForces(st) {
+    const q = { w: st.qw, x: st.qx, y: st.qy, z: st.qz };
+    const dc = dirCosines(q);  // alpha, beta, gamma
+
+    // Direction cosines of thrust direction (gimbal shifts the direction cosines)
+    const gXr = ctrl.gimbalDegX * Math.PI / 180;
+    const gZr = ctrl.gimbalDegZ * Math.PI / 180;
+    // Gimbal rotates thrust vector around body-Z by gXr, body-X by gZr
+    // New thrust body-axis (approximate for small-to-moderate gimbal):
+    //   nb = R_bodyZ(gXr) * R_bodyX(gZr) * [0,1,0]
+    // Exact rotation matrix approach:
+    const cgX = Math.cos(gXr), sgX = Math.sin(gXr);
+    const cgZ = Math.cos(gZr), sgZ = Math.sin(gZr);
+    // Body-frame thrust unit vector after gimbal:
+    const nb_x = sgX * cgZ;    // x component in body frame
+    const nb_y = cgX * cgZ;    // y component (along body axis)
+    const nb_z = sgZ;          // z component in body frame
+    // |nb|² = sgX²*cgZ² + cgX²*cgZ² + sgZ² = cgZ²(sgX²+cgX²) + sgZ² = cgZ² + sgZ² = 1 ✅
+
+    // World-frame thrust vector = R * nb  (R = qToMatrix)
+    const m = qToMatrix(q);
+    const T = ctrl.mainThrust;
+    const Ftx_main = T * (m[0]*nb_x + m[1]*nb_y + m[2]*nb_z);
+    const Fty_main = T * (m[3]*nb_x + m[4]*nb_y + m[5]*nb_z);
+    const Ftz_main = T * (m[6]*nb_x + m[7]*nb_y + m[8]*nb_z);
+
+    // Side thrusters L+R → torque around body-Z (theta control)
+    // Each fires upward along body-Y, offset ±W/2 in body-X
+    const sLR = ctrl.sideThrustLR / 2;  // each side
+    // L thruster: body pos (-W/2, -comH, 0), force = (0, sLR, 0) in body
+    // R thruster: body pos (+W/2, -comH, 0), force = (0, sLR, 0) in body
+    // World force: same direction for both = R * [0, sLR, 0]
+    const Ftx_lr = sLR * (m[1] + m[1]);   // 2 * sLR * m[1]
+    const Fty_lr = sLR * (m[4] + m[4]);
+    const Ftz_lr = sLR * (m[7] + m[7]);
+
+    // Side thrusters F+B → torque around body-X (phi control)
+    // F thruster: body pos (0, -comH, +W/2), force = (0, sFB, 0) in body
+    // B thruster: body pos (0, -comH, -W/2), force = (0, sFB, 0) in body
+    const sFB = ctrl.sideThrustFB / 2;
+    const Ftx_fb = sFB * (m[1] + m[1]);
+    const Fty_fb = sFB * (m[4] + m[4]);
+    const Ftz_fb = sFB * (m[7] + m[7]);
+
+    const Ftx = Ftx_main + Ftx_lr + Ftx_fb;
+    const Fty = Fty_main + Fty_lr + Fty_fb;
+    const Ftz = Ftz_main + Ftz_lr + Ftz_fb;
+
+    // ── Torques ──
+    // Main thruster lever arm: body pos = (0, -comH, 0) → world = R * [0, -comH, 0]
+    const rMx = -st.comH * m[1];
+    const rMy = -st.comH * m[4];
+    const rMz = -st.comH * m[7];
+    // τ = r × F
+    const tau_x_main = rMy * Ftz_main - rMz * Fty_main;
+    const tau_y_main = rMz * Ftx_main - rMx * Ftz_main;
+    const tau_z_main = rMx * Fty_main - rMy * Ftx_main;
+
+    // L thruster: body pos (-W/2, -comH, 0)
+    const rLx_b = -st.W/2, rLy_b = -st.comH, rLz_b = 0;
+    const rLx = m[0]*rLx_b + m[1]*rLy_b + m[2]*rLz_b;
+    const rLy = m[3]*rLx_b + m[4]*rLy_b + m[5]*rLz_b;
+    const rLz = m[6]*rLx_b + m[7]*rLy_b + m[8]*rLz_b;
+    // L force world = R * [0, sLR, 0]
+    const FLx = sLR*m[1], FLy = sLR*m[4], FLz = sLR*m[7];
+    const tau_x_L = rLy*FLz - rLz*FLy;
+    const tau_y_L = rLz*FLx - rLx*FLz;
+    const tau_z_L = rLx*FLy - rLy*FLx;
+
+    // R thruster: body pos (+W/2, -comH, 0)
+    const rRx = m[0]*(st.W/2) + m[1]*rLy_b;
+    const rRy = m[3]*(st.W/2) + m[4]*rLy_b;
+    const rRz = m[6]*(st.W/2) + m[7]*rLy_b;
+    const FRx = sLR*m[1], FRy = sLR*m[4], FRz = sLR*m[7];
+    const tau_x_R = rRy*FRz - rRz*FRy;
+    const tau_y_R = rRz*FRx - rRx*FRz;
+    const tau_z_R = rRx*FRy - rRy*FRx;
+
+    // F thruster: body pos (0, -comH, +W/2)
+    const rFx = m[2]*(st.W/2) + m[1]*rLy_b;
+    const rFy = m[5]*(st.W/2) + m[4]*rLy_b;
+    const rFz = m[8]*(st.W/2) + m[7]*rLy_b;
+    const FFx = sFB*m[1], FFy = sFB*m[4], FFz = sFB*m[7];
+    const tau_x_F = rFy*FFz - rFz*FFy;
+    const tau_y_F = rFz*FFx - rFx*FFz;
+    const tau_z_F = rFx*FFy - rFy*FFx;
+
+    // B thruster: body pos (0, -comH, -W/2)
+    const rBx = m[2]*(-st.W/2) + m[1]*rLy_b;
+    const rBy = m[5]*(-st.W/2) + m[4]*rLy_b;
+    const rBz = m[8]*(-st.W/2) + m[7]*rLy_b;
+    const tau_x_B = rBy*sFB*m[7] - rBz*sFB*m[4];
+    const tau_y_B = rBz*sFB*m[1] - rBx*sFB*m[7];
+    const tau_z_B = rBx*sFB*m[4] - rBy*sFB*m[1];
+
+    const tau_x = tau_x_main + tau_x_L + tau_x_R + tau_x_F + tau_x_B;
+    const tau_y = tau_y_main + tau_y_L + tau_y_R + tau_y_F + tau_y_B;
+    const tau_z = tau_z_main + tau_z_L + tau_z_R + tau_z_F + tau_z_B;
+
+    return { Ftx, Fty, Ftz, tau_x, tau_y, tau_z };
+  }
+
+  // ---- HOVER→LAND controller ----
+  if (hl.active) stepHL(dt);
+
+  // ---- TEST MODE: vertical decel + 3D RE ----
+  if (testMode.active && !testMode.locked) {
+    testMode.t += dt;
+    const re     = testMode.re;
+    const re_phi = testMode.re_phi;
+
+    // ── RE-Z (X-Y plane tilt, omz) ──
+    if (re.active) {
+      re.t += dt;
+      if (re.t >= re.Tr) {
+        re.t = re.Tr; re.active = false;
+        const timeLeft = testMode.T - testMode.t;
+        const dc = dirCosines({ w:s.qw, x:s.qx, y:s.qy, z:s.qz });
+        const tiltXY = dc.beta * 180/Math.PI;
+        const notEq  = Math.abs(tiltXY) > 0.5 || Math.abs(s.omz) > 0.005;
+        if (notEq && timeLeft > 1.0) {
+          rotationalEquilibrium(tiltXY, s.omz, timeLeft, 'z');
+        }
+      }
+    }
+
+    // ── RE-X (Z-Y plane tilt, omx) ──
+    if (re_phi.active) {
+      re_phi.t += dt;
+      if (re_phi.t >= re_phi.Tr) {
+        re_phi.t = re_phi.Tr; re_phi.active = false;
+        const timeLeft = testMode.T - testMode.t;
+        const dc = dirCosines({ w:s.qw, x:s.qx, y:s.qy, z:s.qz });
+        const tiltZY = dc.gamma * 180/Math.PI;
+        const notEq  = Math.abs(tiltZY) > 0.5 || Math.abs(s.omx) > 0.005;
+        if (notEq && timeLeft > 1.0) {
+          rotationalEquilibrium(tiltZY, s.omx, timeLeft, 'x');
+        }
+      }
+    }
+
+    const inHover = testMode.t >= testMode.t_hover;
+    if (inHover && !testMode.hovering) {
+      testMode.hovering = true;
+      document.getElementById('testStatus').textContent = "HOVERING — V≈0, F=Mg";
+    }
+
+    // HL handoff — both axes must be settled
+    if (testMode._hlHandoff) {
+      const dc = dirCosines({ w:s.qw, x:s.qx, y:s.qy, z:s.qz });
+      const tiltXY = Math.abs(dc.beta  * 180/Math.PI);
+      const tiltZY = Math.abs(dc.gamma * 180/Math.PI);
+      const omzOk  = Math.abs(s.omz) < 0.005;
+      const omxOk  = Math.abs(s.omx) < 0.005;
+      if (tiltXY < 0.5 && tiltZY < 0.5 && omzOk && omxOk && Math.abs(s.vy) <= 12) {
+        testMode.active = false; testMode.locked = true; testMode._hlHandoff = false;
+        s.qw = 1; s.qx = 0; s.qy = 0; s.qz = 0;
+        s.omx = 0; s.omy = 0; s.omz = 0;
+        hl.Vi_X = s.vx; hl.Vi_Y = s.vy; hl.Vi_Z = s.vz;
+        hl.Z_X = hl.targetX - s.x;
+        hl.Z_Y = s.y - hl.targetY;
+        hl.Z_Z = hl.targetZ - s.z;
+        if (hl.T <= 0) hl.T = parseFloat(document.getElementById('sl_hl_T').value) || 20;
+        hl.t = 0; hl.formulaActive = true; hl.active = true; hl.hovering = false;
+        document.getElementById('hlLiveStatus').textContent = 'LANDING — formula active';
+        document.getElementById('testStatus').textContent   = 'HL formula active ✅';
+      }
+    }
+
+    // Fy (Y-axis control)
+    let Fy_ctrl;
+    if (testMode.t >= testMode.T && !testMode.hovering) {
+      testMode.t = testMode.T; testMode.locked = true;
+      ctrl.mainThrust = 0; Fy_ctrl = 0;
+    } else if (inHover) {
+      const Kp=2.0, Kd=0.5;
+      Fy_ctrl = Math.max(0, s.mass*testMode.g + s.mass*(Kp*(-s.vy) - Kd*s.ay));
+    } else {
+      Fy_ctrl = Math.max(0, s.mass*(2*testMode.p*testMode.t + testMode.g));
+    }
+
+    // Fx_rot — X-Y plane RE (omz correction) → gimbalX
+    let Fx_rot = 0;
+    if (re.active && re.rC !== 0) {
+      const tl = re.t;
+      const al = re.e*tl*tl*tl + re.f*tl*tl + re.g*tl;
+      Fx_rot = (s.Iz / re.rC) * al;
+    }
+
+    // Fz_rot — Z-Y plane RE (omx correction) → gimbalZ
+    let Fz_rot = 0;
+    if (re_phi.active && re_phi.rC !== 0) {
+      const tl = re_phi.t;
+      const al = re_phi.e*tl*tl*tl + re_phi.f*tl*tl + re_phi.g*tl;
+      Fz_rot = (s.Ix / re_phi.rC) * al;
+    }
+
+    // Drift correction (hover only) — X and Z
+    let Fx_drift = 0, Fz_drift = 0;
+    if (inHover) {
+      const Kp = 0.8;
+      const maxF = s.mass * testMode.g * Math.tan(10*Math.PI/180);
+      Fx_drift = Math.max(-maxF, Math.min(maxF, s.mass*(-Kp*s.vx)));
+      Fz_drift = Math.max(-maxF, Math.min(maxF, s.mass*(-Kp*s.vz)));
+    }
+
+    // Compose: Fx_total, Fz_total independent, both small corrections
+    const dc = dirCosines({ w:s.qw, x:s.qx, y:s.qy, z:s.qz });
+    const cosB = Math.cos(dc.beta);
+    const Fx_total = Fx_rot + Fx_drift;
+    const Fz_total = Fz_rot + Fz_drift;
+    const F_along = (Math.abs(cosB) > 0.1)
+      ? Math.max(0, Fy_ctrl / cosB)
+      : Math.max(0, Fy_ctrl);
+    ctrl.mainThrust = Math.sqrt(F_along*F_along + Fx_total*Fx_total + Fz_total*Fz_total);
+    ctrl.gimbalDegX = Math.atan2(Fx_total, F_along) * 180/Math.PI;
+    ctrl.gimbalDegZ = Math.atan2(Fz_total, F_along) * 180/Math.PI;
+
+    document.getElementById('sl_mt').value = Math.min(300000, ctrl.mainThrust);
+    document.getElementById('lbl_mt').textContent = ctrl.mainThrust.toFixed(0);
+    document.getElementById('sl_gimbal').value = Math.max(-90,Math.min(90,ctrl.gimbalDegX));
+    document.getElementById('lbl_gimbal').textContent = ctrl.gimbalDegX.toFixed(1);
+    document.getElementById('gimbalNeedle').style.transform = `translateX(-50%) rotate(${ctrl.gimbalDegX}deg)`;
+    document.getElementById('sl_gimbalZ').value = Math.max(-90,Math.min(90,ctrl.gimbalDegZ));
+    document.getElementById('lbl_gimbalZ').textContent = ctrl.gimbalDegZ.toFixed(1);
+    document.getElementById('gimbalNeedleZ').style.transform = `translateX(-50%) rotate(${ctrl.gimbalDegZ}deg)`;
+  }
+
+  // --- Mass flow ---
+  const mainThrust = (s.fuelMass > 0) ? ctrl.mainThrust : 0;
+  const sideThrust = (s.fuelMass > 0) ? (ctrl.sideThrustLR + ctrl.sideThrustFB) : 0;
+  const rMain = mainThrust / Ve_MAIN;
+  const rSide = sideThrust / Ve_SIDE;
+  s.fuelMass = Math.max(0, s.fuelMass - (rMain + rSide) * dt);
+  s.mass = s.dryMass + s.fuelMass;
+  s.comH = computeCoM(s.fuelMass, s.mass, s.H);
+  const moi = momentOfInertia(s.mass, s.H, s.W, s.comH);
+  s.Ix = moi.Ix; s.Iy = moi.Iy; s.Iz = moi.Iz;
+
+  // --- 3D Forces ---
+  const tf = thrustForces(s);
+  const Fg = s.mass * s.gravity;
+  const speed3 = Math.sqrt(s.vx*s.vx + s.vy*s.vy + s.vz*s.vz);
+  let Fdrag = 0, Fdx = 0, Fdy = 0, Fdz = 0;
+  if (opts.drag && speed3 > 0) {
+    const area = s.W * s.H * 0.3;
+    Fdrag = 0.5 * RHO_AIR * Cd * area * speed3 * speed3;
+    Fdx = -Fdrag * s.vx / speed3;
+    Fdy = -Fdrag * s.vy / speed3;
+    Fdz = -Fdrag * s.vz / speed3;
+  }
+
+  const Fnx = tf.Ftx + Fdx;
+  const Fny = tf.Fty - Fg + Fdy;
+  const Fnz = tf.Ftz + Fdz;
+
+  s.ax = Fnx / s.mass;
+  s.ay = Fny / s.mass;
+  s.az = Fnz / s.mass;
+
+  // Angular acceleration (world frame)
+  s.alx = (s.Ix > 0) ? tf.tau_x / s.Ix : 0;
+  s.aly = (s.Iy > 0) ? tf.tau_y / s.Iy : 0;
+  s.alz = (s.Iz > 0) ? tf.tau_z / s.Iz : 0;
+
+  // --- RK4: integrate [x,y,z, vx,vy,vz, qw,qx,qy,qz, omx,omy,omz] ---
+  function deriv3D(st) {
+    const tf_ = thrustForces(st);
+    const spd = Math.sqrt(st.vx*st.vx + st.vy*st.vy + st.vz*st.vz);
+    let fdx=0, fdy=0, fdz=0;
+    if (opts.drag && spd > 0) {
+      const area = s.W * s.H * 0.3;
+      const fd = 0.5 * RHO_AIR * Cd * area * spd * spd;
+      fdx = -fd*st.vx/spd; fdy = -fd*st.vy/spd; fdz = -fd*st.vz/spd;
+    }
+    const m = st.mass;
+    const ax = (tf_.Ftx + fdx) / m;
+    const ay = (tf_.Fty - m*s.gravity + fdy) / m;
+    const az = (tf_.Ftz + fdz) / m;
+    const alx_ = (s.Ix>0) ? tf_.tau_x/s.Ix : 0;
+    const aly_ = (s.Iy>0) ? tf_.tau_y/s.Iy : 0;
+    const alz_ = (s.Iz>0) ? tf_.tau_z/s.Iz : 0;
+    const dq = qDeriv({w:st.qw,x:st.qx,y:st.qy,z:st.qz}, st.omx, st.omy, st.omz);
+    return {
+      dx:st.vx, dy:st.vy, dz:st.vz,
+      dvx:ax, dvy:ay, dvz:az,
+      dqw:dq.w, dqx:dq.x, dqy:dq.y, dqz:dq.z,
+      domx:alx_, domy:aly_, domz:alz_,
+    };
+  }
+  function stAdd(st, k, h) {
+    const qr = qNorm({w:st.qw+h*k.dqw, x:st.qx+h*k.dqx, y:st.qy+h*k.dqy, z:st.qz+h*k.dqz});
+    return {
+      x:st.x+h*k.dx, y:st.y+h*k.dy, z:st.z+h*k.dz,
+      vx:st.vx+h*k.dvx, vy:st.vy+h*k.dvy, vz:st.vz+h*k.dvz,
+      qw:qr.w, qx:qr.x, qy:qr.y, qz:qr.z,
+      omx:st.omx+h*k.domx, omy:st.omy+h*k.domy, omz:st.omz+h*k.domz,
+      mass:st.mass, comH:st.comH, W:st.W, H:st.H,
+      Ix:st.Ix, Iy:st.Iy, Iz:st.Iz,
+    };
+  }
+
+  const st0 = { x:s.x, y:s.y, z:s.z, vx:s.vx, vy:s.vy, vz:s.vz,
+                 qw:s.qw, qx:s.qx, qy:s.qy, qz:s.qz,
+                 omx:s.omx, omy:s.omy, omz:s.omz,
+                 mass:s.mass, comH:s.comH, W:s.W, H:s.H,
+                 Ix:s.Ix, Iy:s.Iy, Iz:s.Iz };
+  const k1 = deriv3D(st0);
+  const k2 = deriv3D(stAdd(st0, k1, 0.5*dt));
+  const k3 = deriv3D(stAdd(st0, k2, 0.5*dt));
+  const k4 = deriv3D(stAdd(st0, k3, dt));
+
+  const f = dt/6;
+  s.x  += f*(k1.dx  + 2*k2.dx  + 2*k3.dx  + k4.dx );
+  s.y  += f*(k1.dy  + 2*k2.dy  + 2*k3.dy  + k4.dy );
+  s.z  += f*(k1.dz  + 2*k2.dz  + 2*k3.dz  + k4.dz );
+  s.vx += f*(k1.dvx + 2*k2.dvx + 2*k3.dvx + k4.dvx);
+  s.vy += f*(k1.dvy + 2*k2.dvy + 2*k3.dvy + k4.dvy);
+  s.vz += f*(k1.dvz + 2*k2.dvz + 2*k3.dvz + k4.dvz);
+  s.omx += f*(k1.domx + 2*k2.domx + 2*k3.domx + k4.domx);
+  s.omy += f*(k1.domy + 2*k2.domy + 2*k3.domy + k4.domy);
+  s.omz += f*(k1.domz + 2*k2.domz + 2*k3.domz + k4.domz);
+  // Quaternion integrate + renormalize
+  const dqf = qDeriv({w:s.qw,x:s.qx,y:s.qy,z:s.qz}, s.omx, s.omy, s.omz);
+  const qn = qNorm({
+    w: s.qw + f*(k1.dqw+2*k2.dqw+2*k3.dqw+k4.dqw),
+    x: s.qx + f*(k1.dqx+2*k2.dqx+2*k3.dqx+k4.dqx),
+    y: s.qy + f*(k1.dqy+2*k2.dqy+2*k3.dqy+k4.dqy),
+    z: s.qz + f*(k1.dqz+2*k2.dqz+2*k3.dqz+k4.dqz),
+  });
+  s.qw = qn.w; s.qx = qn.x; s.qy = qn.y; s.qz = qn.z;
+
+  // Soft landing
+  if (testMode.active && !testMode.locked) {
+    const totalVel = Math.sqrt(s.vx*s.vx + s.vy*s.vy + s.vz*s.vz);
+    if (s.y < 5 && totalVel < 3) {
+      ctrl.mainThrust = 0; ctrl.gimbalDegX = 0; ctrl.gimbalDegZ = 0;
+      ctrl.sideThrustLR = 0; ctrl.sideThrustFB = 0;
+      testMode.locked = true; testMode.re.active = false;
+      s.vx=0; s.vy=0; s.vz=0; s.omx=0; s.omy=0; s.omz=0;
+      s.ax=0; s.ay=0; s.az=0; s.alx=0; s.aly=0; s.alz=0;
+      document.getElementById('testStatus').textContent = 'LANDED ✅ — thrust cut';
+      document.getElementById('testStatus').style.color = '#00ff88';
+    }
+  }
+
+  // Ground collision
+  if (s.y <= 0 && s.vy <= 0) {
+    s.y = 0; s.vy = 0;
+    s.vx *= 0.3; s.vz *= 0.3;
+    s.omx *= 0.1; s.omy *= 0.1; s.omz *= 0.1;
+    const spd2d = Math.hypot(s.vx, s.vz);
+    if (spd2d > 20) {
+      s.crashed = true; running = false; updateStatusUI('crashed');
+    }
+  }
+
+  if (s.y > maxAlt) maxAlt = s.y;
+
+  // Store for display
+  s._Fg = Fg; s._Ft = mainThrust + sideThrust; s._Fd = Fdrag;
+  s._Fnx = Fnx; s._Fny = Fny; s._Fnz = Fnz;
+  s._tau_x = tf.tau_x; s._tau_y = tf.tau_y; s._tau_z = tf.tau_z;
+  s._rMain = rMain; s._rSide = rSide;
+}
+
+// ===================== TRAJECTORY / IMPACT PREDICTION =====================
+function predictImpact() {
+  const s = state;
+  if (s.vy >= 0 && s.y > 0) return null;
+  if (s.y <= 0) return null;
+  const a = -0.5*s.gravity, b = s.vy, c = s.y;
+  const disc = b*b - 4*a*c;
+  if (disc < 0) return null;
+  const t = Math.max((-b+Math.sqrt(disc))/(2*a), (-b-Math.sqrt(disc))/(2*a));
+  if (t < 0) return null;
+  return { x: s.x + s.vx*t, z: (s.z||0) + (s.vz||0)*t };
+}
+
+// ===================== RENDER (3 views) =====================
+function resizeCanvases() {
+  const areaEl = document.getElementById('canvasArea');
+  if (!areaEl) return;
+  const W = areaEl.clientWidth || 800, H = areaEl.clientHeight || 600;
+  if (W === 0 || H === 0) return;
+  const halfW = Math.floor(W/2), twoThirdH = Math.floor(H*2/3), oneThirdH = H - twoThirdH;
+  const cXY = document.getElementById('simXY');
+  const cZY = document.getElementById('simZY');
+  const cXZ = document.getElementById('simXZ');
+  if (!cXY || !cZY || !cXZ) return;
+  cXY.width = halfW; cXY.height = twoThirdH;
+  cZY.width = halfW; cZY.height = twoThirdH;
+  cXZ.width = W;     cXZ.height = oneThirdH;
+}
+
+// Generic background draw
+function drawBg(ctx, W, H, color1='#000510') {
+  const bg = ctx.createLinearGradient(0, 0, 0, H);
+  bg.addColorStop(0, color1); bg.addColorStop(1, '#020f20');
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = 'rgba(200,220,255,0.4)';
+  for (let i=0; i<80; i++) {
+    const sx = (i*1731+37)%W, sy = (i*2371+17)%(H*0.8);
+    ctx.beginPath(); ctx.arc(sx, sy, i%3===0?1.2:0.6, 0, Math.PI*2); ctx.fill();
+  }
+}
+
+function drawGrid2D(ctx, W, H, groundY, ox, oy) {
+  if (!opts.grid) return;
+  const gSz = 50*SCALE_PIX_PER_M;
+  ctx.strokeStyle='rgba(10,40,64,0.4)'; ctx.lineWidth=0.5;
+  for (let x=ox%gSz; x<W; x+=gSz) {
+    ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,groundY); ctx.stroke();
+    const wX = Math.round((x-ox)/SCALE_PIX_PER_M);
+    ctx.fillStyle='rgba(60,90,110,0.6)'; ctx.font='9px Share Tech Mono';
+    ctx.fillText(wX+'m', x+2, groundY-4);
+  }
+  for (let y=groundY%gSz; y<groundY; y+=gSz) {
+    ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke();
+    const wY = Math.round((groundY-y)/SCALE_PIX_PER_M);
+    ctx.fillStyle='rgba(60,90,110,0.6)';
+    ctx.fillText(wY+'m', 4, y-2);
+  }
+}
+
+// ===================== FLAME RENDERER =====================
+function drawFlame(ctx, w, intensity) {
+  if (w < 0.5) return;
+  intensity = Math.min(intensity, 3);
+  const flameH = Math.max(2, w * 12 * (0.5 + intensity + Math.random() * 0.3));
+  const thrusterH = w * 0.9;
+  let flameColor;
+  try {
+    const grad = ctx.createLinearGradient(0, thrusterH, 0, thrusterH + flameH);
+    grad.addColorStop(0,    'rgba(255,255,200,0.95)');
+    grad.addColorStop(0.15, 'rgba(255,160,20,0.9)');
+    grad.addColorStop(0.5,  'rgba(255,60,10,0.7)');
+    grad.addColorStop(0.8,  'rgba(255,30,0,0.3)');
+    grad.addColorStop(1,    'rgba(255,10,0,0)');
+    flameColor = grad;
+  } catch(e) { flameColor = 'rgba(255,120,20,0.7)'; }
+  ctx.fillStyle = flameColor;
+  ctx.beginPath();
+  ctx.moveTo(-w/2, thrusterH);
+  ctx.bezierCurveTo(-w*0.6, thrusterH+flameH*0.3, -w*0.3*Math.random(), thrusterH+flameH*0.7, 0, thrusterH+flameH);
+  ctx.bezierCurveTo( w*0.3*Math.random(), thrusterH+flameH*0.7,  w*0.6, thrusterH+flameH*0.3, w/2, thrusterH);
+  ctx.closePath();
+  ctx.fill();
+}
+
+// Draw a single view panel
+// horiz axis: world 'hAxis' ('x' or 'z'), vert axis: world 'vAxis' ('y' or 'z')
+// For top view: hAxis='x', vAxis='z', ground=false
+function drawView(canvasId, hAxisName, vAxisName, accentColor, showGround) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+  drawBg(ctx, W, H);
+
+  const s = state;
+  const hVal = hAxisName==='x' ? s.x : (s.z||0);
+  const vVal = vAxisName==='y' ? s.y : (s.z||0);
+
+  const SCALE = SCALE_PIX_PER_M;
+  const groundY = H - 40;
+  const ox = W/2 - hVal*SCALE;   // origin X pixel
+  const oy = showGround ? (groundY - 0*SCALE) : H/2;   // origin Y pixel
+
+  function w2c(wh, wv) {
+    return [ox + wh*SCALE, showGround ? (groundY - wv*SCALE) : (oy - wv*SCALE)];
+  }
+
+  // Ground
+  if (showGround) {
+    ctx.fillStyle='#0a1a0d';
+    ctx.fillRect(0, groundY, W, H-groundY);
+    ctx.strokeStyle='#1a4a1a'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(0,groundY); ctx.lineTo(W,groundY); ctx.stroke();
+    drawGrid2D(ctx, W, H, groundY, ox, groundY);
+  } else {
+    // Top view: just grid
+    ctx.strokeStyle='rgba(10,40,64,0.4)'; ctx.lineWidth=0.5;
+    const gSz=50*SCALE;
+    for (let x=(W/2)%gSz; x<W; x+=gSz) {
+      ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke();
+    }
+    for (let y=H%gSz; y<H; y+=gSz) {
+      ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke();
+    }
+    // Crosshair at origin
+    ctx.strokeStyle='rgba(0,212,255,0.2)'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(W/2,0); ctx.lineTo(W/2,H); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,oy); ctx.lineTo(W,oy); ctx.stroke();
+  }
+
+  // Trajectory
+  if (opts.traj && trajectory.length > 1) {
+    ctx.strokeStyle=`rgba(0,180,220,0.5)`; ctx.lineWidth=1.5; ctx.setLineDash([4,4]);
+    ctx.beginPath();
+    for (let i=0; i<trajectory.length; i++) {
+      const [px,py] = w2c(
+        hAxisName==='x' ? trajectory[i][0] : (trajectory[i][2]||0),
+        vAxisName==='y' ? trajectory[i][1] : (trajectory[i][2]||0)
+      );
+      i===0 ? ctx.moveTo(px,py) : ctx.lineTo(px,py);
+    }
+    ctx.stroke(); ctx.setLineDash([]);
+  }
+
+  // Target marker
+  if (simTime > 0 && showGround) {
+    const thVal = hAxisName==='x' ? hl.targetX : hl.targetZ;
+    const tvVal = vAxisName==='y' ? hl.targetY : hl.targetZ;
+    const [tx,ty] = w2c(thVal, tvVal);
+    ctx.save(); ctx.strokeStyle='#00ffcc'; ctx.lineWidth=2;
+    ctx.shadowColor='#00ffcc'; ctx.shadowBlur=8; ctx.globalAlpha=0.6;
+    ctx.beginPath(); ctx.arc(tx,ty,10,0,Math.PI*2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(tx-14,ty); ctx.lineTo(tx+14,ty);
+    ctx.moveTo(tx,ty-14); ctx.lineTo(tx,ty+14); ctx.stroke();
+    ctx.restore();
+  }
+
+  // Rocket body projected onto this plane
+  // Get rocket axis in world frame
+  const q = {w:s.qw||1, x:s.qx||0, y:s.qy||0, z:s.qz||0};
+  const axis = rocketAxis(q);  // world nose direction
+  const H_px = s.H * SCALE;
+  const W_px = s.W * SCALE;
+
+  // Project rocket axis onto this view's plane
+  const axH = hAxisName==='x' ? axis.x : axis.z;
+  const axV = vAxisName==='y' ? axis.y : (vAxisName==='z' ? axis.z : axis.y);
+  const axLen = Math.sqrt(axH*axH + axV*axV);
+
+  // CoM position
+  const [cx, cy] = w2c(hVal, vVal + s.comH * (vAxisName==='y' ? 1 : 0));
+
+  ctx.save();
+  ctx.translate(cx, cy);
+  // Angle of rocket projection
+  const ang = Math.atan2(axH, axV);  // angle from vertical
+  ctx.rotate(-ang);
+
+  const comH_px = s.comH * SCALE;
+  const topY = -(H_px - comH_px);
+  const botY = comH_px;
+
+  // Body
+  ctx.fillStyle = '#2a5a7a'; ctx.strokeStyle = accentColor; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.rect(-W_px/2, topY, W_px, H_px); ctx.fill(); ctx.stroke();
+
+  // Nose cone
+  ctx.fillStyle='#5abadd';
+  ctx.beginPath();
+  ctx.moveTo(-W_px/2, topY); ctx.lineTo(0, topY-W_px*1.8); ctx.lineTo(W_px/2, topY);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+
+  // Fuel bar
+  const fuelFrac = s.fuelMass / (s.fuelMassInit||1);
+  const tankH = H_px*0.5, tankY = botY - tankH*0.9;
+  ctx.fillStyle='rgba(255,200,0,0.1)'; ctx.fillRect(-W_px/2+1, tankY, W_px-2, tankH);
+  ctx.fillStyle=`rgba(255,${Math.floor(100+fuelFrac*155)},0,0.4)`;
+  ctx.fillRect(-W_px/2+1, tankY+tankH*(1-fuelFrac), W_px-2, tankH*fuelFrac);
+
+  // Flame from main thruster
+  const gXr = ctrl.gimbalDegX * Math.PI/180;
+  const gZr = ctrl.gimbalDegZ * Math.PI/180;
+  if (ctrl.mainThrust > 0 && s.fuelMass > 0) {
+    ctx.save();
+    // Project gimbal onto this view
+    const gAng = hAxisName==='x' ? gXr : gZr;
+    ctx.rotate(gAng);
+    drawFlame(ctx, W_px*0.5, ctrl.mainThrust/100000);
+    ctx.restore();
+  }
+
+  // CoM marker
+  if (opts.com) {
+    ctx.strokeStyle='#cc44ff'; ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.arc(0,0,5,0,Math.PI*2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-8,0); ctx.lineTo(8,0); ctx.moveTo(0,-8); ctx.lineTo(0,8); ctx.stroke();
+  }
+  ctx.restore();
+
+  // Velocity vector
+  if (opts.vel) {
+    const vH = hAxisName==='x' ? s.vx : (s.vz||0);
+    const vV = vAxisName==='y' ? s.vy : (s.vz||0);
+    const vLen = Math.sqrt(vH*vH+vV*vV)*3;
+    if (vLen > 2) {
+      const vAng = Math.atan2(vH, vV);
+      const [ex,ey] = [cx + Math.sin(vAng)*vLen, cy - Math.cos(vAng)*vLen];
+      ctx.strokeStyle='#ffcc00'; ctx.fillStyle='#ffcc00'; ctx.lineWidth=2;
+      ctx.setLineDash([4,2]);
+      ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(ex,ey); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.moveTo(ex,ey);
+      ctx.lineTo(ex-8*Math.cos(vAng-0.3+Math.PI/2),ey-8*Math.sin(vAng-0.3+Math.PI/2));
+      ctx.lineTo(ex-8*Math.cos(vAng+0.3+Math.PI/2),ey-8*Math.sin(vAng+0.3+Math.PI/2));
+      ctx.closePath(); ctx.fill();
+    }
+  }
+
+  // Axis labels
+  ctx.fillStyle=accentColor; ctx.font='9px Share Tech Mono';
+  ctx.fillText(`${hAxisName.toUpperCase()} →`, W-30, H-8);
+  ctx.fillText(`↑ ${vAxisName.toUpperCase()}`, 4, 14);
+}
+
+function drawFrame() {
+  resizeCanvases();
+  const cXY = document.getElementById('simXY');
+  if (!cXY || cXY.width === 0) return;
+  drawView('simXY', 'x', 'y', '#00d4ff', true);
+  drawView('simZY', 'z', 'y', '#ff6b00', true);
+  drawView('simXZ', 'x', 'z', '#00ff88', false);
+
+  // Update impact prediction display
+  const imp = predictImpact();
+  if (imp) {
+    document.getElementById('d_impactX').textContent = imp.x.toFixed(1)+' m';
+    document.getElementById('d_impactZ').textContent = imp.z.toFixed(1)+' m';
+  } else {
+    document.getElementById('d_impactX').textContent = '—';
+    document.getElementById('d_impactZ').textContent = '—';
+  }
+}
+
+// ===================== DATA PANEL UPDATE =====================
+function updateDataPanel() {
+  const s = state;
+  const fuelFrac = s.fuelMassInit > 0 ? s.fuelMass / s.fuelMassInit : 0;
+
+  // Fuel
+  document.getElementById('d_fuelTotal').textContent = s.fuelMassInit.toFixed(0) + ' kg';
+  document.getElementById('d_fuelRem').textContent   = s.fuelMass.toFixed(1) + ' kg';
+  document.getElementById('fuelBar').style.width     = (fuelFrac * 100).toFixed(1) + '%';
+  const mainThr = (s.fuelMass > 0) ? ctrl.mainThrust : 0;
+  const sideThr = (s.fuelMass > 0) ? (ctrl.sideThrustLR + ctrl.sideThrustFB) : 0;
+  const rMain = mainThr / Ve_MAIN, rSide = sideThr / Ve_SIDE;
+  document.getElementById('d_mdotMain').textContent  = rMain.toFixed(3);
+  document.getElementById('d_mdotSide').textContent  = rSide.toFixed(3);
+  document.getElementById('d_mdotTotal').textContent = (rMain+rSide).toFixed(3);
+  document.getElementById('d_veMain').textContent    = Ve_MAIN.toFixed(0);
+  document.getElementById('d_veSide').textContent    = Ve_SIDE.toFixed(0);
+  document.getElementById('d_rMain').textContent     = rMain.toFixed(3);
+  document.getElementById('d_rSide').textContent     = rSide.toFixed(3);
+
+  // Kinematics
+  document.getElementById('d_x').textContent   = s.x.toFixed(2);
+  document.getElementById('d_y').textContent   = s.y.toFixed(2);
+  document.getElementById('d_z').textContent   = (s.z||0).toFixed(2);
+  document.getElementById('d_vx').textContent  = s.vx.toFixed(3);
+  document.getElementById('d_vy').textContent  = s.vy.toFixed(3);
+  document.getElementById('d_vz').textContent  = (s.vz||0).toFixed(3);
+  document.getElementById('d_vmod').textContent= Math.hypot(s.vx, s.vy, s.vz||0).toFixed(3);
+  document.getElementById('d_ax').textContent  = (s.ax||0).toFixed(4);
+  document.getElementById('d_ay').textContent  = (s.ay||0).toFixed(4);
+  document.getElementById('d_az').textContent  = (s.az||0).toFixed(4);
+  // Direction cosines
+  if (s.qw !== undefined) {
+    const dc = dirCosines({w:s.qw,x:s.qx,y:s.qy,z:s.qz});
+    document.getElementById('d_alpha_dc').textContent = (dc.alpha*180/Math.PI).toFixed(2)+'°';
+    document.getElementById('d_beta_dc').textContent  = (dc.beta *180/Math.PI).toFixed(2)+'°';
+    document.getElementById('d_gamma_dc').textContent = (dc.gamma*180/Math.PI).toFixed(2)+'°';
+  }
+  document.getElementById('d_omx').textContent = ((s.omx||0)*180/Math.PI).toFixed(3);
+  document.getElementById('d_omy').textContent = ((s.omy||0)*180/Math.PI).toFixed(3);
+  document.getElementById('d_omz').textContent = ((s.omz||0)*180/Math.PI).toFixed(3);
+  document.getElementById('d_alx').textContent = ((s.alx||0)*180/Math.PI).toFixed(4);
+  document.getElementById('d_aly').textContent = ((s.aly||0)*180/Math.PI).toFixed(4);
+  document.getElementById('d_alz').textContent = ((s.alz||0)*180/Math.PI).toFixed(4);
+
+  // Forces & Torques
+  if (s._Fg !== undefined) {
+    document.getElementById('d_fg').textContent  = s._Fg.toFixed(1);
+    document.getElementById('d_ft').textContent  = s._Ft.toFixed(1);
+    document.getElementById('d_fd').textContent  = s._Fd.toFixed(3);
+    document.getElementById('d_fnx').textContent = s._Fnx.toFixed(2);
+    document.getElementById('d_fny').textContent = s._Fny.toFixed(2);
+    document.getElementById('d_fnz').textContent = (s._Fnz||0).toFixed(2);
+    document.getElementById('d_tx').textContent  = (s._tau_x||0).toFixed(2);
+    document.getElementById('d_ty').textContent  = (s._tau_y||0).toFixed(2);
+    document.getElementById('d_tz').textContent  = (s._tau_z||0).toFixed(2);
+    document.getElementById('d_tn').textContent  = Math.hypot(s._tau_x||0,s._tau_y||0,s._tau_z||0).toFixed(2);
+  }
+  document.getElementById('d_mass').textContent = s.mass.toFixed(1);
+  document.getElementById('d_com').textContent  = s.comH.toFixed(3);
+  document.getElementById('d_ix').textContent   = (s.Ix||0).toFixed(1);
+  document.getElementById('d_iy').textContent   = (s.Iy||0).toFixed(1);
+  document.getElementById('d_iz').textContent   = (s.Iz||0).toFixed(1);
+
+  // Trajectory
+  document.getElementById('d_alt').textContent    = Math.max(0,s.y).toFixed(2);
+  document.getElementById('d_range').textContent  = s.x.toFixed(2);
+  document.getElementById('d_rangez').textContent = (s.z||0).toFixed(2);
+  document.getElementById('d_maxAlt').textContent = maxAlt.toFixed(2);
+  document.getElementById('d_time').textContent   = simTime.toFixed(2);
+
+  const mins = Math.floor(simTime/60).toString().padStart(2,'0');
+  const secs = Math.floor(simTime%60).toString().padStart(2,'0');
+  const tenths = Math.floor((simTime*10)%10);
+  document.getElementById('timeDisplay').textContent = `T+${mins}:${secs}.${tenths}`;
+
+  // HL Live Panel
+  if (hl.active || hl.t > 0) {
+    const fmt = (v,d=2) => (v===undefined||isNaN(v)) ? '—' : v.toFixed(d);
+    document.getElementById('hl_t').textContent   = fmt(hl.t,2)+' / '+fmt(hl.T,1)+' s';
+    document.getElementById('hl_S').textContent   = fmt(hl._S,4);
+    document.getElementById('hl_aX').textContent  = fmt(hl._aX,4)+' m/s²';
+    document.getElementById('hl_vX').textContent  = fmt(hl._vX,3)+' m/s';
+    document.getElementById('hl_dX').textContent  = fmt(hl._dX,2)+' m';
+    document.getElementById('hl_Fxw').textContent = fmt(hl._Fxw,1)+' N';
+    document.getElementById('hl_aY').textContent  = fmt(hl._aY,4)+' m/s²';
+    document.getElementById('hl_vY').textContent  = fmt(hl._vY,3)+' m/s';
+    document.getElementById('hl_dY').textContent  = fmt(hl._dY,2)+' m';
+    document.getElementById('hl_Fyw').textContent = fmt(hl._Fyw,1)+' N';
+    document.getElementById('hl_aZ').textContent  = fmt(hl._aZ,4)+' m/s²';
+    document.getElementById('hl_vZ').textContent  = fmt(hl._vZ,3)+' m/s';
+    document.getElementById('hl_dZ').textContent  = fmt(hl._dZ,2)+' m';
+    document.getElementById('hl_Fzw').textContent = fmt(hl._Fzw,1)+' N';
+    document.getElementById('hl_Tmag').textContent = fmt(hl._Tmag,1)+' N';
+    const gxd = document.getElementById('hl_gimbalX_disp');
+    const gzd = document.getElementById('hl_gimbalZ_disp');
+    if (gxd) gxd.textContent = fmt(hl._gimbalX,2)+'°';
+    if (gzd) gzd.textContent = fmt(hl._gimbalZ,2)+'°';
+    document.getElementById('hl_Xerr').textContent = fmt(s.x - hl.targetX, 2)+' m';
+    document.getElementById('hl_Yerr').textContent = fmt(s.y - hl.targetY, 2)+' m';
+  }
+}
+
+// ===================== MAIN LOOP =====================
+function loop(timestamp) {
+  if (!running) return;
+
+  if (lastTime === null) lastTime = timestamp;
+  let dt = (timestamp - lastTime) / 1000;
+  lastTime = timestamp;
+
+  // Cap dt to avoid instability
+  dt = Math.min(dt, 0.05);
+
+  // Sub-steps for accuracy (RK4 + 100 steps = very high precision)
+  const steps = 100;
+  const subDt = dt / steps;
+  for (let i = 0; i < steps; i++) {
+    physicsStep(subDt);
+    simTime += subDt;
+    if (state.crashed) break;
+  }
+
+  // Record trajectory every ~0.2s
+  if (trajectory.length === 0 || simTime - (trajectory._lastT || 0) > 0.1) {
+    trajectory.push([state.x, state.y, state.z||0]);
+    trajectory._lastT = simTime;
+    if (trajectory.length > 2000) trajectory.splice(0, 100);
+  }
+
+  drawFrame();
+  updateDataPanel();
+
+  if (!state.crashed) {
+    animId = requestAnimationFrame(loop);
+  }
+}
+
+// ===================== CONTROLS =====================
+function updateThrusters() {
+  ctrl.mainThrust   = parseFloat(document.getElementById('sl_mt').value);
+  ctrl.gimbalDegX   = parseFloat(document.getElementById('sl_gimbal').value);
+  ctrl.gimbalDegZ   = parseFloat(document.getElementById('sl_gimbalZ').value);
+  ctrl.sideThrustLR = parseFloat(document.getElementById('sl_st').value);
+  ctrl.sideThrustFB = parseFloat(document.getElementById('sl_stFB').value);
+  document.getElementById('lbl_mt').textContent     = ctrl.mainThrust.toFixed(0);
+  document.getElementById('lbl_gimbal').textContent = ctrl.gimbalDegX.toFixed(1);
+  document.getElementById('lbl_gimbalZ').textContent= ctrl.gimbalDegZ.toFixed(1);
+  document.getElementById('lbl_st').textContent     = ctrl.sideThrustLR.toFixed(0);
+  document.getElementById('lbl_stFB').textContent   = ctrl.sideThrustFB.toFixed(0);
+  document.getElementById('gimbalNeedle').style.transform  = `translateX(-50%) rotate(${ctrl.gimbalDegX}deg)`;
+  document.getElementById('gimbalNeedleZ').style.transform = `translateX(-50%) rotate(${ctrl.gimbalDegZ}deg)`;
+  if (!running) { drawFrame(); updateDataPanel(); }
+}
+
+function updateInitConfig() {
+  initCfg.dryMass = parseFloat(document.getElementById('sl_mass').value);
+  initCfg.fuelMass = parseFloat(document.getElementById('sl_fuel').value);
+  initCfg.rocketH = parseFloat(document.getElementById('sl_rh').value);
+  initCfg.rocketW = parseFloat(document.getElementById('sl_rw').value);
+  initCfg.initAngle = parseFloat(document.getElementById('sl_ang').value);
+  initCfg.gravity = parseFloat(document.getElementById('sl_grav').value);
+  document.getElementById('lbl_mass').textContent = initCfg.dryMass;
+  document.getElementById('lbl_fuel').textContent = initCfg.fuelMass;
+  document.getElementById('lbl_rh').textContent = initCfg.rocketH;
+  document.getElementById('lbl_rw').textContent = initCfg.rocketW;
+  document.getElementById('lbl_ang').textContent = initCfg.initAngle;
+  document.getElementById('lbl_grav').textContent = initCfg.gravity;
+  if (!running) {
+    state = buildInitState();
+    drawFrame();
+    updateDataPanel();
+  }
+}
+
+function updateLabels() {
+  document.getElementById('lbl_mass').textContent = initCfg.dryMass;
+  document.getElementById('lbl_fuel').textContent = initCfg.fuelMass;
+  document.getElementById('lbl_rh').textContent = initCfg.rocketH;
+  document.getElementById('lbl_rw').textContent = initCfg.rocketW;
+  document.getElementById('lbl_ang').textContent = initCfg.initAngle;
+  document.getElementById('lbl_grav').textContent = initCfg.gravity;
+  document.getElementById('lbl_mt').textContent = '0';
+  document.getElementById('lbl_gimbal').textContent = '0';
+  document.getElementById('lbl_st').textContent = '0';
+}
+
+function toggleOpt(key) {
+  opts[key] = !opts[key];
+  const el = document.getElementById('tog_' + key);
+  if (opts[key]) el.classList.add('on'); else el.classList.remove('on');
+  if (!running) drawFrame();
+}
+
+// ===================== CANVAS RESIZE =====================
+// resizeCanvases() handles all 3 views; legacy alias below
+
+// ===================== KEYBOARD =====================
+document.addEventListener('keydown', (e) => {
+  switch(e.code) {
+    case 'Space':
+      e.preventDefault();
+      if (running) stopSim(); else startSim();
+      break;
+    case 'KeyR':
+      resetSim();
+      break;
+    case 'ArrowUp':
+      e.preventDefault();
+      document.getElementById('sl_mt').value = Math.min(300000, ctrl.mainThrust + 5000);
+      updateThrusters();
+      break;
+    case 'ArrowDown':
+      e.preventDefault();
+      document.getElementById('sl_mt').value = Math.max(0, ctrl.mainThrust - 5000);
+      updateThrusters();
+      break;
+    case 'ArrowLeft':
+      e.preventDefault();
+      document.getElementById('sl_gimbal').value = Math.max(-90, ctrl.gimbalDegX - 1);
+      updateThrusters();
+      break;
+    case 'ArrowRight':
+      e.preventDefault();
+      document.getElementById('sl_gimbal').value = Math.min(90, ctrl.gimbalDegX + 1);
+      updateThrusters();
+      break;
+  }
+});
+
+// ===================== INIT =====================
+function resizeCanvas() { resizeCanvases(); }  // legacy alias
+window.addEventListener('resize', () => { resizeCanvases(); drawFrame(); });
+
+window.addEventListener('DOMContentLoaded', () => {
+  resizeCanvases();
+  state = buildInitState();
+  updateInitConfig();
+  updateThrusters();
+  drawFrame();
+  updateDataPanel();
+  updateStatusUI('stopped');
+});
+</script>
+</body>
+</html>

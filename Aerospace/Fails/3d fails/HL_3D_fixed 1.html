@@ -1,0 +1,2192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>3D Rocket Simulation</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap');
+
+  :root {
+    --bg: #030b14;
+    --panel: #050f1c;
+    --border: #0a2840;
+    --accent: #00d4ff;
+    --accent2: #ff6b00;
+    --accent3: #00ff88;
+    --warn: #ffcc00;
+    --danger: #ff2244;
+    --text: #a8d8ea;
+    --dim: #3a5a6a;
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  header {
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    padding: 6px 16px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-shrink: 0;
+  }
+
+  header h1 {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 14px;
+    font-weight: 900;
+    color: var(--accent);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+  }
+
+  .status-bar {
+    display: flex;
+    gap: 16px;
+    margin-left: auto;
+    align-items: center;
+    font-size: 11px;
+  }
+
+  .status-indicator {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--dim);
+  }
+  .dot.active { background: var(--accent3); box-shadow: 0 0 6px var(--accent3); animation: pulse 1s infinite; }
+  .dot.stopped { background: var(--warn); }
+  .dot.crashed { background: var(--danger); }
+
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  .main-layout {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  .left-panel {
+    width: 220px;
+    flex-shrink: 0;
+    background: var(--panel);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    padding: 8px;
+    gap: 8px;
+  }
+
+  /* CANVAS AREA — holds multiple canvases */
+  .canvas-area {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    background: #010810;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .canvas-row {
+    display: flex;
+    flex: 1;
+    gap: 2px;
+  }
+
+  .canvas-wrap {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    background: #010810;
+  }
+
+  .canvas-wrap canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  .canvas-label {
+    position: absolute;
+    top: 4px; left: 6px;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 9px;
+    color: rgba(0,212,255,0.7);
+    letter-spacing: 2px;
+    pointer-events: none;
+    z-index: 2;
+  }
+
+  .canvas-wrap.hidden { display: none; }
+
+  /* Canvas toggle bar */
+  .canvas-toggle-bar {
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    padding: 4px 10px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-shrink: 0;
+    font-size: 10px;
+  }
+
+  .canvas-toggle-bar span {
+    color: var(--dim);
+    font-family: 'Orbitron', sans-serif;
+    font-size: 9px;
+    letter-spacing: 1px;
+    margin-right: 4px;
+  }
+
+  .cv-btn {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 9px;
+    letter-spacing: 1px;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 3px 8px;
+    cursor: pointer;
+    background: transparent;
+    color: var(--dim);
+    transition: all 0.15s;
+  }
+  .cv-btn.on { border-color: var(--accent); color: var(--accent); background: rgba(0,212,255,0.08); }
+
+  .right-panel {
+    width: 230px;
+    flex-shrink: 0;
+    background: var(--panel);
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    padding: 8px;
+    gap: 8px;
+  }
+
+  .panel-section {
+    background: rgba(0,20,40,0.6);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 8px;
+  }
+
+  .section-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 9px;
+    letter-spacing: 2px;
+    color: var(--accent);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 4px;
+  }
+
+  .ctrl-row {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    margin-bottom: 8px;
+  }
+
+  .ctrl-label {
+    font-size: 10px;
+    color: var(--dim);
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .ctrl-label span { color: var(--accent2); }
+
+  input[type=range] {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    outline: none;
+  }
+
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    box-shadow: 0 0 4px var(--accent);
+  }
+
+  input[type=range].orange::-webkit-slider-thumb { background: var(--accent2); box-shadow: 0 0 4px var(--accent2); }
+  input[type=range].green::-webkit-slider-thumb { background: var(--accent3); box-shadow: 0 0 4px var(--accent3); }
+  input[type=range].purple::-webkit-slider-thumb { background: #cc44ff; box-shadow: 0 0 4px #cc44ff; }
+
+  .data-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    padding: 2px 0;
+    border-bottom: 1px solid rgba(10,40,64,0.5);
+  }
+
+  .data-row .key { color: var(--dim); }
+  .data-row .val { color: var(--accent3); font-weight: bold; }
+  .data-row .val.warn { color: var(--warn); }
+  .data-row .val.danger { color: var(--danger); }
+
+  .btn {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 10px;
+    letter-spacing: 1px;
+    border: 1px solid;
+    border-radius: 3px;
+    padding: 6px 10px;
+    cursor: pointer;
+    text-transform: uppercase;
+    background: transparent;
+    transition: all 0.15s;
+    width: 100%;
+    margin-bottom: 4px;
+  }
+
+  .btn-start { border-color: var(--accent3); color: var(--accent3); }
+  .btn-start:hover { background: var(--accent3); color: #000; }
+  .btn-stop { border-color: var(--warn); color: var(--warn); }
+  .btn-stop:hover { background: var(--warn); color: #000; }
+  .btn-reset { border-color: var(--danger); color: var(--danger); }
+  .btn-reset:hover { background: var(--danger); color: #fff; }
+
+  .angle-display {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 4px;
+    flex-wrap: wrap;
+  }
+
+  .angle-dial {
+    width: 36px; height: 36px;
+    border: 2px solid var(--accent2);
+    border-radius: 50%;
+    position: relative;
+    flex-shrink: 0;
+  }
+  .angle-dial.purple-dial { border-color: #cc44ff; }
+  .angle-dial.green-dial { border-color: var(--accent3); }
+
+  .angle-needle {
+    position: absolute;
+    width: 2px;
+    height: 14px;
+    background: var(--accent2);
+    left: 50%;
+    bottom: 50%;
+    transform-origin: bottom center;
+    transform: translateX(-50%) rotate(0deg);
+    border-radius: 2px;
+  }
+  .angle-needle.purple-needle { background: #cc44ff; }
+  .angle-needle.green-needle { background: var(--accent3); }
+
+  .fuel-bar-wrap { margin-bottom: 6px; }
+  .fuel-bar-bg {
+    width: 100%; height: 8px;
+    background: var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .fuel-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--danger), var(--warn), var(--accent3));
+    border-radius: 4px;
+    transition: width 0.1s;
+  }
+
+  .input-num {
+    background: rgba(0,20,40,0.8);
+    border: 1px solid var(--border);
+    color: var(--accent);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    padding: 3px 6px;
+    border-radius: 3px;
+    width: 100%;
+  }
+
+  .time-display {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 18px;
+    color: var(--accent);
+    text-align: center;
+    letter-spacing: 3px;
+    padding: 4px 0;
+  }
+
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .force-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    font-size: 9px;
+  }
+  .legend-item { display: flex; align-items: center; gap: 3px; }
+  .legend-dot { width: 8px; height: 3px; border-radius: 1px; }
+
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 10px;
+    margin-bottom: 4px;
+  }
+  .toggle {
+    width: 28px; height: 14px;
+    background: var(--border);
+    border-radius: 7px;
+    position: relative;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .toggle.on { background: var(--accent); }
+  .toggle::after {
+    content: '';
+    position: absolute;
+    width: 10px; height: 10px;
+    background: #fff;
+    border-radius: 50%;
+    top: 2px; left: 2px;
+    transition: left 0.2s;
+  }
+  .toggle.on::after { left: 16px; }
+
+  .section-title.orange { color: var(--accent2); }
+  .section-title.green { color: var(--accent3); }
+  .section-title.purple { color: #cc44ff; }
+
+  /* Quaternion display strip */
+  .quat-strip {
+    display: flex;
+    gap: 3px;
+    font-size: 9px;
+    flex-wrap: wrap;
+    margin-top: 3px;
+  }
+  .quat-val { color: var(--accent); }
+  .quat-key { color: var(--dim); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🚀 Rocket Sim 3D</h1>
+  <div class="status-bar">
+    <div class="status-indicator">
+      <div class="dot" id="statusDot"></div>
+      <span id="statusText">STOPPED</span>
+    </div>
+    <div class="time-display" id="timeDisplay">T+00:00.0</div>
+  </div>
+</header>
+
+<!-- Canvas view toggle bar -->
+<div class="canvas-toggle-bar">
+  <span>VIEWS:</span>
+  <button class="cv-btn on" id="cvbtn_xy" onclick="toggleCanvas('xy')">X-Y (Front)</button>
+  <button class="cv-btn on" id="cvbtn_zy" onclick="toggleCanvas('zy')">Z-Y (Side)</button>
+  <button class="cv-btn on" id="cvbtn_xz" onclick="toggleCanvas('xz')">X-Z (Top)</button>
+</div>
+
+<div class="main-layout">
+
+  <!-- LEFT PANEL -->
+  <div class="left-panel">
+
+    <div class="panel-section">
+      <div class="section-title">Simulation</div>
+      <button class="btn btn-start" id="btnStart" onclick="startSim()">▶ START</button>
+      <button class="btn btn-stop" id="btnStop" onclick="stopSim()">⏸ STOP</button>
+      <button class="btn btn-reset" onclick="resetSim()">↺ RESET</button>
+      <button class="btn" id="btnTest" onclick="activateTestMode()"
+        style="border-color:#cc44ff;color:#cc44ff;margin-top:4px;">
+        🎯 LANDING TEST
+      </button>
+      <button class="btn" onclick="activateHLMode()"
+        style="border-color:#00ffcc;color:#00ffcc;margin-top:4px;">
+        🎯 HL LANDING
+      </button>
+      <button class="btn" onclick="loadPreset()"
+        style="border-color:#ffaa00;color:#ffaa00;margin-top:4px;">
+        🧪 PRESET TEST
+      </button>
+      <button class="btn" onclick="showHLPanel()"
+        style="border-color:#00ffcc;color:#00ffcc;margin-top:4px;">
+        🚀 HOVER→LAND
+      </button>
+    </div>
+
+    <!-- HL Config Panel -->
+    <div class="panel-section" id="hlConfigPanel" style="display:none; border-color:#00ffcc;">
+      <div class="section-title" style="color:#00ffcc;">Hover → Land Config</div>
+      <div class="ctrl-row">
+        <div class="ctrl-label">Total Time T (s)</div>
+        <input type="number" min="5" max="120" step="1" value="20" id="sl_hl_T" class="input-num">
+      </div>
+      <div style="font-size:9px;color:#00ffcc;margin:6px 0 3px;border-top:1px solid #0a2840;padding-top:4px;">Distances to target</div>
+      <div class="ctrl-row">
+        <div class="ctrl-label">Z_X horiz dist (m)</div>
+        <input type="number" min="0" step="10" value="200" id="sl_hl_ZX" class="input-num">
+      </div>
+      <div class="ctrl-row">
+        <div class="ctrl-label">Z_Y vert dist (m)</div>
+        <input type="number" min="0" step="10" value="200" id="sl_hl_ZY" class="input-num">
+      </div>
+      <div class="ctrl-row">
+        <div class="ctrl-label">Z_Z depth dist (m)</div>
+        <input type="number" step="10" value="0" id="sl_hl_ZZ" class="input-num">
+      </div>
+      <div style="font-size:9px;color:#00ffcc;margin:6px 0 3px;border-top:1px solid #0a2840;padding-top:4px;">Land Target (absolute)</div>
+      <div class="ctrl-row">
+        <div class="ctrl-label">Target X (m)</div>
+        <input type="number" step="10" value="100" id="hl_targetX_inp" class="input-num">
+      </div>
+      <div class="ctrl-row">
+        <div class="ctrl-label">Target Y (m)</div>
+        <input type="number" step="1" value="0" id="hl_targetY_inp" class="input-num">
+      </div>
+      <div class="ctrl-row">
+        <div class="ctrl-label">Target Z (m)</div>
+        <input type="number" step="10" value="0" id="hl_targetZ_inp" class="input-num">
+      </div>
+      <button class="btn" onclick="loadHLPreset()"
+        style="border-color:#00ffcc;color:#00ffcc;margin-top:6px;">① LOAD PRESET</button>
+      <button class="btn" id="btnHL2" onclick="hlBtn2Click()"
+        style="border-color:#00ff88;color:#00ff88;margin-top:2px;">② HOVER (then land)</button>
+      <div id="hlStatus" style="font-size:9px;color:var(--dim);margin-top:4px;">Not loaded</div>
+    </div>
+
+    <div class="panel-section">
+      <div class="section-title">Initial Config</div>
+      <div class="ctrl-row">
+        <div class="ctrl-label">Dry Mass (kg) <span id="lbl_mass">5000</span></div>
+        <input type="range" min="500" max="20000" value="5000" id="sl_mass" oninput="updateInitConfig()">
+      </div>
+      <div class="ctrl-row">
+        <div class="ctrl-label">Fuel Mass (kg) <span id="lbl_fuel">3000</span></div>
+        <input type="range" min="100" max="15000" value="3000" id="sl_fuel" oninput="updateInitConfig()">
+      </div>
+      <div class="ctrl-row">
+        <div class="ctrl-label">Rocket Height (m) <span id="lbl_rh">20</span></div>
+        <input type="range" min="5" max="60" value="20" id="sl_rh" oninput="updateInitConfig()">
+      </div>
+      <div class="ctrl-row">
+        <div class="ctrl-label">Rocket Width (m) <span id="lbl_rw">4</span></div>
+        <input type="range" min="1" max="12" value="4" id="sl_rw" oninput="updateInitConfig()">
+      </div>
+      <div class="ctrl-row">
+        <div class="ctrl-label">Init β (°) X-Y tilt <span id="lbl_ang">0</span></div>
+        <input type="range" min="-45" max="45" value="0" id="sl_ang" oninput="updateInitConfig()">
+      </div>
+      <div class="ctrl-row">
+        <div class="ctrl-label">Init γ (°) Z-Y tilt <span id="lbl_ang_z">0</span></div>
+        <input type="range" min="-45" max="45" value="0" id="sl_ang_z" oninput="updateInitConfig()">
+      </div>
+      <div class="ctrl-row">
+        <div class="ctrl-label">Gravity (m/s²) <span id="lbl_grav">9.81</span></div>
+        <input type="range" min="0" max="25" step="0.1" value="9.81" id="sl_grav" oninput="updateInitConfig()">
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <div class="section-title">Display</div>
+      <div class="toggle-row">
+        <span>Trajectory</span>
+        <div class="toggle on" id="tog_traj" onclick="toggleOpt('traj')"></div>
+      </div>
+      <div class="toggle-row">
+        <span>Forces</span>
+        <div class="toggle on" id="tog_forces" onclick="toggleOpt('forces')"></div>
+      </div>
+      <div class="toggle-row">
+        <span>CoM Marker</span>
+        <div class="toggle on" id="tog_com" onclick="toggleOpt('com')"></div>
+      </div>
+      <div class="toggle-row">
+        <span>Impact Point</span>
+        <div class="toggle on" id="tog_impact" onclick="toggleOpt('impact')"></div>
+      </div>
+      <div class="toggle-row">
+        <span>Velocity Vec</span>
+        <div class="toggle on" id="tog_vel" onclick="toggleOpt('vel')"></div>
+      </div>
+      <div class="toggle-row">
+        <span>Grid</span>
+        <div class="toggle on" id="tog_grid" onclick="toggleOpt('grid')"></div>
+      </div>
+      <div class="toggle-row">
+        <span>Drag Force</span>
+        <div class="toggle" id="tog_drag" onclick="toggleOpt('drag')"></div>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <div class="section-title">Force Legend</div>
+      <div class="force-legend">
+        <div class="legend-item"><div class="legend-dot" style="background:#ff2244"></div><span>Gravity</span></div>
+        <div class="legend-item"><div class="legend-dot" style="background:#ff6b00"></div><span>Thrust</span></div>
+        <div class="legend-item"><div class="legend-dot" style="background:#00d4ff"></div><span>Drag</span></div>
+        <div class="legend-item"><div class="legend-dot" style="background:#00ff88"></div><span>Net Force</span></div>
+        <div class="legend-item"><div class="legend-dot" style="background:#ffcc00"></div><span>Velocity</span></div>
+        <div class="legend-item"><div class="legend-dot" style="background:#cc44ff"></div><span>CoM</span></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- CANVAS AREA: 3 canvases -->
+  <div class="canvas-area" id="canvasArea">
+    <div class="canvas-row">
+      <div class="canvas-wrap" id="wrap_xy">
+        <div class="canvas-label">X-Y VIEW (FRONT)</div>
+        <canvas id="sim_xy"></canvas>
+      </div>
+      <div class="canvas-wrap" id="wrap_zy">
+        <div class="canvas-label">Z-Y VIEW (SIDE)</div>
+        <canvas id="sim_zy"></canvas>
+      </div>
+    </div>
+    <div class="canvas-row">
+      <div class="canvas-wrap" id="wrap_xz">
+        <div class="canvas-label">X-Z VIEW (TOP)</div>
+        <canvas id="sim_xz"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div class="right-panel">
+
+    <!-- Main Thruster -->
+    <div class="panel-section">
+      <div class="section-title orange">Main Thruster</div>
+      <div class="ctrl-row">
+        <div class="ctrl-label">Thrust Force (N) <span id="lbl_mt" style="color:var(--accent2)">0</span></div>
+        <input type="range" class="orange" min="0" max="300000" step="1000" value="0" id="sl_mt" oninput="updateThrusters()">
+      </div>
+      <div class="ctrl-row">
+        <div class="ctrl-label">Gimbal α° (X-dir) <span id="lbl_gimbal_a" style="color:var(--accent2)">0</span></div>
+        <input type="range" class="orange" min="-90" max="90" step="0.5" value="0" id="sl_gimbal_a" oninput="updateThrusters()">
+      </div>
+      <div class="ctrl-row">
+        <div class="ctrl-label">Gimbal β° (Y-dir) <span id="lbl_gimbal_b" style="color:var(--accent2)">0</span></div>
+        <input type="range" class="orange" min="-90" max="90" step="0.5" value="0" id="sl_gimbal_b" oninput="updateThrusters()">
+      </div>
+      <div class="ctrl-row">
+        <div class="ctrl-label">Gimbal γ° (Z-dir) <span id="lbl_gimbal_g" style="color:var(--accent2)">0</span></div>
+        <input type="range" class="orange" min="-90" max="90" step="0.5" value="0" id="sl_gimbal_g" oninput="updateThrusters()">
+      </div>
+      <div class="angle-display">
+        <div class="angle-dial"><div class="angle-needle" id="gimbalNeedle_a"></div></div>
+        <div style="font-size:9px;color:var(--dim)">α<br>X-dir</div>
+        <div class="angle-dial purple-dial"><div class="angle-needle purple-needle" id="gimbalNeedle_b"></div></div>
+        <div style="font-size:9px;color:var(--dim)">β<br>Y-dir</div>
+        <div class="angle-dial green-dial"><div class="angle-needle green-needle" id="gimbalNeedle_g"></div></div>
+        <div style="font-size:9px;color:var(--dim)">γ<br>Z-dir</div>
+      </div>
+    </div>
+
+    <!-- Side Thrusters L+R -->
+    <div class="panel-section">
+      <div class="section-title green">Side Thrusters L+R (torque Y-axis)</div>
+      <div class="ctrl-row">
+        <div class="ctrl-label">Combined Thrust (N) <span id="lbl_st" style="color:var(--accent3)">0</span></div>
+        <input type="range" class="green" min="0" max="100000" step="500" value="0" id="sl_st" oninput="updateThrusters()">
+      </div>
+    </div>
+
+    <!-- Side Thrusters F+B -->
+    <div class="panel-section">
+      <div class="section-title purple">Side Thrusters F+B (torque X-axis)</div>
+      <div class="ctrl-row">
+        <div class="ctrl-label">Combined Thrust (N) <span id="lbl_stfb" style="color:#cc44ff">0</span></div>
+        <input type="range" class="purple" min="0" max="100000" step="500" value="0" id="sl_stfb" oninput="updateThrusters()">
+      </div>
+    </div>
+
+    <!-- Fuel Status -->
+    <div class="panel-section">
+      <div class="section-title">Fuel Status</div>
+      <div class="data-row"><span class="key">Total Fuel</span><span class="val" id="d_fuelTotal">3000.0 kg</span></div>
+      <div class="data-row"><span class="key">Remaining</span><span class="val" id="d_fuelRem">3000.0 kg</span></div>
+      <div class="fuel-bar-wrap">
+        <div class="fuel-bar-bg"><div class="fuel-bar-fill" id="fuelBar" style="width:100%"></div></div>
+      </div>
+      <div class="data-row"><span class="key">ṁ main (kg/s)</span><span class="val" id="d_mdotMain">0.000</span></div>
+      <div class="data-row"><span class="key">ṁ side (kg/s)</span><span class="val" id="d_mdotSide">0.000</span></div>
+      <div class="data-row"><span class="key">ṁ total (kg/s)</span><span class="val" id="d_mdotTotal">0.000</span></div>
+      <div class="data-row"><span class="key">Ve main (m/s)</span><span class="val" id="d_veMain">3000</span></div>
+      <div class="data-row"><span class="key">Ve side (m/s)</span><span class="val" id="d_veSide">2800</span></div>
+    </div>
+
+    <!-- Kinematics -->
+    <div class="panel-section">
+      <div class="section-title">Kinematics</div>
+      <div class="data-row"><span class="key">X (m)</span><span class="val" id="d_x">0.0</span></div>
+      <div class="data-row"><span class="key">Y (m)</span><span class="val" id="d_y">0.0</span></div>
+      <div class="data-row"><span class="key">Z (m)</span><span class="val" id="d_z">0.0</span></div>
+      <div class="data-row"><span class="key">Vx (m/s)</span><span class="val" id="d_vx">0.0</span></div>
+      <div class="data-row"><span class="key">Vy (m/s)</span><span class="val" id="d_vy">0.0</span></div>
+      <div class="data-row"><span class="key">Vz (m/s)</span><span class="val" id="d_vz">0.0</span></div>
+      <div class="data-row"><span class="key">|V| (m/s)</span><span class="val" id="d_vmod">0.0</span></div>
+      <div class="data-row"><span class="key">Ax (m/s²)</span><span class="val" id="d_ax">0.0</span></div>
+      <div class="data-row"><span class="key">Ay (m/s²)</span><span class="val" id="d_ay">0.0</span></div>
+      <div class="data-row"><span class="key">Az (m/s²)</span><span class="val" id="d_az">0.0</span></div>
+      <div style="font-size:9px;color:#ffcc00;margin:4px 0 2px;border-top:1px solid #0a2840;padding-top:3px;">— Direction Cosines —</div>
+      <div class="data-row"><span class="key">α° (w/ X-axis)</span><span class="val" id="d_alpha_dc">90.0</span></div>
+      <div class="data-row"><span class="key">β° (w/ Y-axis)</span><span class="val" id="d_beta_dc">0.0</span></div>
+      <div class="data-row"><span class="key">γ° (w/ Z-axis)</span><span class="val" id="d_gamma_dc">90.0</span></div>
+      <div style="font-size:9px;color:#ffcc00;margin:4px 0 2px;border-top:1px solid #0a2840;padding-top:3px;">— Angular Velocity —</div>
+      <div class="data-row"><span class="key">ωx (°/s)</span><span class="val" id="d_omx">0.0</span></div>
+      <div class="data-row"><span class="key">ωy (°/s)</span><span class="val" id="d_omy">0.0</span></div>
+      <div class="data-row"><span class="key">ωz (°/s)</span><span class="val" id="d_omz">0.0</span></div>
+      <div style="font-size:9px;color:#ffcc00;margin:4px 0 2px;border-top:1px solid #0a2840;padding-top:3px;">— Quaternion —</div>
+      <div class="quat-strip">
+        <span class="quat-key">w:</span><span class="quat-val" id="d_qw">1.000</span>
+        <span class="quat-key"> x:</span><span class="quat-val" id="d_qx">0.000</span>
+        <span class="quat-key"> y:</span><span class="quat-val" id="d_qy">0.000</span>
+        <span class="quat-key"> z:</span><span class="quat-val" id="d_qz">0.000</span>
+      </div>
+    </div>
+
+    <!-- Forces & Torques -->
+    <div class="panel-section">
+      <div class="section-title">Forces & Torques</div>
+      <div class="data-row"><span class="key">F_gravity (N)</span><span class="val" id="d_fg">0.0</span></div>
+      <div class="data-row"><span class="key">Ftx (N)</span><span class="val" id="d_ftx">0.0</span></div>
+      <div class="data-row"><span class="key">Fty (N)</span><span class="val" id="d_fty">0.0</span></div>
+      <div class="data-row"><span class="key">Ftz (N)</span><span class="val" id="d_ftz">0.0</span></div>
+      <div class="data-row"><span class="key">F_drag (N)</span><span class="val" id="d_fd">0.0</span></div>
+      <div class="data-row"><span class="key">F_net_x (N)</span><span class="val" id="d_fnx">0.0</span></div>
+      <div class="data-row"><span class="key">F_net_y (N)</span><span class="val" id="d_fny">0.0</span></div>
+      <div class="data-row"><span class="key">F_net_z (N)</span><span class="val" id="d_fnz">0.0</span></div>
+      <div class="data-row"><span class="key">τ_x (N·m)</span><span class="val" id="d_tx">0.0</span></div>
+      <div class="data-row"><span class="key">τ_y (N·m)</span><span class="val" id="d_ty">0.0</span></div>
+      <div class="data-row"><span class="key">τ_z (N·m)</span><span class="val" id="d_tz">0.0</span></div>
+      <div class="data-row"><span class="key">Mass (kg)</span><span class="val" id="d_mass">8000.0</span></div>
+      <div class="data-row"><span class="key">CoM height (m)</span><span class="val" id="d_com">10.0</span></div>
+      <div class="data-row"><span class="key">Ix=Iy=Iz (kg·m²)</span><span class="val" id="d_inertia">0.0</span></div>
+    </div>
+
+    <!-- Trajectory -->
+    <div class="panel-section">
+      <div class="section-title">Trajectory</div>
+      <div class="data-row"><span class="key">Alt Y (m)</span><span class="val" id="d_alt">0.0</span></div>
+      <div class="data-row"><span class="key">Range X (m)</span><span class="val" id="d_range">0.0</span></div>
+      <div class="data-row"><span class="key">Range Z (m)</span><span class="val" id="d_rangez">0.0</span></div>
+      <div class="data-row"><span class="key">Impact X (m)</span><span class="val" id="d_impactX">—</span></div>
+      <div class="data-row"><span class="key">Impact Z (m)</span><span class="val" id="d_impactZ">—</span></div>
+      <div class="data-row"><span class="key">Max Alt (m)</span><span class="val" id="d_maxAlt">0.0</span></div>
+      <div class="data-row"><span class="key">Time (s)</span><span class="val" id="d_time">0.0</span></div>
+    </div>
+
+    <!-- Test Panel -->
+    <div class="panel-section" id="testPanel" style="border-color:#cc44ff;">
+      <div class="section-title" style="color:#cc44ff;">🎯 Landing Test</div>
+      <div style="font-size:9px;color:var(--dim);margin-bottom:6px;" id="testStatus">
+        Inactive — activate when vy &lt; 0
+      </div>
+      <div class="data-row"><span class="key">T (s)</span><span class="val" id="td_T">—</span></div>
+      <div class="data-row"><span class="key">t elapsed (s)</span><span class="val" id="td_t">—</span></div>
+      <div class="data-row"><span class="key">t remaining (s)</span><span class="val" id="td_tr">—</span></div>
+      <div class="data-row"><span class="key">F(t) now (N)</span><span class="val" id="td_F">—</span></div>
+      <div class="data-row"><span class="key">F hover (N)</span><span class="val" id="td_Ff">—</span></div>
+      <div class="data-row"><span class="key">Ftx (N)</span><span class="val" id="td_Fx">—</span></div>
+      <div class="data-row"><span class="key">Fty (N)</span><span class="val" id="td_Fy">—</span></div>
+      <div class="data-row"><span class="key">Ftz (N)</span><span class="val" id="td_Fz">—</span></div>
+      <div style="font-size:9px;color:#cc44ff;margin:4px 0 2px;">— Rotational EQ —</div>
+      <div class="data-row"><span class="key">RE active</span><span class="val" id="td_re_active">—</span></div>
+      <div class="data-row"><span class="key">RE t_local (s)</span><span class="val" id="td_re_t">—</span></div>
+      <div class="data-row"><span class="key">RE Tr (s)</span><span class="val" id="td_re_Tr">—</span></div>
+      <div class="data-row"><span class="key">RE calls</span><span class="val" id="td_re_calls">0</span></div>
+    </div>
+
+    <!-- HL Live Data Panel -->
+    <div class="panel-section" id="hlDataPanel" style="display:none; border-color:#00ffcc;">
+      <div class="section-title" style="color:#00ffcc;">🚀 H→L Live Data</div>
+      <div style="font-size:9px;color:var(--dim);margin-bottom:4px;" id="hlLiveStatus">Inactive</div>
+      <div class="data-row"><span class="key">t / T (s)</span><span class="val" id="hl_t">—</span></div>
+      <div style="font-size:9px;color:#00ffcc;margin:3px 0 1px;">— Translational X —</div>
+      <div class="data-row"><span class="key">aX (m/s²)</span><span class="val" id="hl_aX">—</span></div>
+      <div class="data-row"><span class="key">vX (m/s)</span><span class="val" id="hl_vX">—</span></div>
+      <div class="data-row"><span class="key">dX (m)</span><span class="val" id="hl_dX">—</span></div>
+      <div class="data-row"><span class="key">Fx_world (N)</span><span class="val" id="hl_Fxw">—</span></div>
+      <div style="font-size:9px;color:#00ffcc;margin:3px 0 1px;">— Vertical Y —</div>
+      <div class="data-row"><span class="key">aY (m/s²)</span><span class="val" id="hl_aY">—</span></div>
+      <div class="data-row"><span class="key">vY (m/s)</span><span class="val" id="hl_vY">—</span></div>
+      <div class="data-row"><span class="key">dY (m)</span><span class="val" id="hl_dY">—</span></div>
+      <div class="data-row"><span class="key">Fy_world (N)</span><span class="val" id="hl_Fyw">—</span></div>
+      <div style="font-size:9px;color:#00ffcc;margin:3px 0 1px;">— Depth Z —</div>
+      <div class="data-row"><span class="key">aZ (m/s²)</span><span class="val" id="hl_aZ">—</span></div>
+      <div class="data-row"><span class="key">vZ (m/s)</span><span class="val" id="hl_vZ">—</span></div>
+      <div class="data-row"><span class="key">dZ (m)</span><span class="val" id="hl_dZ">—</span></div>
+      <div class="data-row"><span class="key">Fz_world (N)</span><span class="val" id="hl_Fzw">—</span></div>
+      <div style="font-size:9px;color:#00ffcc;margin:3px 0 1px;">— Thrust Output —</div>
+      <div class="data-row"><span class="key">Thrust Mag (N)</span><span class="val" id="hl_Tmag">—</span></div>
+      <div class="data-row"><span class="key">X err (m)</span><span class="val" id="hl_Xerr">—</span></div>
+      <div class="data-row"><span class="key">Y err (m)</span><span class="val" id="hl_Yerr">—</span></div>
+      <div class="data-row"><span class="key">Z err (m)</span><span class="val" id="hl_Zerr">—</span></div>
+    </div>
+
+  </div>
+</div>
+
+<script type="text/javascript" charset="utf-8">
+  
+  // ===================== PHYSICS CONSTANTS =====================
+const Ve_MAIN = 3000;
+const Ve_SIDE = 2800;
+const Cd = 0.4;
+const RHO_AIR = 1.225;
+const SCALE_PIX_PER_M = 2;
+
+// ===================== QUATERNION MATH =====================
+function qMul(a, b) {
+  if (!a || a.w === undefined) a = {w:1, x:0, y:0, z:0};
+  if (!b || b.w === undefined) b = {w:1, x:0, y:0, z:0};
+  return {
+    w: a.w*b.w - a.x*b.x - a.y*b.y - a.z*b.z,
+    x: a.w*b.x + a.x*b.w + a.y*b.z - a.z*b.y,
+    y: a.w*b.y - a.x*b.z + a.y*b.w + a.z*b.x,
+    z: a.w*b.z + a.x*b.y - a.y*b.x + a.z*b.w
+  };
+}
+
+function qNorm(q) {
+  if (!q || q.w === undefined || isNaN(q.w) || isNaN(q.x) || isNaN(q.y) || isNaN(q.z)) return {w:1,x:0,y:0,z:0};
+  const n = Math.sqrt(q.w*q.w + q.x*q.x + q.y*q.y + q.z*q.z);
+  if (n < 1e-12) return {w:1, x:0, y:0, z:0};
+  return {w: q.w/n, x: q.x/n, y: q.y/n, z: q.z/n};
+}
+
+function qDeriv(q, wx, wy, wz) {
+  if (!q || isNaN(q.w)) return {w:0, x:0, y:0, z:0};
+  const p = {w:0, x:wx, y:wy, z:wz};
+  const d = qMul(q, p);
+  return {w: 0.5*d.w, x: 0.5*d.x, y: 0.5*d.y, z: 0.5*d.z};
+}
+
+function qToMatrix(q) {
+  if (!q || q.w === undefined || isNaN(q.w)) q = {w:1, x:0, y:0, z:0};
+  const {w, x, y, z} = q;
+  return [
+    [1-2*(y*y+z*z),  2*(x*y-w*z),    2*(x*z+w*y)],
+    [2*(x*y+w*z),    1-2*(x*x+z*z),  2*(y*z-w*x)],
+    [2*(x*z-w*y),    2*(y*z+w*x),    1-2*(x*x+y*y)]
+  ];
+}
+
+function dirCosines(q) {
+  const R = qToMatrix(q);
+  const nx = R[0][1];
+  const ny = R[1][1];
+  const nz = R[2][1];
+  const alpha_r = Math.acos(Math.max(-1, Math.min(1, nx)));
+  const beta_r  = Math.acos(Math.max(-1, Math.min(1, ny)));
+  const gamma_r = Math.acos(Math.max(-1, Math.min(1, nz)));
+  return { alpha_r, beta_r, gamma_r, nx, ny, nz };
+}
+
+function buildQuat(betaDeg, gammaDeg) {
+  betaDeg = isNaN(betaDeg) ? 0 : betaDeg;
+  gammaDeg = isNaN(gammaDeg) ? 0 : gammaDeg;
+  const bR = betaDeg * Math.PI / 180;
+  const gR = gammaDeg * Math.PI / 180;
+  const qb = {w: Math.cos(bR/2), x: 0, y: 0, z: Math.sin(bR/2)};
+  const qg = {w: Math.cos(gR/2), x: Math.sin(gR/2), y: 0, z: 0};
+  return qNorm(qMul(qb, qg));
+}
+
+// ===================== HL FORMULA =====================
+function hlFormula(t, T, Vi, D) {
+  const omega = 2 * Math.PI / T;
+  if (Math.abs(Vi) < 0.01) return { a: 0, v: 0, x: 0 };
+  const cotArg = Math.PI * (1 - (2 * D) / (Vi * T));
+  const k1 = Math.atan2(1, cotArg);
+  const arcsinArg = -Vi / T;
+  let k2;
+  if (arcsinArg < -1 || arcsinArg > 1) {
+    k2 = Math.asin(Math.max(-1, Math.min(1, arcsinArg)));
+  } else {
+    k2 = Math.asin(arcsinArg);
+  }
+  const sinK1 = Math.sin(k1);
+  const A = (Math.abs(sinK1) < 1e-6) ? 0 : -Vi / (T * sinK1);
+  const phase = omega * t - k1;
+  const a = -A * Math.sin(phase) - Math.sin(k2);
+  const v = Vi + (Vi / (2*Math.PI*sinK1)) * (Math.cos(phase) - Math.cos(k1)) - (Vi/T)*t;
+  const x = Vi*t + (Vi/(2*Math.PI*sinK1))*((T/(2*Math.PI))*Math.sin(phase) - t*Math.cos(k1) + (T/(2*Math.PI))*Math.sin(k1)) - (Vi/(2*T))*t*t;
+  return { a, v, x };
+}
+
+// ===================== STATE VARIABLES =====================
+let state = {};
+let running = false;
+let animId = null;
+let lastTime = null;
+let simTime = 0;
+let maxAlt = 0;
+let trajectory = [];
+let opts = { traj: true, forces: true, com: true, impact: true, vel: true, grid: true, drag: false };
+let canvasVisible = { xy: true, zy: true, xz: true };
+
+// ===================== TEST MODE =====================
+let testMode = {
+  active: false, locked: false,
+  T: 0, t: 0, M: 0, p: 0, q: 0, g: 0,
+  t_hover: 0, hovering: false,
+  F_final: 0, Fx: 0, Fy: 0, Fz: 0,
+  Ve: Ve_MAIN, H: 0, V0: 0,
+  _fuelAtActivation: 0, _impactLogged: false, _hlHandoff: false,
+  re: {
+    active: false, t: 0, Tr: 0, rC: 0, callCount: 0,
+    ex: 0, fx: 0, gx: 0,
+    ey: 0, fy: 0, gy: 0,
+    ez: 0, fz: 0, gz: 0
+  }
+};
+
+// ===================== HOVER→LAND MODE =====================
+let hl = {
+  active: false, hovering: false, formulaActive: false,
+  T: 0, t: 0,
+  Z_X: 0, Z_Y: 0, Z_Z: 0,
+  Vi_X: 0, Vi_Y: 0, Vi_Z: 0,
+  targetX: 0, targetY: 0, targetZ: 0,
+  startX: 0, startY: 0, startZ: 0,
+  _aX: 0, _vX: 0, _dX: 0, _Fxw: 0,
+  _aY: 0, _vY: 0, _dY: 0, _Fyw: 0,
+  _aZ: 0, _vZ: 0, _dZ: 0, _Fzw: 0,
+  _Tmag: 0
+};
+
+// ===================== THRUSTER CONTROLS =====================
+let ctrl = {
+  mainThrust: 0,
+  gimbalDeg_a: 0, gimbalDeg_b: 0, gimbalDeg_g: 0,
+  sideThrust_LR: 0, sideThrust_FB: 0,
+  _Fx_world_des: 0, _Fy_world_des: 0, _Fz_world_des: 0,
+  _hl_t: undefined
+};
+
+// ===================== INIT CONFIG =====================
+let initCfg = {
+  dryMass: 5000, fuelMass: 3000,
+  rocketH: 20, rocketW: 4,
+  initBeta: 0, initGamma: 0,
+  gravity: 9.81
+};
+
+// ===================== HELPER FUNCTIONS =====================
+function computeCoM(fuelMass, totalMass, H) {
+  const dryMass = totalMass - fuelMass;
+  return (fuelMass * 0.275*H + dryMass * 0.5*H) / totalMass;
+}
+
+function momentOfInertia(mass, H, W) {
+  return mass * (H*H/12 + W*W/12);
+}
+
+function buildInitState() {
+  const totalMass = initCfg.dryMass + initCfg.fuelMass;
+  const H = initCfg.rocketH, W = initCfg.rocketW;
+  const comH = computeCoM(initCfg.fuelMass, totalMass, H);
+  const I = momentOfInertia(totalMass, H, W);
+  const q0 = buildQuat(initCfg.initBeta, initCfg.initGamma);
+  return {
+    x: 0, y: 0, z: 0,
+    vx: 0, vy: 0, vz: 0,
+    ax: 0, ay: 0, az: 0,
+    quat: q0,
+    omx: 0, omy: 0, omz: 0,
+    mass: totalMass, dryMass: initCfg.dryMass,
+    fuelMass: initCfg.fuelMass, fuelMassInit: initCfg.fuelMass,
+    H: H, W: W,
+    gravity: initCfg.gravity,
+    comH: comH, I: I,
+    crashed: false, landed: false
+  };
+}
+
+// ===================== ROTATIONAL EQUILIBRIUM (FIXED 3 AXIS) =====================
+function rotationalEquilibrium(omx0, omy0, omz0, quat, timeLeft) {
+  const re = testMode.re;
+  if (timeLeft <= 1.0) { re.active = false; return; }
+
+  const angle_x = 2 * quat.x;
+  const angle_y = 2 * quat.y;
+  const angle_z = 2 * quat.z;
+
+  const Tr = 0.6 * timeLeft;
+  const Tr2 = Tr*Tr, Tr3 = Tr2*Tr, Tr4 = Tr3*Tr, Tr5 = Tr4*Tr;
+
+  function cubicCoeffs(angle0, omega0) {
+    if (Math.abs(angle0) < 1e-4 && Math.abs(omega0) < 1e-4) return {e:0, f:0, g:0};
+    const e = 60 * (omega0*Tr - 2*angle0) / Tr5;
+    const f = 12 * (15*angle0 - 7*omega0*Tr) / Tr4;
+    const g = -e*Tr2 - f*Tr;
+    return {e, f, g};
+  }
+
+  const cx = cubicCoeffs(angle_x, omx0);
+  const cy = cubicCoeffs(angle_y, omy0);
+  const cz = cubicCoeffs(angle_z, omz0);
+
+  re.active = true; re.t = 0; re.Tr = Tr; re.rC = state.comH;
+  re.ex = cx.e; re.fx = cx.f; re.gx = cx.g;
+  re.ey = cy.e; re.fy = cy.f; re.gy = cy.g;
+  re.ez = cz.e; re.fz = cz.f; re.gz = cz.g;
+  re.callCount = (re.callCount || 0) + 1;
+  console.log(`[RE] Tr=${Tr.toFixed(3)}s angles=[${(angle_x*180/Math.PI).toFixed(2)},${(angle_y*180/Math.PI).toFixed(2)},${(angle_z*180/Math.PI).toFixed(2)}]°`);
+}
+
+// ===================== HL WORLD FORCES =====================
+function hlWorldForces(t_eval, M, g) {
+  if (t_eval >= hl.T) return { Fx:0, Fy:M*g, Fz:0, fX:null, fY:null, fZ:null };
+  const fX = hlFormula(t_eval, hl.T, hl.Vi_X, hl.Z_X);
+  const fY = hlFormula(t_eval, hl.T, hl.Vi_Y, -hl.Z_Y);
+  const fZ = hlFormula(t_eval, hl.T, hl.Vi_Z, hl.Z_Z);
+  return { Fx: M*(-fX.a), Fy: M*(g+(-fY.a)), Fz: M*(-fZ.a), fX, fY, fZ };
+}
+
+// ===================== STEP HL (FIXED) =====================
+function stepHL(dt) {
+  if (!hl.active) return;
+  const s = state;
+
+  if (hl.hovering) {
+    const Fy_hover = s.mass * s.gravity;
+    ctrl.mainThrust = Fy_hover;
+    ctrl.gimbalDeg_a = 0; ctrl.gimbalDeg_b = 0; ctrl.gimbalDeg_g = 0;
+    ctrl._Fx_world_des = 0; ctrl._Fy_world_des = Fy_hover; ctrl._Fz_world_des = 0;
+    ctrl._hl_t = undefined;
+    hl._Fyw = Fy_hover; hl._Fxw = 0; hl._Fzw = 0; hl._Tmag = Fy_hover;
+    hl._aX = 0; hl._vX = 0; hl._dX = 0; hl._aY = 0; hl._vY = 0; hl._dY = 0; hl._aZ = 0; hl._vZ = 0; hl._dZ = 0;
+    return;
+  }
+
+  if (!hl.formulaActive) {
+    const dc = dirCosines(s.quat);
+    const thetaDeg = Math.abs(dc.beta_r * 180 / Math.PI);
+    const omegaAbs = Math.sqrt(s.omx*s.omx + s.omy*s.omy + s.omz*s.omz);
+    const velAbs = Math.sqrt(s.vy*s.vy + s.vz*s.vz);
+    const atAlt = Math.abs(s.y - 100) <= 5;
+    const straight = thetaDeg < 5.0 && omegaAbs < 0.05 && velAbs < 8.0;
+    
+    if (atAlt && straight && !testMode._hlHandoff) {
+      testMode._hlHandoff = true; testMode.active = false; testMode.locked = true;
+      state.omx = 0; state.omy = 0; state.omz = 0; state.quat = {w:1, x:0, y:0, z:0};
+      hl.Vi_X = state.vx; hl.Vi_Y = state.vy; hl.Vi_Z = state.vz;
+      hl.Z_X = hl.targetX - state.x; hl.Z_Y = state.y - hl.targetY; hl.Z_Z = hl.targetZ - state.z;
+      hl.t = 0; hl.formulaActive = true;
+      console.log('[HL HANDOFF] vx='+state.vx.toFixed(3)+' vy='+state.vy.toFixed(3)+' vz='+state.vz.toFixed(3));
+      document.getElementById('hlLiveStatus').textContent = 'LANDING — formula active';
+    }
+    return;
+  }
+
+  if (hl.t >= hl.T) {
+    hl.active = false;
+    ctrl.mainThrust = 0; ctrl._Fx_world_des = 0; ctrl._Fy_world_des = 0; ctrl._Fz_world_des = 0;
+    ctrl._hl_t = undefined;
+    document.getElementById('hlLiveStatus').textContent = '✅ LANDED';
+    document.getElementById('sl_mt').value = 0; document.getElementById('lbl_mt').textContent = '0';
+    console.log('[HL DONE] x='+state.x.toFixed(2)+' y='+state.y.toFixed(2)+' z='+state.z.toFixed(2));
+    return;
+  }
+
+  const wf = hlWorldForces(hl.t, s.mass, s.gravity);
+  const Fx_des = wf.Fx; const Fy_des = wf.Fy; const Fz_des = wf.Fz;
+  
+  ctrl._Fx_world_des = Fx_des; ctrl._Fy_world_des = Fy_des; ctrl._Fz_world_des = Fz_des;
+  ctrl._hl_t = hl.t;
+
+  let thrust_mag = Math.sqrt(Fx_des*Fx_des + Fy_des*Fy_des + Fz_des*Fz_des);
+  const MAX_THRUST = 300000;
+  if (thrust_mag > MAX_THRUST) thrust_mag = MAX_THRUST;
+  ctrl.mainThrust = thrust_mag;
+
+  // XY plane gimbal (pitch)
+  if (Math.abs(Fy_des) > 0.01 && thrust_mag > 0.01) {
+    const gimbal_world_xy = Math.atan2(Fx_des, Fy_des);
+    const rocket_pitch = Math.atan2(s.quat.y, s.quat.w) * 2;
+    let gimbal_rocket_xy = gimbal_world_xy - rocket_pitch;
+    while (gimbal_rocket_xy > Math.PI) gimbal_rocket_xy -= 2*Math.PI;
+    while (gimbal_rocket_xy < -Math.PI) gimbal_rocket_xy += 2*Math.PI;
+    ctrl.gimbalDeg_a = gimbal_rocket_xy * 180 / Math.PI;
+  } else { ctrl.gimbalDeg_a = 0; }
+
+  // ZY plane gimbal (yaw/roll)
+  if (Math.abs(Fy_des) > 0.01 && thrust_mag > 0.01) {
+    const gimbal_world_zy = Math.atan2(Fz_des, Fy_des);
+    const rocket_roll = Math.atan2(s.quat.x, s.quat.w) * 2;
+    let gimbal_rocket_zy = gimbal_world_zy - rocket_roll;
+    while (gimbal_rocket_zy > Math.PI) gimbal_rocket_zy -= 2*Math.PI;
+    while (gimbal_rocket_zy < -Math.PI) gimbal_rocket_zy += 2*Math.PI;
+    ctrl.gimbalDeg_g = gimbal_rocket_zy * 180 / Math.PI;
+  } else { ctrl.gimbalDeg_g = 0; }
+
+  document.getElementById('sl_mt').value = Math.min(300000, ctrl.mainThrust);
+  document.getElementById('lbl_mt').textContent = ctrl.mainThrust.toFixed(0);
+  document.getElementById('sl_gimbal_a').value = ctrl.gimbalDeg_a;
+  document.getElementById('lbl_gimbal_a').textContent = ctrl.gimbalDeg_a.toFixed(1);
+  document.getElementById('sl_gimbal_g').value = ctrl.gimbalDeg_g;
+  document.getElementById('lbl_gimbal_g').textContent = ctrl.gimbalDeg_g.toFixed(1);
+  document.getElementById('gimbalNeedle_a').style.transform = `translateX(-50%) rotate(${ctrl.gimbalDeg_a}deg)`;
+  document.getElementById('gimbalNeedle_g').style.transform = `translateX(-50%) rotate(${ctrl.gimbalDeg_g}deg)`;
+
+  if (wf.fX) {
+    hl._aX = wf.fX.a; hl._vX = wf.fX.v; hl._dX = wf.fX.x; hl._Fxw = wf.Fx;
+    hl._aY = wf.fY.a; hl._vY = wf.fY.v; hl._dY = wf.fY.x; hl._Fyw = wf.Fy;
+    hl._aZ = wf.fZ.a; hl._vZ = wf.fZ.v; hl._dZ = wf.fZ.x; hl._Fzw = wf.Fz;
+  }
+  hl._Tmag = ctrl.mainThrust;
+  hl.t += dt;
+}
+
+// ===================== PHYSICS STEP (FIXED) =====================
+function physicsStep(dt) {
+  const s = state;
+  if (s.crashed) return;
+
+  if (!s.quat || s.quat.w === undefined || isNaN(s.quat.w)) s.quat = {w:1, x:0, y:0, z:0};
+  if (hl.active) stepHL(dt);
+
+  // Test mode
+  if (testMode.active && !testMode.locked) {
+    testMode.t += dt;
+    const re = testMode.re;
+    if (re.active) {
+      re.t += dt;
+      if (re.t >= re.Tr) {
+        re.t = re.Tr; re.active = false;
+        const tLeft = testMode.T - testMode.t;
+        if (tLeft > 1.0) rotationalEquilibrium(s.omx, s.omy, s.omz, s.quat, tLeft);
+      }
+    }
+    const inHover = testMode.t >= testMode.t_hover;
+    if (inHover && !testMode.hovering) {
+      testMode.hovering = true;
+      document.getElementById('testStatus').textContent = 'HOVERING — V≈0, F=Mg';
+    }
+    
+    if (testMode._hlHandoff) {
+      const dc = dirCosines(s.quat);
+      const omAbs = Math.sqrt(s.omx*s.omx + s.omy*s.omy + s.omz*s.omz);
+      if (dc.beta_r*180/Math.PI < 0.5 && omAbs < 0.002 && Math.abs(s.vy) <= 12) {
+        testMode.active = false; testMode.locked = true; testMode._hlHandoff = false;
+        state.omx = 0; state.omy = 0; state.omz = 0; state.quat = {w:1, x:0, y:0, z:0};
+        hl.Vi_X = state.vx; hl.Vi_Y = state.vy; hl.Vi_Z = state.vz;
+        hl.Z_X = hl.targetX - state.x; hl.Z_Y = state.y - hl.targetY; hl.Z_Z = hl.targetZ - state.z;
+        if (hl.T <= 0) hl.T = parseFloat(document.getElementById('sl_hl_T').value) || 20;
+        hl.t = 0; hl.formulaActive = true; hl.active = true; hl.hovering = false;
+        document.getElementById('hlLiveStatus').textContent = 'LANDING — formula active';
+      }
+    }
+    
+    let Fy_ctrl;
+    if (testMode.t >= testMode.T && !testMode.hovering) {
+      testMode.t = testMode.T; testMode.locked = true; ctrl.mainThrust = 0; Fy_ctrl = 0;
+    } else if (inHover) {
+      Fy_ctrl = Math.max(0, s.mass*(testMode.g + 2.0*(-s.vy) - 0.5*s.ay));
+    } else {
+      Fy_ctrl = Math.max(0, s.mass*(2*testMode.p*testMode.t + testMode.g));
+    }
+    
+    // FIXED: 3-axis torque from RE
+    let torque_x_re = 0, torque_y_re = 0, torque_z_re = 0;
+    if (re.active && re.rC > 0) {
+      const tl = re.t;
+      const alpha_x = re.ex*tl*tl*tl + re.fx*tl*tl + re.gx*tl;
+      const alpha_y = re.ey*tl*tl*tl + re.fy*tl*tl + re.gy*tl;
+      const alpha_z = re.ez*tl*tl*tl + re.fz*tl*tl + re.gz*tl;
+      torque_x_re = s.I * alpha_x;
+      torque_y_re = s.I * alpha_y;
+      torque_z_re = s.I * alpha_z;
+    }
+    const Rmat = qToMatrix(s.quat);
+    const torque_world_x = Rmat[0][0]*torque_x_re + Rmat[0][1]*torque_y_re + Rmat[0][2]*torque_z_re;
+    const torque_world_y = Rmat[1][0]*torque_x_re + Rmat[1][1]*torque_y_re + Rmat[1][2]*torque_z_re;
+    const torque_world_z = Rmat[2][0]*torque_x_re + Rmat[2][1]*torque_y_re + Rmat[2][2]*torque_z_re;
+    const Fx_torque = torque_world_y / re.rC;
+    const Fz_torque = torque_world_x / re.rC;
+    
+    let Fx_drift = 0, Fz_drift = 0;
+    if (inHover) {
+      const maxF = s.mass*testMode.g*Math.tan(10*Math.PI/180);
+      Fx_drift = Math.max(-maxF, Math.min(maxF, s.mass*(-0.8*s.vx)));
+      Fz_drift = Math.max(-maxF, Math.min(maxF, s.mass*(-0.8*s.vz)));
+    }
+    const Fxt = Fx_torque + Fx_drift;
+    const Fzt = Fz_torque + Fz_drift;
+    ctrl.mainThrust = Math.sqrt(Fxt*Fxt + Fy_ctrl*Fy_ctrl + Fzt*Fzt);
+    testMode.Fx = Fxt; testMode.Fy = Fy_ctrl; testMode.Fz = Fzt;
+    ctrl._Fx_world_des = Fxt; ctrl._Fy_world_des = Fy_ctrl; ctrl._Fz_world_des = Fzt;
+    ctrl._hl_t = undefined;
+  } else if (testMode.active && testMode.locked) {
+    ctrl.mainThrust = testMode.F_final;
+    ctrl._Fx_world_des = 0; ctrl._Fy_world_des = 0; ctrl._Fz_world_des = 0; ctrl._hl_t = undefined;
+  }
+
+  // Mass flow
+  const mainThrust = (s.fuelMass > 0) ? ctrl.mainThrust : 0;
+  const sideLR = (s.fuelMass > 0) ? ctrl.sideThrust_LR : 0;
+  const sideFB = (s.fuelMass > 0) ? ctrl.sideThrust_FB : 0;
+  const rMain = mainThrust / Ve_MAIN;
+  const rSide = (sideLR + sideFB) / Ve_SIDE;
+  s.fuelMass = Math.max(0, s.fuelMass - (rMain + rSide) * dt);
+  s.mass = s.dryMass + s.fuelMass;
+  s.comH = computeCoM(s.fuelMass, s.mass, s.H);
+  s.I = momentOfInertia(s.mass, s.H, s.W);
+
+  // World thrust function
+  function worldThrust(st, t_eval) {
+    let Fx, Fy, Fz;
+    if (hl.active && hl.formulaActive && t_eval !== undefined) {
+      const wf = hlWorldForces(t_eval, st.mass, s.gravity);
+      Fx = wf.Fx; Fy = wf.Fy; Fz = wf.Fz;
+    } else if (testMode.active && !testMode.locked) {
+      Fx = ctrl._Fx_world_des; Fy = ctrl._Fy_world_des; Fz = ctrl._Fz_world_des;
+    } else {
+      const R = qToMatrix(st.quat);
+      const nose = {x:R[0][1], y:R[1][1], z:R[2][1]};
+      const locX = {x:R[0][0], y:R[1][0], z:R[2][0]};
+      const locZ = {x:R[0][2], y:R[1][2], z:R[2][2]};
+      const sinA = Math.sin(ctrl.gimbalDeg_a * Math.PI/180);
+      const cosA = Math.cos(ctrl.gimbalDeg_a * Math.PI/180);
+      const sinG = Math.sin(ctrl.gimbalDeg_g * Math.PI/180);
+      const cosG = Math.cos(ctrl.gimbalDeg_g * Math.PI/180);
+      Fx = mainThrust * (locX.x*sinA + nose.x*cosA*cosG + locZ.x*cosA*sinG);
+      Fy = mainThrust * (locX.y*sinA + nose.y*cosA*cosG + locZ.y*cosA*sinG);
+      Fz = mainThrust * (locX.z*sinA + nose.z*cosA*cosG + locZ.z*cosA*sinG);
+    }
+    const dcS = dirCosines(st.quat);
+    Fx += (sideLR + sideFB) * dcS.nx;
+    Fy += (sideLR + sideFB) * dcS.ny;
+    Fz += (sideLR + sideFB) * dcS.nz;
+    return {Fx, Fy, Fz};
+  }
+
+  const dc0 = dirCosines(s.quat);
+  const wt0 = worldThrust({...s, quat:{...s.quat}}, ctrl._hl_t);
+  const Ftx = wt0.Fx, Fty = wt0.Fy, Ftz = wt0.Fz;
+  const Fg = s.mass * s.gravity;
+  const sp0 = Math.sqrt(s.vx*s.vx + s.vy*s.vy + s.vz*s.vz);
+  let Fdrag = 0, Fdx = 0, Fdy = 0, Fdz = 0;
+  if (opts.drag && sp0 > 0) {
+    const area = s.W * s.H * 0.3;
+    Fdrag = 0.5 * RHO_AIR * Cd * area * sp0 * sp0;
+    Fdx = -Fdrag * s.vx / sp0;
+    Fdy = -Fdrag * s.vy / sp0;
+    Fdz = -Fdrag * s.vz / sp0;
+  }
+  const Fnx = Ftx + Fdx;
+  const Fny = Fty - Fg + Fdy;
+  const Fnz = Ftz + Fdz;
+  s.ax = Fnx / s.mass;
+  s.ay = Fny / s.mass;
+  s.az = Fnz / s.mass;
+  const rx0 = -s.comH * dc0.nx, ry0 = -s.comH * dc0.ny, rz0 = -s.comH * dc0.nz;
+  const torque_x = ry0*Ftz - rz0*Fty;
+  const torque_y = rz0*Ftx - rx0*Ftz;
+  const torque_z = rx0*Fty - ry0*Ftx;
+
+  // RK4 integration
+  function derivatives(st, t_off) {
+    if (!st.quat || isNaN(st.quat.w)) return {dx:0, dy:0, dz:0, dvx:0, dvy:0, dvz:0, domx:0, domy:0, domz:0, dqw:0, dqx:0, dqy:0, dqz:0};
+    const M_ = st.mass > 0 ? st.mass : s.mass;
+    const I_ = s.I > 0 ? s.I : 1;
+    const t_ev = (ctrl._hl_t !== undefined && t_off !== undefined) ? ctrl._hl_t + t_off : undefined;
+    const wt = worldThrust(st, t_ev);
+    const Fx_ = wt.Fx, Fy_ = wt.Fy, Fz_ = wt.Fz;
+    const spd_ = Math.sqrt(st.vx*st.vx + st.vy*st.vy + st.vz*st.vz);
+    let fdx = 0, fdy = 0, fdz = 0;
+    if (opts.drag && spd_ > 0) {
+      const a_ = s.W * s.H * 0.3;
+      const fd_ = 0.5 * RHO_AIR * Cd * a_ * spd_ * spd_;
+      fdx = -fd_ * st.vx / spd_;
+      fdy = -fd_ * st.vy / spd_;
+      fdz = -fd_ * st.vz / spd_;
+    }
+    const ax_ = (Fx_ + fdx) / M_;
+    const ay_ = (Fy_ - M_*s.gravity + fdy) / M_;
+    const az_ = (Fz_ + fdz) / M_;
+    const dc_ = dirCosines(st.quat);
+    const rx_ = -s.comH * dc_.nx, ry_ = -s.comH * dc_.ny, rz_ = -s.comH * dc_.nz;
+    const Fxm = Fx_ - (sideLR+sideFB)*dc_.nx;
+    const Fym = Fy_ - (sideLR+sideFB)*dc_.ny;
+    const Fzm = Fz_ - (sideLR+sideFB)*dc_.nz;
+    const txq = ry_*Fzm - rz_*Fym;
+    const tyq = rz_*Fxm - rx_*Fzm;
+    const tzq = rx_*Fym - ry_*Fxm;
+    const dq = qDeriv(st.quat, st.omx, st.omy, st.omz);
+    return {dx: st.vx, dy: st.vy, dz: st.vz, dvx: ax_, dvy: ay_, dvz: az_,
+            domx: txq/I_, domy: tyq/I_, domz: tzq/I_,
+            dqw: dq.w, dqx: dq.x, dqy: dq.y, dqz: dq.z};
+  }
+
+  function advSt(st, k, h) {
+    return {
+      x: st.x + h*k.dx, y: st.y + h*k.dy, z: st.z + h*k.dz,
+      vx: st.vx + h*k.dvx, vy: st.vy + h*k.dvy, vz: st.vz + h*k.dvz,
+      omx: st.omx + h*k.domx, omy: st.omy + h*k.domy, omz: st.omz + h*k.domz,
+      quat: qNorm({w: (st.quat.w||0) + h*k.dqw, x: (st.quat.x||0) + h*k.dqx,
+                   y: (st.quat.y||0) + h*k.dqy, z: (st.quat.z||0) + h*k.dqz}),
+      mass: st.mass
+    };
+  }
+
+  const st0 = {x:s.x, y:s.y, z:s.z, vx:s.vx, vy:s.vy, vz:s.vz,
+               omx:s.omx, omy:s.omy, omz:s.omz, quat:{...s.quat}, mass:s.mass};
+  const k1 = derivatives(st0, 0);
+  const k2 = derivatives(advSt(st0, k1, 0.5*dt), 0.5*dt);
+  const k3 = derivatives(advSt(st0, k2, 0.5*dt), 0.5*dt);
+  const k4 = derivatives(advSt(st0, k3, dt), dt);
+  const w6 = dt/6;
+  s.vx += w6*(k1.dvx + 2*k2.dvx + 2*k3.dvx + k4.dvx);
+  s.vy += w6*(k1.dvy + 2*k2.dvy + 2*k3.dvy + k4.dvy);
+  s.vz += w6*(k1.dvz + 2*k2.dvz + 2*k3.dvz + k4.dvz);
+  s.x  += w6*(k1.dx + 2*k2.dx + 2*k3.dx + k4.dx);
+  s.y  += w6*(k1.dy + 2*k2.dy + 2*k3.dy + k4.dy);
+  s.z  += w6*(k1.dz + 2*k2.dz + 2*k3.dz + k4.dz);
+  s.omx += w6*(k1.domx + 2*k2.domx + 2*k3.domx + k4.domx);
+  s.omy += w6*(k1.domy + 2*k2.domy + 2*k3.domy + k4.domy);
+  s.omz += w6*(k1.domz + 2*k2.domz + 2*k3.domz + k4.domz);
+  s.quat = qNorm({
+    w: s.quat.w + w6*(k1.dqw + 2*k2.dqw + 2*k3.dqw + k4.dqw),
+    x: s.quat.x + w6*(k1.dqx + 2*k2.dqx + 2*k3.dqx + k4.dqx),
+    y: s.quat.y + w6*(k1.dqy + 2*k2.dqy + 2*k3.dqy + k4.dqy),
+    z: s.quat.z + w6*(k1.dqz + 2*k2.dqz + 2*k3.dqz + k4.dqz)
+  });
+
+  // Angular damping
+  const damping = Math.pow(0.995, dt);
+  s.omx *= damping; s.omy *= damping; s.omz *= damping;
+
+  s._Fg = Fg; s._Ftx = Ftx; s._Fty = Fty; s._Ftz = Ftz;
+  s._Fd = Fdrag; s._Fnx = Fnx; s._Fny = Fny; s._Fnz = Fnz;
+  s._tx = torque_x; s._ty = torque_y; s._tz = torque_z;
+  s._rMain = rMain; s._rSide = rSide;
+
+  const isActive = (testMode.active && !testMode.locked) || (hl.active && hl.formulaActive);
+  if (isActive) {
+    const tv = Math.sqrt(s.vx*s.vx + s.vy*s.vy + s.vz*s.vz);
+    if (s.y < 5 && tv < 3) {
+      ctrl.mainThrust = 0; ctrl.sideThrust_LR = 0; ctrl.sideThrust_FB = 0;
+      testMode.locked = true; testMode.re.active = false; hl.active = false;
+      s.vx = 0; s.vy = 0; s.vz = 0; s.omx = 0; s.omy = 0; s.omz = 0; s.ax = 0; s.ay = 0; s.az = 0;
+      document.getElementById('testStatus').textContent = 'LANDED ✅ — thrust cut';
+      document.getElementById('testStatus').style.color = '#00ff88';
+      const hlst = document.getElementById('hlLiveStatus');
+      if(hlst) hlst.textContent = '✅ LANDED';
+      console.log('[SOFT LAND] x='+s.x.toFixed(3)+' y='+s.y.toFixed(3)+' z='+s.z.toFixed(3));
+    }
+  }
+
+  if (s.y <= 0 && s.vy <= 0) {
+    if (testMode.active && !testMode._impactLogged) {
+      testMode._impactLogged = true;
+      console.log('=== IMPACT === vy='+s.vy.toFixed(4)+' x='+s.x.toFixed(2)+' z='+s.z.toFixed(2));
+    }
+    s.y = 0; s.vy = 0; s.vx *= 0.3; s.vz *= 0.3; s.omx *= 0.1; s.omy *= 0.1; s.omz *= 0.1;
+    if (Math.sqrt(s.vx*s.vx + s.vz*s.vz) > 20) { s.crashed = true; running = false; updateStatusUI('crashed'); }
+  }
+
+  if (s.y > maxAlt) maxAlt = s.y;
+}
+
+// ===================== RESET, START, STOP =====================
+function resetSim() {
+  running = false;
+  if (animId) cancelAnimationFrame(animId);
+  animId = null; lastTime = null; simTime = 0; maxAlt = 0; trajectory = [];
+  state = buildInitState();
+  ctrl.mainThrust = 0; ctrl.gimbalDeg_a = 0; ctrl.gimbalDeg_b = 0; ctrl.gimbalDeg_g = 0;
+  ctrl.sideThrust_LR = 0; ctrl.sideThrust_FB = 0;
+  ctrl._Fx_world_des = 0; ctrl._Fy_world_des = 0; ctrl._Fz_world_des = 0;
+  document.getElementById('sl_mt').value = 0;
+  document.getElementById('sl_gimbal_a').value = 0;
+  document.getElementById('sl_gimbal_b').value = 0;
+  document.getElementById('sl_gimbal_g').value = 0;
+  document.getElementById('sl_st').value = 0;
+  document.getElementById('sl_stfb').value = 0;
+  testMode.active = false; testMode.locked = false; testMode.t = 0;
+  testMode.Fx = 0; testMode.Fy = 0; testMode.Fz = 0;
+  testMode.re.active = false; testMode.re.t = 0; testMode.re.callCount = 0;
+  testMode._impactLogged = false;
+  document.getElementById('testStatus').textContent = "Inactive — activate when vy < 0";
+  hl.active = false; hl.t = 0; hl.T = 0; hl.hovering = false; hl.formulaActive = false;
+  document.getElementById('hlDataPanel').style.display = 'none';
+  if (document.getElementById('hlStatus')) document.getElementById('hlStatus').textContent = 'Not loaded';
+  const btnHL2 = document.getElementById('btnHL2');
+  if (btnHL2) { btnHL2.textContent = '② HOVER (then land)'; btnHL2.style.borderColor = '#00ff88'; btnHL2.style.color = '#00ff88'; }
+  updateLabels(); updateStatusUI('stopped'); updateDataPanel(); drawAllFrames();
+}
+
+function startSim() {
+  if (running) return;
+  if (state.crashed) resetSim();
+  running = true; lastTime = null;
+  updateStatusUI('running');
+  animId = requestAnimationFrame(loop);
+}
+
+function stopSim() {
+  running = false;
+  if (animId) cancelAnimationFrame(animId);
+  animId = null;
+  updateStatusUI('stopped');
+}
+
+function updateStatusUI(s) {
+  const dot = document.getElementById('statusDot');
+  const txt = document.getElementById('statusText');
+  dot.className = 'dot';
+  if (s === 'running') { dot.classList.add('active'); txt.textContent = 'RUNNING'; }
+  else if (s === 'stopped') { dot.classList.add('stopped'); txt.textContent = 'STOPPED'; }
+  else if (s === 'crashed') { dot.classList.add('crashed'); txt.textContent = 'CRASHED'; }
+}
+
+function loadPreset() {
+  resetSim();
+  const PRESET = {
+    dryMass: 5000, fuelMass: 3000, rocketH: 20, rocketW: 4, gravity: 9.81,
+    x: -100, y: 800, z: 80,
+    vx: 15, vy: -15, vz: -10,
+    betaDeg: 30, gammaDeg: 10,
+    omx: 0, omy: -0.05, omz: 0
+  };
+  initCfg.dryMass = PRESET.dryMass; initCfg.fuelMass = PRESET.fuelMass;
+  initCfg.rocketH = PRESET.rocketH; initCfg.rocketW = PRESET.rocketW;
+  initCfg.gravity = PRESET.gravity; initCfg.initBeta = 0; initCfg.initGamma = 0;
+  document.getElementById('sl_mass').value = PRESET.dryMass;
+  document.getElementById('sl_fuel').value = PRESET.fuelMass;
+  document.getElementById('sl_rh').value = PRESET.rocketH;
+  document.getElementById('sl_rw').value = PRESET.rocketW;
+  document.getElementById('sl_grav').value = PRESET.gravity;
+  document.getElementById('sl_ang').value = 0;
+  document.getElementById('sl_ang_z').value = 0;
+  updateLabels();
+
+  const totalMass = PRESET.dryMass + PRESET.fuelMass;
+  const comH = computeCoM(PRESET.fuelMass, totalMass, PRESET.rocketH);
+  const I = momentOfInertia(totalMass, PRESET.rocketH, PRESET.rocketW);
+  const q0 = buildQuat(PRESET.betaDeg, PRESET.gammaDeg);
+
+  state = {
+    x: PRESET.x, y: PRESET.y, z: PRESET.z,
+    vx: PRESET.vx, vy: PRESET.vy, vz: PRESET.vz,
+    ax: 0, ay: 0, az: 0,
+    quat: q0,
+    omx: PRESET.omx, omy: PRESET.omy, omz: PRESET.omz,
+    mass: totalMass, dryMass: PRESET.dryMass,
+    fuelMass: PRESET.fuelMass, fuelMassInit: PRESET.fuelMass,
+    H: PRESET.rocketH, W: PRESET.rocketW,
+    gravity: PRESET.gravity,
+    comH: comH, I: I,
+    crashed: false, landed: false
+  };
+  maxAlt = PRESET.y;
+  trajectory = [[PRESET.x, PRESET.y, PRESET.z]];
+  updateDataPanel(); drawAllFrames(); updateStatusUI('stopped');
+}
+
+function loadHLPreset() {
+  resetSim();
+  const PRESET = {
+    dryMass: 5000, fuelMass: 3000, rocketH: 20, rocketW: 4, gravity: 9.81,
+    x: -100, y: 500, z: 50,
+    vx: 10, vy: -15, vz: -5,
+    betaDeg: 0, gammaDeg: 0,
+    omx: 0, omy: 0, omz: 0
+  };
+  const T_total = parseFloat(document.getElementById('sl_hl_T').value);
+  const targetX = parseFloat(document.getElementById('hl_targetX_inp').value);
+  const targetY = parseFloat(document.getElementById('hl_targetY_inp').value);
+  const targetZ = parseFloat(document.getElementById('hl_targetZ_inp').value);
+
+  initCfg.dryMass = PRESET.dryMass; initCfg.fuelMass = PRESET.fuelMass;
+  initCfg.rocketH = PRESET.rocketH; initCfg.rocketW = PRESET.rocketW;
+  initCfg.gravity = PRESET.gravity; initCfg.initBeta = 0; initCfg.initGamma = 0;
+  document.getElementById('sl_mass').value = PRESET.dryMass;
+  document.getElementById('sl_fuel').value = PRESET.fuelMass;
+  document.getElementById('sl_rh').value = PRESET.rocketH;
+  document.getElementById('sl_rw').value = PRESET.rocketW;
+  document.getElementById('sl_grav').value = PRESET.gravity;
+  document.getElementById('sl_ang').value = 0;
+  document.getElementById('sl_ang_z').value = 0;
+  updateLabels();
+
+  const totalMass = PRESET.dryMass + PRESET.fuelMass;
+  const comH = computeCoM(PRESET.fuelMass, totalMass, PRESET.rocketH);
+  const I = momentOfInertia(totalMass, PRESET.rocketH, PRESET.rocketW);
+  const q0 = buildQuat(PRESET.betaDeg, PRESET.gammaDeg);
+
+  state = {
+    x: PRESET.x, y: PRESET.y, z: PRESET.z,
+    vx: PRESET.vx, vy: PRESET.vy, vz: PRESET.vz,
+    ax: 0, ay: 0, az: 0,
+    quat: q0,
+    omx: PRESET.omx, omy: PRESET.omy, omz: PRESET.omz,
+    mass: totalMass, dryMass: PRESET.dryMass,
+    fuelMass: PRESET.fuelMass, fuelMassInit: PRESET.fuelMass,
+    H: PRESET.rocketH, W: PRESET.rocketW,
+    gravity: PRESET.gravity,
+    comH: comH, I: I,
+    crashed: false, landed: false
+  };
+  maxAlt = PRESET.y;
+  trajectory = [[PRESET.x, PRESET.y, PRESET.z]];
+
+  hl.T = T_total;
+  hl.Z_X = targetX - PRESET.x;
+  hl.Z_Y = PRESET.y - targetY;
+  hl.Z_Z = targetZ - PRESET.z;
+  hl.targetX = targetX; hl.targetY = targetY; hl.targetZ = targetZ;
+  hl.active = false; hl.hovering = false; hl.t = 0;
+
+  document.getElementById('hlStatus').textContent = `Preset loaded. Press ② to hover+land.`;
+  updateDataPanel(); drawAllFrames(); updateStatusUI('stopped');
+}
+
+function activateTestMode() {
+  const s = state;
+  if (s.vy >= 0) { alert("Test mode activates only when vy < 0."); return; }
+  if (!running) { alert("Simulation must be RUNNING."); return; }
+  const g = s.gravity, H = s.y, V0 = s.vy, M = s.mass;
+  if (H <= 0) { alert("Cannot compute."); return; }
+  const T = (-3*H) / (2*V0);
+  if (T <= 0.1) { alert("Too close."); return; }
+  const p_c = -V0 / (T*T);
+  const t_hover = Math.sqrt(-V0/p_c);
+
+  testMode.active = true; testMode.locked = false;
+  testMode.T = T; testMode.t = 0; testMode.M = M; testMode.Ve = Ve_MAIN;
+  testMode.H = H; testMode.V0 = V0; testMode.p = p_c; testMode.q = 0;
+  testMode.g = g; testMode.t_hover = t_hover; testMode.hovering = false;
+  testMode.F_final = 0; testMode.Fx = 0; testMode.Fy = 0; testMode.Fz = 0;
+  testMode._fuelAtActivation = s.fuelMass;
+  testMode._impactLogged = false; testMode._hlHandoff = false;
+  testMode.re.active = false; testMode.re.t = 0; testMode.re.callCount = 0;
+  rotationalEquilibrium(s.omx, s.omy, s.omz, s.quat, T);
+  document.getElementById('testStatus').textContent = "ACTIVE — Decel → Hover";
+  document.getElementById('testStatus').style.color = '#cc44ff';
+}
+
+function activateHLMode() {
+  const s = state;
+  if (s.vy >= 0) { alert("Rocket must be falling."); return; }
+  if (!running) { alert("Simulation must be RUNNING."); return; }
+  const g = s.gravity, H = s.y - 200, V0 = s.vy, M = s.mass;
+  if (H <= 0) { alert("Altitude must be > 200m."); return; }
+  const T = (-3*H) / (2*V0);
+  if (T <= 0.1) { alert("Too close."); return; }
+  const p_c = -V0 / (T*T);
+  const t_hover = Math.sqrt(-V0/p_c);
+
+  testMode.active = true; testMode.locked = false;
+  testMode.T = T; testMode.t = 0; testMode.M = M; testMode.Ve = Ve_MAIN;
+  testMode.H = H; testMode.V0 = V0; testMode.p = p_c; testMode.g = g;
+  testMode.t_hover = t_hover; testMode.hovering = false;
+  testMode.F_final = 0; testMode.Fx = 0; testMode.Fy = 0; testMode.Fz = 0;
+  testMode._fuelAtActivation = s.fuelMass;
+  testMode._impactLogged = false; testMode._hlHandoff = true;
+  testMode.re.active = false; testMode.re.t = 0; testMode.re.callCount = 0;
+  rotationalEquilibrium(s.omx, s.omy, s.omz, s.quat, T);
+  document.getElementById('testStatus').textContent = "HL MODE — stabilizing";
+  document.getElementById('testStatus').style.color = '#00ffcc';
+}
+
+function showHLPanel() {
+  const p = document.getElementById('hlConfigPanel');
+  p.style.display = p.style.display === 'none' ? 'block' : 'none';
+}
+
+function hlBtn2Click() {
+  if (!hl.active) {
+    activateHL();
+    document.getElementById('btnHL2').textContent = '③ BEGIN LANDING';
+    document.getElementById('btnHL2').style.borderColor = '#ffaa00';
+    document.getElementById('btnHL2').style.color = '#ffaa00';
+  } else if (hl.hovering) {
+    beginHLLanding();
+    document.getElementById('btnHL2').textContent = '— LANDING —';
+    document.getElementById('btnHL2').style.borderColor = '#ff2244';
+    document.getElementById('btnHL2').style.color = '#ff2244';
+  }
+}
+
+function activateHL() {
+  if (hl.T <= 0) { document.getElementById('hlStatus').textContent = 'ERR: Load preset first!'; return; }
+  if (!running) startSim();
+  hl.active = true;
+  hl.hovering = true;
+  hl.t = 0;
+  document.getElementById('hlDataPanel').style.display = 'block';
+  document.getElementById('hlLiveStatus').textContent = 'HOVERING';
+}
+
+function beginHLLanding() {
+  if (!hl.active || !hl.hovering) return;
+  hl.hovering = false;
+  const s = state;
+  const H = s.y - 100;
+  const V0 = s.vy;
+  const M = s.mass;
+  if (H <= 0) { alert("Altitude too low."); return; }
+  if (V0 >= 0) { alert("Rocket must be falling."); return; }
+  const T = (-3*H) / (2*V0);
+  if (T <= 0.1) { alert("Too close to target."); return; }
+  const p = -V0 / (T*T);
+  const t_hover = Math.sqrt(-V0/p);
+
+  testMode.active = true;
+  testMode.locked = false;
+  testMode.T = T; testMode.t = 0;
+  testMode.M = M; testMode.Ve = Ve_MAIN;
+  testMode.H = H; testMode.V0 = V0;
+  testMode.p = p; testMode.q = 0;
+  testMode.g = s.gravity;
+  testMode.t_hover = t_hover; testMode.hovering = false;
+  testMode.F_final = 0; testMode.Fx = 0; testMode.Fy = 0; testMode.Fz = 0;
+  testMode._fuelAtActivation = s.fuelMass;
+  testMode._impactLogged = false;
+  testMode._hlHandoff = false;
+  testMode.re.active = false; testMode.re.t = 0; testMode.re.callCount = 0;
+  rotationalEquilibrium(s.omx, s.omy, s.omz, s.quat, T);
+
+  hl.formulaActive = false; hl.t = 0;
+  document.getElementById('hlLiveStatus').textContent = 'STABILIZING';
+}
+
+// ===================== UPDATE FUNCTIONS =====================
+function updateThrusters() {
+  ctrl.mainThrust = parseFloat(document.getElementById('sl_mt').value);
+  ctrl.gimbalDeg_a = parseFloat(document.getElementById('sl_gimbal_a').value);
+  ctrl.gimbalDeg_b = parseFloat(document.getElementById('sl_gimbal_b').value);
+  ctrl.gimbalDeg_g = parseFloat(document.getElementById('sl_gimbal_g').value);
+  ctrl.sideThrust_LR = parseFloat(document.getElementById('sl_st').value);
+  ctrl.sideThrust_FB = parseFloat(document.getElementById('sl_stfb').value);
+  document.getElementById('lbl_mt').textContent = ctrl.mainThrust.toFixed(0);
+  document.getElementById('lbl_gimbal_a').textContent = ctrl.gimbalDeg_a.toFixed(1);
+  document.getElementById('lbl_gimbal_b').textContent = ctrl.gimbalDeg_b.toFixed(1);
+  document.getElementById('lbl_gimbal_g').textContent = ctrl.gimbalDeg_g.toFixed(1);
+  document.getElementById('lbl_st').textContent = ctrl.sideThrust_LR.toFixed(0);
+  document.getElementById('lbl_stfb').textContent = ctrl.sideThrust_FB.toFixed(0);
+  document.getElementById('gimbalNeedle_a').style.transform = `translateX(-50%) rotate(${ctrl.gimbalDeg_a}deg)`;
+  document.getElementById('gimbalNeedle_b').style.transform = `translateX(-50%) rotate(${ctrl.gimbalDeg_b}deg)`;
+  document.getElementById('gimbalNeedle_g').style.transform = `translateX(-50%) rotate(${ctrl.gimbalDeg_g}deg)`;
+  if (!running) { drawAllFrames(); updateDataPanel(); }
+}
+
+function updateInitConfig() {
+  initCfg.dryMass = parseFloat(document.getElementById('sl_mass').value);
+  initCfg.fuelMass = parseFloat(document.getElementById('sl_fuel').value);
+  initCfg.rocketH = parseFloat(document.getElementById('sl_rh').value);
+  initCfg.rocketW = parseFloat(document.getElementById('sl_rw').value);
+  initCfg.initBeta = parseFloat(document.getElementById('sl_ang').value);
+  initCfg.initGamma = parseFloat(document.getElementById('sl_ang_z').value);
+  initCfg.gravity = parseFloat(document.getElementById('sl_grav').value);
+  document.getElementById('lbl_mass').textContent = initCfg.dryMass;
+  document.getElementById('lbl_fuel').textContent = initCfg.fuelMass;
+  document.getElementById('lbl_rh').textContent = initCfg.rocketH;
+  document.getElementById('lbl_rw').textContent = initCfg.rocketW;
+  document.getElementById('lbl_ang').textContent = initCfg.initBeta;
+  document.getElementById('lbl_ang_z').textContent = initCfg.initGamma;
+  document.getElementById('lbl_grav').textContent = initCfg.gravity;
+  if (!running) { state = buildInitState(); drawAllFrames(); updateDataPanel(); }
+}
+
+function updateLabels() {
+  document.getElementById('lbl_mass').textContent = initCfg.dryMass;
+  document.getElementById('lbl_fuel').textContent = initCfg.fuelMass;
+  document.getElementById('lbl_rh').textContent = initCfg.rocketH;
+  document.getElementById('lbl_rw').textContent = initCfg.rocketW;
+  document.getElementById('lbl_ang').textContent = initCfg.initBeta || 0;
+  document.getElementById('lbl_ang_z').textContent = initCfg.initGamma || 0;
+  document.getElementById('lbl_grav').textContent = initCfg.gravity;
+  document.getElementById('lbl_mt').textContent = '0';
+  document.getElementById('lbl_gimbal_a').textContent = '0';
+  document.getElementById('lbl_gimbal_b').textContent = '0';
+  document.getElementById('lbl_gimbal_g').textContent = '0';
+  document.getElementById('lbl_st').textContent = '0';
+  document.getElementById('lbl_stfb').textContent = '0';
+}
+
+function toggleOpt(key) {
+  opts[key] = !opts[key];
+  const el = document.getElementById('tog_'+key);
+  if (opts[key]) el.classList.add('on'); else el.classList.remove('on');
+  if (!running) drawAllFrames();
+}
+
+function toggleCanvas(view) {
+  canvasVisible[view] = !canvasVisible[view];
+  const wrap = document.getElementById('wrap_'+view);
+  const btn = document.getElementById('cvbtn_'+view);
+  if (canvasVisible[view]) {
+    wrap.classList.remove('hidden');
+    btn.classList.add('on');
+  } else {
+    wrap.classList.add('hidden');
+    btn.classList.remove('on');
+  }
+  resizeCanvases();
+  if (!running) drawAllFrames();
+}
+
+// ===================== DATA PANEL UPDATE =====================
+function updateDataPanel() {
+  const s = state;
+  const fuelFrac = s.fuelMassInit > 0 ? s.fuelMass / s.fuelMassInit : 0;
+  document.getElementById('d_fuelTotal').textContent = s.fuelMassInit.toFixed(0)+' kg';
+  document.getElementById('d_fuelRem').textContent = s.fuelMass.toFixed(1)+' kg';
+  document.getElementById('fuelBar').style.width = (fuelFrac*100).toFixed(1)+'%';
+  const mainThr = (s.fuelMass>0) ? ctrl.mainThrust : 0;
+  const sideTotal = ctrl.sideThrust_LR + ctrl.sideThrust_FB;
+  const rMain = mainThr/Ve_MAIN, rSide = sideTotal/Ve_SIDE;
+  document.getElementById('d_mdotMain').textContent = rMain.toFixed(3);
+  document.getElementById('d_mdotSide').textContent = rSide.toFixed(3);
+  document.getElementById('d_mdotTotal').textContent = (rMain+rSide).toFixed(3);
+  document.getElementById('d_veMain').textContent = Ve_MAIN.toFixed(0);
+  document.getElementById('d_veSide').textContent = Ve_SIDE.toFixed(0);
+  document.getElementById('d_x').textContent = s.x.toFixed(2);
+  document.getElementById('d_y').textContent = s.y.toFixed(2);
+  document.getElementById('d_z').textContent = s.z.toFixed(2);
+  document.getElementById('d_vx').textContent = s.vx.toFixed(3);
+  document.getElementById('d_vy').textContent = s.vy.toFixed(3);
+  document.getElementById('d_vz').textContent = s.vz.toFixed(3);
+  document.getElementById('d_vmod').textContent = Math.sqrt(s.vx*s.vx+s.vy*s.vy+s.vz*s.vz).toFixed(3);
+  document.getElementById('d_ax').textContent = s.ax.toFixed(4);
+  document.getElementById('d_ay').textContent = s.ay.toFixed(4);
+  document.getElementById('d_az').textContent = s.az.toFixed(4);
+  const dc = dirCosines(s.quat);
+  document.getElementById('d_alpha_dc').textContent = (dc.alpha_r*180/Math.PI).toFixed(2)+'°';
+  document.getElementById('d_beta_dc').textContent = (dc.beta_r*180/Math.PI).toFixed(2)+'°';
+  document.getElementById('d_gamma_dc').textContent = (dc.gamma_r*180/Math.PI).toFixed(2)+'°';
+  document.getElementById('d_omx').textContent = (s.omx*180/Math.PI).toFixed(3);
+  document.getElementById('d_omy').textContent = (s.omy*180/Math.PI).toFixed(3);
+  document.getElementById('d_omz').textContent = (s.omz*180/Math.PI).toFixed(3);
+  document.getElementById('d_qw').textContent = s.quat.w.toFixed(4);
+  document.getElementById('d_qx').textContent = s.quat.x.toFixed(4);
+  document.getElementById('d_qy').textContent = s.quat.y.toFixed(4);
+  document.getElementById('d_qz').textContent = s.quat.z.toFixed(4);
+  if (s._Fg !== undefined) {
+    document.getElementById('d_fg').textContent = s._Fg.toFixed(1);
+    document.getElementById('d_ftx').textContent = s._Ftx ? s._Ftx.toFixed(1) : '0';
+    document.getElementById('d_fty').textContent = s._Fty ? s._Fty.toFixed(1) : '0';
+    document.getElementById('d_ftz').textContent = s._Ftz ? s._Ftz.toFixed(1) : '0';
+    document.getElementById('d_fd').textContent = s._Fd.toFixed(3);
+    document.getElementById('d_fnx').textContent = s._Fnx.toFixed(2);
+    document.getElementById('d_fny').textContent = s._Fny.toFixed(2);
+    document.getElementById('d_fnz').textContent = s._Fnz ? s._Fnz.toFixed(2) : '0';
+    document.getElementById('d_tx').textContent = s._tx ? s._tx.toFixed(2) : '0';
+    document.getElementById('d_ty').textContent = s._ty ? s._ty.toFixed(2) : '0';
+    document.getElementById('d_tz').textContent = s._tz ? s._tz.toFixed(2) : '0';
+  }
+  document.getElementById('d_mass').textContent = s.mass.toFixed(1);
+  document.getElementById('d_com').textContent = s.comH.toFixed(3);
+  document.getElementById('d_inertia').textContent = s.I.toFixed(1);
+  document.getElementById('d_alt').textContent = Math.max(0, s.y).toFixed(2);
+  document.getElementById('d_range').textContent = s.x.toFixed(2);
+  document.getElementById('d_rangez').textContent = s.z.toFixed(2);
+  document.getElementById('d_maxAlt').textContent = maxAlt.toFixed(2);
+  document.getElementById('d_time').textContent = simTime.toFixed(2);
+  const mins = Math.floor(simTime/60).toString().padStart(2,'0');
+  const secs = Math.floor(simTime%60).toString().padStart(2,'0');
+  const tenths = Math.floor((simTime*10)%10);
+  document.getElementById('timeDisplay').textContent = `T+${mins}:${secs}.${tenths}`;
+  if (testMode.active) {
+    const t=testMode.t, T=testMode.T;
+    const inHover = t >= testMode.t_hover;
+    const Fnow = testMode.locked ? 0 : (inHover ? s.mass*testMode.g : Math.max(0, s.mass*(2*testMode.p*t+testMode.g)));
+    document.getElementById('td_T').textContent = T.toFixed(3)+' s';
+    document.getElementById('td_t').textContent = t.toFixed(3)+' s';
+    document.getElementById('td_tr').textContent = inHover ? "HOVERING" : Math.max(0,testMode.t_hover-t).toFixed(3)+' s';
+    document.getElementById('td_F').textContent = Fnow.toFixed(1)+' N';
+    document.getElementById('td_Ff').textContent = (s.mass*testMode.g).toFixed(1)+' N';
+    document.getElementById('td_Fx').textContent = testMode.Fx.toFixed(2)+' N';
+    document.getElementById('td_Fy').textContent = testMode.Fy.toFixed(2)+' N';
+    document.getElementById('td_Fz').textContent = testMode.Fz.toFixed(2)+' N';
+    const re=testMode.re;
+    document.getElementById('td_re_active').textContent = re.active ? 'YES':'NO';
+    document.getElementById('td_re_t').textContent = re.active ? re.t.toFixed(3)+' s':'—';
+    document.getElementById('td_re_Tr').textContent = re.Tr>0 ? re.Tr.toFixed(3)+' s':'—';
+    document.getElementById('td_re_calls').textContent = re.callCount;
+    if (testMode.locked) document.getElementById('testStatus').textContent = "DONE — thrust cut at T";
+  }
+  if (hl.active || hl.t > 0) {
+    const fmt = (v,d=2) => isNaN(v)?'ERR':v.toFixed(d);
+    document.getElementById('hl_t').textContent = fmt(hl.t)+' / '+fmt(hl.T,1)+' s';
+    document.getElementById('hl_aX').textContent = fmt(hl._aX,4)+' m/s²';
+    document.getElementById('hl_vX').textContent = fmt(hl._vX,3)+' m/s';
+    document.getElementById('hl_dX').textContent = fmt(hl._dX,2)+' m';
+    document.getElementById('hl_Fxw').textContent = fmt(hl._Fxw,1)+' N';
+    document.getElementById('hl_aY').textContent = fmt(hl._aY,4)+' m/s²';
+    document.getElementById('hl_vY').textContent = fmt(hl._vY,3)+' m/s';
+    document.getElementById('hl_dY').textContent = fmt(hl._dY,2)+' m';
+    document.getElementById('hl_Fyw').textContent = fmt(hl._Fyw,1)+' N';
+    document.getElementById('hl_aZ').textContent = fmt(hl._aZ,4)+' m/s²';
+    document.getElementById('hl_vZ').textContent = fmt(hl._vZ,3)+' m/s';
+    document.getElementById('hl_dZ').textContent = fmt(hl._dZ,2)+' m';
+    document.getElementById('hl_Fzw').textContent = fmt(hl._Fzw,1)+' N';
+    document.getElementById('hl_Tmag').textContent = fmt(hl._Tmag,1)+' N';
+    document.getElementById('hl_Xerr').textContent = fmt(state.x-hl.targetX,2)+' m';
+    document.getElementById('hl_Yerr').textContent = fmt(state.y-hl.targetY,2)+' m';
+    document.getElementById('hl_Zerr').textContent = fmt(state.z-hl.targetZ,2)+' m';
+  }
+}
+
+// ===================== RENDER FUNCTIONS =====================
+function predictImpact() {
+  const s = state;
+  if (s.vy >= 0 && s.y > 0) return null;
+  if (s.y <= 0) return null;
+  const a = -0.5*s.gravity, b = s.vy, c = s.y;
+  const disc = b*b - 4*a*c;
+  if (disc < 0) return null;
+  const t1 = (-b + Math.sqrt(disc)) / (2*a);
+  const t2 = (-b - Math.sqrt(disc)) / (2*a);
+  const t = Math.max(t1, t2);
+  if (t < 0) return null;
+  return { x: s.x + s.vx*t, z: s.z + s.vz*t };
+}
+
+function w2c_xy(wx, wy, canvas) {
+  return [canvas.width/2 + wx*SCALE_PIX_PER_M, canvas.height - 60 - wy*SCALE_PIX_PER_M];
+}
+function w2c_zy(wz, wy, canvas) {
+  return [canvas.width/2 + wz*SCALE_PIX_PER_M, canvas.height - 60 - wy*SCALE_PIX_PER_M];
+}
+function w2c_xz(wx, wz, canvas) {
+  return [canvas.width/2 + wx*SCALE_PIX_PER_M, canvas.height/2 + wz*SCALE_PIX_PER_M];
+}
+
+function drawBackground(ctx, W, H, label) {
+  const bg = ctx.createLinearGradient(0, 0, 0, H);
+  bg.addColorStop(0, '#000510'); bg.addColorStop(0.7, '#010a18'); bg.addColorStop(1, '#020f20');
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = 'rgba(200,220,255,0.4)';
+  for (let i = 0; i < 80; i++) {
+    const sx = ((i*1731+37*label.charCodeAt(0))%W);
+    const sy = ((i*2371+17)%(H*0.8));
+    ctx.beginPath(); ctx.arc(sx, sy, (i%3===0)?1.2:0.6, 0, Math.PI*2); ctx.fill();
+  }
+}
+
+function drawThrusterNozzle(ctx, w, h, isMain, firing) {
+  const col = isMain ? '#ff6b00' : '#00ff88';
+  const col2 = isMain ? '#cc4400' : '#009966';
+  ctx.fillStyle = firing ? col : col2; ctx.strokeStyle = col; ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(-w/2, 0);
+  ctx.bezierCurveTo(-w/2, h/2, -w*0.7, h, -w*0.8, h);
+  ctx.lineTo(w*0.8, h);
+  ctx.bezierCurveTo(w*0.7, h, w/2, h/2, w/2, 0);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  if (isMain) { ctx.fillStyle = '#ffaa44'; ctx.beginPath(); ctx.arc(0, -2, 4, 0, Math.PI*2); ctx.fill(); }
+}
+
+function drawFlame(ctx, w, intensity) {
+  if (w < 0.5) return;
+  intensity = Math.min(intensity, 3);
+  const flameH = Math.max(2, w*12*(0.5+intensity+Math.random()*0.3));
+  const tH = w*0.9;
+  let flameColor;
+  try {
+    const grad = ctx.createLinearGradient(0, tH, 0, tH+flameH);
+    grad.addColorStop(0, 'rgba(255,255,200,0.95)');
+    grad.addColorStop(0.15, 'rgba(255,160,20,0.9)');
+    grad.addColorStop(0.5, 'rgba(255,60,10,0.7)');
+    grad.addColorStop(1, 'rgba(255,10,0,0)');
+    flameColor = grad;
+  } catch(e) { flameColor = 'rgba(255,120,20,0.7)'; }
+  ctx.fillStyle = flameColor;
+  ctx.beginPath();
+  ctx.moveTo(-w/2, tH);
+  ctx.bezierCurveTo(-w*0.6, tH+flameH*0.3, -w*0.3*Math.random(), tH+flameH*0.7, 0, tH+flameH);
+  ctx.bezierCurveTo(w*0.3*Math.random(), tH+flameH*0.7, w*0.6, tH+flameH*0.3, w/2, tH);
+  ctx.closePath(); ctx.fill();
+}
+
+function drawRocketProjection(ctx, view, W, H) {
+  const s = state;
+  const dc = dirCosines(s.quat);
+  const comH_px = s.comH * SCALE_PIX_PER_M;
+  const H_px = s.H * SCALE_PIX_PER_M;
+  const W_px = s.W * SCALE_PIX_PER_M;
+  let cx, cy;
+  if (view === 'xy') {
+    [cx, cy] = w2c_xy(s.x, s.y + s.comH, {width:W, height:H});
+  } else if (view === 'zy') {
+    [cx, cy] = w2c_zy(s.z, s.y + s.comH, {width:W, height:H});
+  } else {
+    [cx, cy] = w2c_xz(s.x, s.z, {width:W, height:H});
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.fillStyle = 'rgba(42,90,122,0.8)'; ctx.strokeStyle = '#00d4ff'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(0, 0, W_px/2, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+    const arrowLen = H_px * 0.5;
+    const ex = dc.nx * arrowLen * SCALE_PIX_PER_M / Math.max(0.01, Math.abs(dc.ny)*SCALE_PIX_PER_M + 1);
+    const ez = dc.nz * arrowLen * SCALE_PIX_PER_M / Math.max(0.01, Math.abs(dc.ny)*SCALE_PIX_PER_M + 1);
+    ctx.strokeStyle = '#ffcc00'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(ex, ez); ctx.stroke();
+    if (opts.com) {
+      ctx.strokeStyle = '#cc44ff'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(0, 0, 4, 0, Math.PI*2); ctx.stroke();
+    }
+    ctx.restore();
+    return;
+  }
+  let rotAngle;
+  if (view === 'xy') {
+    rotAngle = Math.atan2(dc.nx, dc.ny);
+  } else {
+    rotAngle = Math.atan2(dc.nz, dc.ny);
+  }
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(-rotAngle);
+  const topY_local = -(H_px - comH_px);
+  const botY_local = comH_px;
+  ctx.fillStyle = '#2a5a7a'; ctx.strokeStyle = '#00d4ff'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.rect(-W_px/2, topY_local, W_px, H_px); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = 'rgba(90,154,204,0.35)';
+  ctx.fillRect(-W_px*0.15, topY_local, W_px*0.3, H_px);
+  ctx.fillStyle = '#5abadd'; ctx.strokeStyle = '#00d4ff'; ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(-W_px/2, topY_local);
+  ctx.lineTo(0, topY_local - W_px*1.8);
+  ctx.lineTo(W_px/2, topY_local);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  for (let i = 0; i < 2; i++) {
+    const wy = topY_local + H_px*(0.25 + i*0.25);
+    ctx.fillStyle = '#00d4ff'; ctx.beginPath();
+    ctx.arc(0, wy, W_px*0.12, 0, Math.PI*2); ctx.fill();
+  }
+  const fuelFrac = s.fuelMass / s.fuelMassInit;
+  const tankH = H_px*0.5, tankY = botY_local - tankH*0.9;
+  ctx.fillStyle = 'rgba(255,200,0,0.15)'; ctx.fillRect(-W_px/2+2, tankY, W_px-4, tankH);
+  ctx.fillStyle = `rgba(255,${Math.floor(100+fuelFrac*155)},0,0.5)`;
+  ctx.fillRect(-W_px/2+2, tankY+tankH*(1-fuelFrac), W_px-4, tankH*fuelFrac);
+  ctx.fillStyle = '#2a5a7a'; ctx.strokeStyle = '#00aadd'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(-W_px/2, botY_local);
+  ctx.lineTo(-W_px/2-W_px*0.8, botY_local+H_px*0.25);
+  ctx.lineTo(-W_px/2, botY_local-H_px*0.2); ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(W_px/2, botY_local);
+  ctx.lineTo(W_px/2+W_px*0.8, botY_local+H_px*0.25);
+  ctx.lineTo(W_px/2, botY_local-H_px*0.2); ctx.closePath(); ctx.fill(); ctx.stroke();
+  const thrusterH = W_px*0.8, thrusterW = W_px*0.35;
+  const mainThr = (s.fuelMass > 0) ? ctrl.mainThrust : 0;
+  ctx.save(); ctx.translate(-W_px/2 + thrusterW*0.3, botY_local);
+  drawThrusterNozzle(ctx, thrusterW*0.9, thrusterH*0.9, 0, ctrl.sideThrust_LR > 0);
+  if (ctrl.sideThrust_LR > 0) drawFlame(ctx, thrusterW*0.8, ctrl.sideThrust_LR/50000); ctx.restore();
+  ctx.save(); ctx.translate(W_px/2 - thrusterW*0.3, botY_local);
+  drawThrusterNozzle(ctx, thrusterW*0.9, thrusterH*0.9, 0, ctrl.sideThrust_LR > 0);
+  if (ctrl.sideThrust_LR > 0) drawFlame(ctx, thrusterW*0.8, ctrl.sideThrust_LR/50000); ctx.restore();
+  const gimbalVis = (view === 'xy') ? ctrl.gimbalDeg_a : ctrl.gimbalDeg_g;
+  ctx.save(); ctx.translate(0, botY_local); ctx.rotate(gimbalVis * Math.PI/180);
+  drawThrusterNozzle(ctx, thrusterW*1.4, thrusterH*1.2, 1, mainThr > 0);
+  if (mainThr > 0) drawFlame(ctx, thrusterW*1.2, mainThr/100000); ctx.restore();
+  if (opts.com) {
+    ctx.strokeStyle = '#cc44ff'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(0, 0, 5, 0, Math.PI*2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-8,0); ctx.lineTo(8,0); ctx.moveTo(0,-8); ctx.lineTo(0,8); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawForceArrows(ctx, view, W, H) {
+  const s = state;
+  if (!s._Fg || !opts.forces) return;
+  const scale = 0.0002;
+  let cx, cy;
+  if (view === 'xy') { [cx, cy] = w2c_xy(s.x, s.y+s.comH, {width:W,height:H}); }
+  else if (view === 'zy') { [cx, cy] = w2c_zy(s.z, s.y+s.comH, {width:W,height:H}); }
+  else return;
+  function drawArrow(color, fx, fy, label) {
+    const len = Math.sqrt(fx*fx+fy*fy)*scale;
+    if (len < 2) return;
+    const ang = Math.atan2(-fy, fx);
+    const ex = cx+Math.cos(ang)*len, ey = cy+Math.sin(ang)*len;
+    ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(ex,ey); ctx.stroke();
+    const aS=6;
+    ctx.beginPath(); ctx.moveTo(ex,ey);
+    ctx.lineTo(ex-aS*Math.cos(ang-0.4), ey-aS*Math.sin(ang-0.4));
+    ctx.lineTo(ex-aS*Math.cos(ang+0.4), ey-aS*Math.sin(ang+0.4));
+    ctx.closePath(); ctx.fill();
+    ctx.font='10px Share Tech Mono'; ctx.fillText(label, ex+4, ey-4);
+  }
+  if (view === 'xy') {
+    drawArrow('#ff2244', 0, -s._Fg, 'Fg');
+    drawArrow('#ff6b00', s._Ftx, s._Fty, 'Ft');
+    drawArrow('#00ff88', s._Fnx, s._Fny, 'Fn');
+  } else {
+    drawArrow('#ff2244', 0, -s._Fg, 'Fg');
+    drawArrow('#ff6b00', s._Ftz, s._Fty, 'Ft');
+    drawArrow('#00ff88', s._Fnz, s._Fny, 'Fn');
+  }
+}
+
+function drawVelocityVec(ctx, view, W, H) {
+  if (!opts.vel) return;
+  const s = state;
+  let cx, cy, vx_proj, vy_proj;
+  if (view === 'xy') {
+    [cx, cy] = w2c_xy(s.x, s.y+s.comH, {width:W,height:H});
+    vx_proj = s.vx; vy_proj = s.vy;
+  } else if (view === 'zy') {
+    [cx, cy] = w2c_zy(s.z, s.y+s.comH, {width:W,height:H});
+    vx_proj = s.vz; vy_proj = s.vy;
+  } else {
+    [cx, cy] = w2c_xz(s.x, s.z, {width:W,height:H});
+    vx_proj = s.vx; vy_proj = s.vz;
+  }
+  const scale = 3;
+  const vLen = Math.sqrt(vx_proj*vx_proj+vy_proj*vy_proj)*scale;
+  if (vLen < 2) return;
+  const ang = (view === 'xz') ? Math.atan2(vy_proj, vx_proj) : Math.atan2(-vy_proj, vx_proj);
+  const ex = cx+Math.cos(ang)*vLen, ey = cy+Math.sin(ang)*vLen;
+  ctx.strokeStyle='#ffcc00'; ctx.fillStyle='#ffcc00'; ctx.lineWidth=2;
+  ctx.setLineDash([4,2]);
+  ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(ex,ey); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.beginPath(); ctx.moveTo(ex,ey);
+  ctx.lineTo(ex-8*Math.cos(ang-0.4), ey-8*Math.sin(ang-0.4));
+  ctx.lineTo(ex-8*Math.cos(ang+0.4), ey-8*Math.sin(ang+0.4));
+  ctx.closePath(); ctx.fill();
+  ctx.fillText('V', ex+4, ey);
+}
+
+function drawTrajectory(ctx, view, W, H) {
+  if (!opts.traj || trajectory.length < 2) return;
+  ctx.strokeStyle = 'rgba(0,180,220,0.5)'; ctx.lineWidth = 1.5;
+  ctx.setLineDash([4,4]);
+  ctx.beginPath();
+  for (let i = 0; i < trajectory.length; i++) {
+    const [tx, ty, tz] = trajectory[i];
+    let px, py;
+    if (view === 'xy') { [px, py] = w2c_xy(tx, ty, {width:W,height:H}); }
+    else if (view === 'zy') { [px, py] = w2c_zy(tz, ty, {width:W,height:H}); }
+    else { [px, py] = w2c_xz(tx, tz, {width:W,height:H}); }
+    if (i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
+  }
+  ctx.stroke(); ctx.setLineDash([]);
+}
+
+function drawTargetMarker(ctx, view, W, H) {
+  if (simTime <= 0) return;
+  let cx, cy;
+  if (view === 'xy') { [cx, cy] = w2c_xy(hl.targetX, hl.targetY, {width:W,height:H}); }
+  else if (view === 'zy') { [cx, cy] = w2c_zy(hl.targetZ, hl.targetY, {width:W,height:H}); }
+  else { [cx, cy] = w2c_xz(hl.targetX, hl.targetZ, {width:W,height:H}); }
+  const r=12;
+  ctx.save();
+  ctx.strokeStyle='#00ffcc'; ctx.lineWidth=2;
+  ctx.shadowColor='#00ffcc'; ctx.shadowBlur=8; ctx.globalAlpha=0.4;
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(cx-r,cy); ctx.lineTo(cx+r,cy); ctx.moveTo(cx,cy-r); ctx.lineTo(cx,cy+r); ctx.stroke();
+  ctx.fillStyle='#00ffcc'; ctx.beginPath(); ctx.arc(cx,cy,3,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+}
+
+function drawImpact(ctx, view, W, H) {
+  if (!opts.impact || !running) return;
+  const imp = predictImpact();
+  if (!imp) return;
+  let px, py;
+  if (view === 'xy') { [px, py] = w2c_xy(imp.x, 0, {width:W,height:H}); }
+  else if (view === 'zy') { [px, py] = w2c_zy(imp.z, 0, {width:W,height:H}); }
+  else { [px, py] = w2c_xz(imp.x, imp.z, {width:W,height:H}); }
+  ctx.strokeStyle='#ff2244'; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.moveTo(px-8,py-8); ctx.lineTo(px+8,py+8);
+  ctx.moveTo(px+8,py-8); ctx.lineTo(px-8,py+8); ctx.stroke();
+  ctx.fillStyle='#ff2244'; ctx.font='10px Share Tech Mono';
+  ctx.fillText('IMPACT', px+10, py-5);
+  document.getElementById('d_impactX').textContent = imp.x.toFixed(1)+' m';
+  document.getElementById('d_impactZ').textContent = imp.z.toFixed(1)+' m';
+}
+
+function drawTelemetryOverlay(ctx, W, H, view) {
+  const s = state;
+  const dc = dirCosines(s.quat);
+  ctx.save();
+  ctx.translate(W-40, 40);
+  ctx.strokeStyle='#00d4ff'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.arc(0,0,28,0,Math.PI*2); ctx.stroke();
+  ctx.strokeStyle='rgba(0,212,255,0.3)';
+  ctx.beginPath(); ctx.moveTo(-28,0); ctx.lineTo(28,0); ctx.stroke();
+  let tiltAngle;
+  if (view === 'xy') {
+    tiltAngle = -Math.atan2(dc.nx, dc.ny);
+  } else if (view === 'zy') {
+    tiltAngle = -Math.atan2(dc.nz, dc.ny);
+  } else {
+    tiltAngle = 0;
+  }
+  ctx.strokeStyle='#ffcc00'; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.moveTo(0,14);
+  ctx.lineTo(Math.sin(tiltAngle)*22, -Math.cos(tiltAngle)*22); ctx.stroke();
+  ctx.fillStyle='#ffcc00'; ctx.font='8px Orbitron'; ctx.textAlign='center';
+  ctx.fillText((tiltAngle*180/Math.PI).toFixed(1)+'°', 0, 44);
+  ctx.restore();
+}
+
+function drawOneView(canvasId, view) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  const W = canvas.width, H = canvas.height;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0,0,W,H);
+  drawBackground(ctx, W, H, view);
+  if (view !== 'xz') {
+    const groundY = H - 60;
+    ctx.fillStyle = '#0a1a0d'; ctx.fillRect(0, groundY, W, H-groundY);
+    ctx.strokeStyle = '#1a4a1a'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(0, groundY); ctx.lineTo(W, groundY); ctx.stroke();
+  } else {
+    const [ox, oy] = w2c_xz(0, 0, {width:W,height:H});
+    ctx.strokeStyle = 'rgba(26,74,26,0.5)'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(ox-20,oy); ctx.lineTo(ox+20,oy);
+    ctx.moveTo(ox,oy-20); ctx.lineTo(ox,oy+20); ctx.stroke();
+  }
+  if (opts.grid) {
+    ctx.strokeStyle = 'rgba(10,40,64,0.4)'; ctx.lineWidth = 0.5;
+    const gridSzPx = 50 * SCALE_PIX_PER_M;
+    let ox, oy;
+    if (view === 'xy') { [ox, oy] = w2c_xy(0, 0, {width:W,height:H}); }
+    else if (view === 'zy') { [ox, oy] = w2c_zy(0, 0, {width:W,height:H}); }
+    else { [ox, oy] = w2c_xz(0, 0, {width:W,height:H}); }
+    const lim = (view==='xz') ? H : H-60;
+    for (let x = ox%gridSzPx; x < W; x += gridSzPx) {
+      ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,lim); ctx.stroke();
+      const wv = Math.round((x-ox)/SCALE_PIX_PER_M);
+      ctx.fillStyle='rgba(60,90,110,0.6)'; ctx.font='9px Share Tech Mono';
+      ctx.fillText(wv+'m', x+2, lim-4);
+    }
+    for (let y = oy%gridSzPx; y < lim; y += gridSzPx) {
+      ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke();
+      const wv = Math.round((oy-y)/SCALE_PIX_PER_M);
+      ctx.fillStyle='rgba(60,90,110,0.6)';
+      ctx.fillText(wv+'m', 4, y-2);
+    }
+  }
+  drawTrajectory(ctx, view, W, H);
+  drawImpact(ctx, view, W, H);
+  drawRocketProjection(ctx, view, W, H);
+  drawForceArrows(ctx, view, W, H);
+  drawTargetMarker(ctx, view, W, H);
+  drawVelocityVec(ctx, view, W, H);
+  drawTelemetryOverlay(ctx, W, H, view);
+}
+
+function drawAllFrames() {
+  if (canvasVisible.xy) drawOneView('sim_xy', 'xy');
+  if (canvasVisible.zy) drawOneView('sim_zy', 'zy');
+  if (canvasVisible.xz) drawOneView('sim_xz', 'xz');
+}
+
+function resizeCanvases() {
+  ['xy','zy','xz'].forEach(view => {
+    const canvas = document.getElementById('sim_'+view);
+    const wrap = document.getElementById('wrap_'+view);
+    if (!canvasVisible[view]) return;
+    canvas.width = wrap.clientWidth;
+    canvas.height = wrap.clientHeight;
+  });
+  if (!running) drawAllFrames();
+}
+
+// ===================== MAIN LOOP =====================
+function loop(timestamp) {
+  if (!running) return;
+  if (lastTime === null) lastTime = timestamp;
+  let dt = Math.min((timestamp - lastTime) / 1000, 0.05);
+  lastTime = timestamp;
+  const steps = 100;
+  const subDt = dt / steps;
+  for (let i = 0; i < steps; i++) {
+    physicsStep(subDt);
+    simTime += subDt;
+    if (state.crashed) break;
+  }
+  if (trajectory.length === 0 || simTime - (trajectory._lastT||0) > 0.1) {
+    trajectory.push([state.x, state.y, state.z]);
+    trajectory._lastT = simTime;
+    if (trajectory.length > 2000) trajectory.splice(0, 100);
+  }
+  drawAllFrames();
+  updateDataPanel();
+  if (!state.crashed) animId = requestAnimationFrame(loop);
+}
+
+// ===================== KEYBOARD =====================
+document.addEventListener('keydown', (e) => {
+  switch(e.code) {
+    case 'Space':
+      e.preventDefault();
+      if (running) stopSim(); else startSim();
+      break;
+    case 'KeyR': resetSim(); break;
+    case 'ArrowUp':
+      e.preventDefault();
+      document.getElementById('sl_mt').value = Math.min(300000, ctrl.mainThrust+5000);
+      updateThrusters(); break;
+    case 'ArrowDown':
+      e.preventDefault();
+      document.getElementById('sl_mt').value = Math.max(0, ctrl.mainThrust-5000);
+      updateThrusters(); break;
+    case 'ArrowLeft':
+      e.preventDefault();
+      document.getElementById('sl_gimbal_a').value = Math.max(-90, ctrl.gimbalDeg_a-1);
+      updateThrusters(); break;
+    case 'ArrowRight':
+      e.preventDefault();
+      document.getElementById('sl_gimbal_a').value = Math.min(90, ctrl.gimbalDeg_a+1);
+      updateThrusters(); break;
+  }
+});
+
+// ===================== INIT =====================
+window.addEventListener('resize', resizeCanvases);
+resizeCanvases();
+state = buildInitState();
+updateInitConfig();
+updateThrusters();
+drawAllFrames();
+updateDataPanel();
+updateStatusUI('stopped');
+  
+</script>
+</body>
+</html>
