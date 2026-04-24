@@ -733,6 +733,7 @@ let lastTs  = null;
 let simTime = 0;
 let maxAlt  = 0;
 let trajectory = [];   // [{x,y,z}]
+let frozenImpact = null; // cached impact point — only recalc when forces change
 let opts = {
   traj:true, forces:true, com:true, impact:true,
   vel:true, grid:true, torq:true, drag:false, rcsfuel:true
@@ -1111,17 +1112,17 @@ function physicsStep(dt) {
   }
 
   // ── 14. Ground check ──
-  // y = CoM altitude. Rocket bottom effectively at (y - comH).
-  // Crash only if CoM goes significantly below ground while moving fast.
-  if (s.y < s.comH * 0.1) {
-    s.y = Math.max(s.y, 0);
+  // Rocket bottom is at (y - comH). Ground at y=0.
+  // Contact when y <= comH.
+  if (s.y <= s.comH) {
     if (s.vy < -2.0) {
       // Hard landing / crash
       s.crashed = true;
+      s.y = s.comH;
       s.vy = 0; s.vx = 0; s.vz = 0;
       s.wx = 0; s.wy = 0; s.wz = 0;
     } else {
-      // Gentle ground contact — just stop vertical motion
+      // Gentle ground contact — stop vertical motion, sit on ground
       s.vy = 0;
       s.y = s.comH;
     }
@@ -1129,22 +1130,48 @@ function physicsStep(dt) {
 }
 
 // ──────────────────────────────────────
-//   IMPACT PREDICTION (ballistic, no thrust)
+//   IMPACT PREDICTION
+//   Time from current vy, ay, height.
+//   X/Z from current vx/vz + ax/az at that time.
 // ──────────────────────────────────────
 function predictImpact() {
   const s = state;
-  if (s.y <= 0 || s.vy >= 0) return null;
-  // Solve: y + vy*t - 0.5*g*t² = 0
-  // t = (vy + sqrt(vy²+2*g*y)) / g
-  const g = s.gravity;
-  const disc = s.vy * s.vy + 2 * g * s.y;
-  if (disc < 0) return null;
-  const t_imp = (-s.vy + Math.sqrt(disc)) / g;
-  return {
-    x: s.x + s.vx * t_imp,
-    z: s.z + s.vz * t_imp,
+  const groundY = s.comH;
+  if (s.y <= groundY) { frozenImpact = null; return null; }
+
+  // Solve: h + vy*t + 0.5*ay*t² = 0  where h = s.y - groundY
+  const h = s.y - groundY;
+  const vy = s.vy;
+  const ay = s.ay;
+
+  let t_imp;
+  if (Math.abs(ay) > 1e-6) {
+    // Quadratic: 0.5*ay*t² + vy*t + h = 0
+    const a = 0.5 * ay;
+    const b = vy;
+    const c = h;
+    const disc = b*b - 4*a*c;
+    if (disc < 0) { frozenImpact = null; return null; }
+    const sq = Math.sqrt(disc);
+    const t1 = (-b + sq) / (2*a);
+    const t2 = (-b - sq) / (2*a);
+    // Pick smallest positive t
+    const candidates = [t1, t2].filter(t => t > 1e-6);
+    if (candidates.length === 0) { frozenImpact = null; return null; }
+    t_imp = Math.min(...candidates);
+  } else {
+    // Linear: vy*t + h = 0 → t = -h/vy
+    if (Math.abs(vy) < 1e-6) { frozenImpact = null; return null; }
+    t_imp = -h / vy;
+    if (t_imp <= 0) { frozenImpact = null; return null; }
+  }
+
+  frozenImpact = {
+    x: s.x + s.vx * t_imp + 0.5 * s.ax * t_imp * t_imp,
+    z: s.z + s.vz * t_imp + 0.5 * s.az * t_imp * t_imp,
     t: t_imp,
   };
+  return frozenImpact;
 }
 
 // ──────────────────────────────────────
@@ -1574,12 +1601,13 @@ function drawFrame() {
     ctx.fillStyle = '#010810';
     ctx.fillRect(0, 0, W, H);
 
-    // Camera follows rocket — rocket stays at screen center
-    const cx = W * 0.5 - s.x * scale;
-    const cy = H * 0.5 + s.y * scale;  // rocket center on screen
-
-    // Ground is at world Y=0
-    const groundScreenY = cy;  // screen Y where world Y=0
+    // Rocket stays at screen center horizontally and vertically
+    const rocketScreenX = W * 0.5;
+    const rocketScreenY = H * 0.5;
+    // cx: world X=0 maps to screen X (so rocket at s.x → rocketScreenX)
+    const cx = rocketScreenX - s.x * scale;
+    // Ground (world Y=0) is below rocket
+    const groundScreenY = rocketScreenY + s.y * scale;
 
     if (opts.grid) drawGrid(ctx, W, H, cx, groundScreenY, scale, 0);
 
@@ -1602,24 +1630,28 @@ function drawFrame() {
       ctx.stroke();
     }
 
-    // Impact point — vertical dashed line from rocket down to ground
+    // Impact line — from rocket CoM to impact point on ground
     if (opts.impact && impact) {
-      const ipx = cx + impact.x * scale;
-      const rocketScreenY = groundScreenY - s.y * scale;
-      // Dashed vertical line from rocket to ground
+      // impact.x is fixed world coord — position relative to rocket on screen
+      const ipx = rocketScreenX + (impact.x - s.x) * scale;
+      const ipy = groundScreenY;
+      // Dashed line from rocket to impact point
       ctx.save();
-      ctx.setLineDash([4, 4]);
-      ctx.strokeStyle = 'rgba(255,34,68,0.7)';
-      ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.moveTo(ipx, rocketScreenY); ctx.lineTo(ipx, groundScreenY); ctx.stroke();
+      ctx.setLineDash([5, 4]);
+      ctx.strokeStyle = 'rgba(255,34,68,0.85)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(rocketScreenX, rocketScreenY);
+      ctx.lineTo(ipx, ipy);
+      ctx.stroke();
       ctx.setLineDash([]);
-      // X marker on ground
+      // X marker on ground at impact
       ctx.strokeStyle = '#ff2244';
       ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.moveTo(ipx-8, groundScreenY); ctx.lineTo(ipx+8, groundScreenY); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(ipx, groundScreenY-8); ctx.lineTo(ipx, groundScreenY+8); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(ipx-8, ipy); ctx.lineTo(ipx+8, ipy); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(ipx, ipy-8); ctx.lineTo(ipx, ipy+8); ctx.stroke();
       ctx.font='8px Share Tech Mono'; ctx.fillStyle='#ff2244';
-      ctx.fillText('IMPACT', ipx+5, groundScreenY - 3);
+      ctx.fillText('IMPACT', ipx+5, ipy - 4);
       ctx.restore();
     }
 
@@ -1630,8 +1662,8 @@ function drawFrame() {
     if (opts.torq) {
       const torqZ = s._torqTz + s._torqRz;
       if (Math.abs(torqZ) > 0.1) {
-        const rpx = cx + s.x * scale;
-        const rpy = groundScreenY - s.y * scale;
+        const rpx = rocketScreenX;
+        const rpy = rocketScreenY;
         ctx.strokeStyle = 'rgba(255,68,170,0.7)';
         ctx.lineWidth = 2;
         const arcR = Math.max(s.H*scale*0.65, 12);
@@ -1673,8 +1705,10 @@ function drawFrame() {
     ctx.clearRect(0,0,W,H);
     ctx.fillStyle='#010810'; ctx.fillRect(0,0,W,H);
 
-    const cx = W*0.5 - s.z*scale;
-    const groundScreenY = H*0.5 + s.y*scale;
+    const rocketScreenX = W * 0.5;
+    const rocketScreenY = H * 0.5;
+    const cx = rocketScreenX - s.z*scale;
+    const groundScreenY = rocketScreenY + s.y*scale;
 
     if (opts.grid) drawGrid(ctx,W,H,cx,groundScreenY,scale,0);
     if (groundScreenY < H) {
@@ -1693,31 +1727,31 @@ function drawFrame() {
     }
 
     if(opts.impact && impact){
-      const ipz=cx+impact.z*scale;
-      const rocketScreenY = groundScreenY - s.y*scale;
+      const ipz = rocketScreenX + (impact.z - s.z) * scale;
+      const ipy = groundScreenY;
       ctx.save();
-      ctx.setLineDash([4,4]);
-      ctx.strokeStyle='rgba(255,34,68,0.7)'; ctx.lineWidth=1;
-      ctx.beginPath(); ctx.moveTo(ipz,rocketScreenY); ctx.lineTo(ipz,groundScreenY); ctx.stroke();
+      ctx.setLineDash([5,4]);
+      ctx.strokeStyle='rgba(255,34,68,0.85)'; ctx.lineWidth=1.5;
+      ctx.beginPath(); ctx.moveTo(rocketScreenX, rocketScreenY); ctx.lineTo(ipz, ipy); ctx.stroke();
       ctx.setLineDash([]);
       ctx.strokeStyle='#ff2244'; ctx.lineWidth=2;
-      ctx.beginPath(); ctx.moveTo(ipz-8,groundScreenY); ctx.lineTo(ipz+8,groundScreenY); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(ipz-8,ipy); ctx.lineTo(ipz+8,ipy); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(ipz,ipy-8); ctx.lineTo(ipz,ipy+8); ctx.stroke();
       ctx.restore();
     }
 
     if(opts.forces) drawForces(ctx,s,cx,groundScreenY,scale,'z','y',R);
     drawRocket2D(ctx,s,cx,groundScreenY,scale,'z','y',R);
 
-    // Torque arc (about X axis → pitch in ZY view)
+    // Torque arc
     if(opts.torq){
       const torqX=s._torqTx+s._torqRx;
       if(Math.abs(torqX)>0.1){
-        const rpx=cx+s.z*scale, rpy=groundScreenY-s.y*scale;
         ctx.strokeStyle='rgba(255,68,170,0.7)'; ctx.lineWidth=2;
         const arcR=Math.max(s.H*scale*0.65,12);
         const arcSpan=Math.min(Math.abs(torqX)/Math.max(s.Ixx,1)*20,Math.PI*0.6);
         ctx.beginPath();
-        ctx.arc(rpx,rpy,arcR,-Math.PI/2,-Math.PI/2+(torqX>0?arcSpan:-arcSpan));
+        ctx.arc(rocketScreenX,rocketScreenY,arcR,-Math.PI/2,-Math.PI/2+(torqX>0?arcSpan:-arcSpan));
         ctx.stroke();
       }
     }
@@ -1775,6 +1809,14 @@ function drawFrame() {
     // Impact
     if(opts.impact&&impact){
       const ix=cx+impact.x*scale, iz=cy-impact.z*scale;
+      // Dashed line from rocket to impact
+      ctx.save();
+      ctx.setLineDash([5,4]);
+      ctx.strokeStyle='rgba(255,34,68,0.85)'; ctx.lineWidth=1.5;
+      ctx.beginPath(); ctx.moveTo(rx,rz); ctx.lineTo(ix,iz); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+      // Marker
       ctx.strokeStyle='#ff2244'; ctx.lineWidth=2;
       ctx.beginPath(); ctx.arc(ix,iz,7,0,Math.PI*2); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(ix-12,iz); ctx.lineTo(ix+12,iz); ctx.moveTo(ix,iz-12); ctx.lineTo(ix,iz+12); ctx.stroke();
@@ -2023,6 +2065,7 @@ function resetSim() {
   simTime = 0;
   maxAlt = 0;
   trajectory = [];
+  frozenImpact = null;
   state = buildInitState();
   ctrl.mainThrust = 0;
   ctrl.gimbalPitch = 0;
