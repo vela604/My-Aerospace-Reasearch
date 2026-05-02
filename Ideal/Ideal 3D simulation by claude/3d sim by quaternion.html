@@ -1,0 +1,2298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>3D Rocket Simulation</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap');
+
+:root {
+  --bg: #030b14;
+  --panel: #050f1c;
+  --border: #0a2840;
+  --accent: #00d4ff;
+  --accent2: #ff6b00;
+  --accent3: #00ff88;
+  --warn: #ffcc00;
+  --danger: #ff2244;
+  --purple: #cc44ff;
+  --text: #a8d8ea;
+  --dim: #3a5a6a;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Share Tech Mono', monospace;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+header {
+  background: var(--panel);
+  border-bottom: 2px solid var(--border);
+  padding: 6px 16px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-shrink: 0;
+}
+
+header h1 {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 13px;
+  font-weight: 900;
+  color: var(--accent);
+  letter-spacing: 3px;
+  text-transform: uppercase;
+}
+
+.status-bar {
+  display: flex;
+  gap: 16px;
+  margin-left: auto;
+  align-items: center;
+  font-size: 11px;
+}
+
+.status-indicator { display:flex; align-items:center; gap:5px; }
+
+.dot { width:7px; height:7px; border-radius:50%; background:var(--dim); }
+.dot.active { background:var(--accent3); box-shadow:0 0 6px var(--accent3); animation:pulse 1s infinite; }
+.dot.stopped { background:var(--warn); }
+.dot.crashed { background:var(--danger); }
+
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+.time-display {
+  font-family:'Orbitron',sans-serif;
+  font-size:16px;
+  color:var(--accent);
+  letter-spacing:3px;
+}
+
+.main-layout {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* ===== LEFT PANEL ===== */
+.left-panel {
+  width: 210px;
+  flex-shrink: 0;
+  background: var(--panel);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  padding: 6px;
+  gap: 6px;
+}
+
+/* ===== CENTER: 3 CANVASES ===== */
+.canvas-area {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: 2px;
+  background: #020810;
+  overflow: hidden;
+  position: relative;
+  min-width: 0;
+}
+
+.view-wrap {
+  position: relative;
+  overflow: hidden;
+  background: #010810;
+  border: 1px solid var(--border);
+  min-width: 0; min-height: 0;
+}
+
+.view-label {
+  position: absolute;
+  top: 5px; left: 7px;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 8px;
+  letter-spacing: 2px;
+  color: var(--accent);
+  opacity: 0.8;
+  z-index: 10;
+  pointer-events: none;
+  background: rgba(3,11,20,0.6);
+  padding: 1px 4px;
+  border-radius: 2px;
+}
+
+.view-wrap canvas { display:block; position:absolute; top:0; left:0; width:100%; height:100%; }
+
+/* Data table bottom-right */
+.data-table-wrap {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  overflow-y: auto;
+  padding: 6px;
+  min-width: 0; min-height: 0;
+}
+
+/* ===== RIGHT PANEL ===== */
+.right-panel {
+  width: 220px;
+  flex-shrink: 0;
+  background: var(--panel);
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  padding: 6px;
+  gap: 6px;
+}
+
+/* ===== SHARED PANEL STYLES ===== */
+.panel-section {
+  background: rgba(0,20,40,0.6);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 7px;
+}
+
+.section-title {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 8px;
+  letter-spacing: 2px;
+  color: var(--accent);
+  text-transform: uppercase;
+  margin-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 3px;
+}
+.section-title.orange { color: var(--accent2); }
+.section-title.green { color: var(--accent3); }
+.section-title.purple { color: var(--purple); }
+.section-title.warn { color: var(--warn); }
+
+.ctrl-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 6px;
+}
+
+.ctrl-label {
+  font-size: 9px;
+  color: var(--dim);
+  display: flex;
+  justify-content: space-between;
+}
+.ctrl-label span { color: var(--accent2); }
+.ctrl-label span.green { color: var(--accent3); }
+.ctrl-label span.blue { color: var(--accent); }
+
+input[type=range] {
+  -webkit-appearance: none;
+  width: 100%;
+  height: 3px;
+  background: var(--border);
+  border-radius: 2px;
+  outline: none;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 11px; height: 11px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  box-shadow: 0 0 4px var(--accent);
+}
+input[type=range].orange::-webkit-slider-thumb { background:var(--accent2); box-shadow:0 0 4px var(--accent2); }
+input[type=range].green::-webkit-slider-thumb { background:var(--accent3); box-shadow:0 0 4px var(--accent3); }
+input[type=range].purple::-webkit-slider-thumb { background:var(--purple); box-shadow:0 0 4px var(--purple); }
+input[type=range].warn::-webkit-slider-thumb { background:var(--warn); box-shadow:0 0 4px var(--warn); }
+
+.data-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 9px;
+  padding: 2px 0;
+  border-bottom: 1px solid rgba(10,40,64,0.5);
+}
+.data-row .key { color: var(--dim); }
+.data-row .val { color: var(--accent3); font-weight: bold; }
+.data-row .val.warn { color: var(--warn); }
+.data-row .val.danger { color: var(--danger); }
+.data-row .val.blue { color: var(--accent); }
+.data-row .val.orange { color: var(--accent2); }
+.data-row .val.purple { color: var(--purple); }
+
+.btn {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 9px;
+  letter-spacing: 1px;
+  border: 1px solid;
+  border-radius: 3px;
+  padding: 5px 8px;
+  cursor: pointer;
+  text-transform: uppercase;
+  background: transparent;
+  transition: all 0.15s;
+  width: 100%;
+  margin-bottom: 3px;
+}
+.btn-start { border-color:var(--accent3); color:var(--accent3); }
+.btn-start:hover { background:var(--accent3); color:#000; }
+.btn-stop { border-color:var(--warn); color:var(--warn); }
+.btn-stop:hover { background:var(--warn); color:#000; }
+.btn-reset { border-color:var(--danger); color:var(--danger); }
+.btn-reset:hover { background:var(--danger); color:#fff; }
+
+.toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 9px;
+  margin-bottom: 3px;
+}
+
+.toggle {
+  width: 26px; height: 13px;
+  background: var(--border);
+  border-radius: 7px;
+  position: relative;
+  cursor: pointer;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+.toggle.on { background: var(--accent); }
+.toggle.on.orange { background: var(--accent2); }
+.toggle.on.green { background: var(--accent3); }
+.toggle::after {
+  content: '';
+  position: absolute;
+  width: 9px; height: 9px;
+  background: #fff;
+  border-radius: 50%;
+  top: 2px; left: 2px;
+  transition: left 0.2s;
+}
+.toggle.on::after { left: 15px; }
+
+.fuel-bar-bg {
+  width: 100%;
+  height: 6px;
+  background: var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+  margin: 3px 0;
+}
+.fuel-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--danger), var(--warn), var(--accent3));
+  border-radius: 3px;
+  transition: width 0.1s;
+}
+
+/* Angle dial */
+.angle-display { display:flex; align-items:center; gap:6px; margin-top:3px; }
+.angle-dial {
+  width: 32px; height: 32px;
+  border: 2px solid var(--accent2);
+  border-radius: 50%;
+  position: relative;
+  flex-shrink: 0;
+}
+.angle-needle {
+  position: absolute;
+  width: 2px; height: 12px;
+  background: var(--accent2);
+  left: 50%; bottom: 50%;
+  transform-origin: bottom center;
+  transform: translateX(-50%) rotate(0deg);
+  border-radius: 2px;
+}
+
+/* RCS thrust indicators */
+.rcs-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3px;
+  margin-top: 4px;
+}
+.rcs-btn {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 8px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 3px 4px;
+  cursor: pointer;
+  background: rgba(0,20,40,0.4);
+  color: var(--dim);
+  text-align: center;
+  transition: all 0.1s;
+  user-select: none;
+}
+.rcs-btn:active, .rcs-btn.active {
+  background: rgba(0,212,255,0.2);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* Force legend */
+.force-legend { display:flex; flex-wrap:wrap; gap:3px; font-size:8px; }
+.legend-item { display:flex; align-items:center; gap:2px; }
+.legend-dot { width:8px; height:3px; border-radius:1px; }
+
+/* Data table section */
+.dt-section { margin-bottom: 6px; }
+.dt-head {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 7px;
+  letter-spacing: 2px;
+  color: var(--accent);
+  margin-bottom: 3px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 2px;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 3px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+/* 3-axis gimbal display */
+.gimbal-3d {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+}
+.gimbal-item {
+  flex: 1;
+  text-align: center;
+  font-size: 8px;
+  color: var(--dim);
+}
+.gimbal-dial-sm {
+  width: 26px; height: 26px;
+  border: 1px solid var(--accent2);
+  border-radius: 50%;
+  position: relative;
+  margin: 2px auto;
+}
+.gimbal-needle-sm {
+  position: absolute;
+  width: 1.5px; height: 10px;
+  background: var(--accent2);
+  left: 50%; bottom: 50%;
+  transform-origin: bottom center;
+  transform: translateX(-50%) rotate(0deg);
+  border-radius: 1px;
+}
+
+.warning-flash {
+  animation: warnflash 0.5s infinite;
+}
+@keyframes warnflash { 0%,100%{opacity:1} 50%{opacity:0.2} }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🚀 Rocket Sim 3D — Full Physics</h1>
+  <div class="status-bar">
+    <div class="status-indicator">
+      <div class="dot" id="statusDot"></div>
+      <span id="statusText" style="font-size:10px;">STOPPED</span>
+    </div>
+    <div class="time-display" id="timeDisplay">T+00:00.0</div>
+    <span style="font-size:10px;color:var(--dim)">SPEED:</span>
+    <select id="simSpeed" style="background:var(--panel);color:var(--accent);border:1px solid var(--border);font-family:'Share Tech Mono',monospace;font-size:10px;padding:2px;">
+      <option value="0.25">0.25×</option>
+      <option value="0.5">0.5×</option>
+      <option value="1" selected>1×</option>
+      <option value="2">2×</option>
+      <option value="5">5×</option>
+      <option value="10">10×</option>
+    </select>
+  </div>
+</header>
+
+<div class="main-layout">
+
+<!-- ===== LEFT PANEL ===== -->
+<div class="left-panel">
+
+  <div class="panel-section">
+    <div class="section-title">Simulation</div>
+    <button class="btn btn-start" id="btnStart" onclick="startSim()">▶ START</button>
+    <button class="btn btn-stop" id="btnStop" onclick="stopSim()">⏸ PAUSE</button>
+    <button class="btn btn-reset" onclick="resetSim()">↺ RESET</button>
+  </div>
+
+  <div class="panel-section">
+    <div class="section-title">Initial Config</div>
+    <div class="ctrl-row">
+      <div class="ctrl-label">Dry Mass (kg) <span id="lbl_mass">5000</span></div>
+      <input type="range" min="500" max="20000" value="5000" id="sl_mass" oninput="updateInitConfig()">
+    </div>
+    <div class="ctrl-row">
+      <div class="ctrl-label">Fuel Mass (kg) <span id="lbl_fuel">3000</span></div>
+      <input type="range" min="100" max="15000" value="3000" id="sl_fuel" oninput="updateInitConfig()">
+    </div>
+    <div class="ctrl-row">
+      <div class="ctrl-label">Height (m) <span id="lbl_rh">20</span></div>
+      <input type="range" min="5" max="60" value="20" id="sl_rh" oninput="updateInitConfig()">
+    </div>
+    <div class="ctrl-row">
+      <div class="ctrl-label">Diameter (m) <span id="lbl_rw">4</span></div>
+      <input type="range" min="1" max="12" value="4" id="sl_rw" oninput="updateInitConfig()">
+    </div>
+    <div class="ctrl-row">
+      <div class="ctrl-label">Init Pitch (°) <span id="lbl_ang">0</span></div>
+      <input type="range" min="-45" max="45" value="0" id="sl_ang" oninput="updateInitConfig()">
+    </div>
+    <div class="ctrl-row">
+      <div class="ctrl-label">Init Yaw (°) <span id="lbl_yaw">0</span></div>
+      <input type="range" min="-45" max="45" value="0" id="sl_yaw" oninput="updateInitConfig()">
+    </div>
+    <div class="ctrl-row">
+      <div class="ctrl-label">Gravity (m/s²) <span id="lbl_grav">9.81</span></div>
+      <input type="range" min="0" max="25" step="0.01" value="9.81" id="sl_grav" oninput="updateInitConfig()">
+    </div>
+    <div class="ctrl-row">
+      <div class="ctrl-label">Init Alt (m) <span id="lbl_initAlt">0</span></div>
+      <input type="range" min="0" max="5000" step="10" value="0" id="sl_initAlt" oninput="updateInitConfig()">
+    </div>
+    <div class="ctrl-row">
+      <div class="ctrl-label">Init Vx (m/s) <span id="lbl_initVx">0</span></div>
+      <input type="range" min="-100" max="100" step="1" value="0" id="sl_initVx" oninput="updateInitConfig()">
+    </div>
+    <div class="ctrl-row">
+      <div class="ctrl-label">Init Vz (m/s) <span id="lbl_initVz">0</span></div>
+      <input type="range" min="-100" max="100" step="1" value="0" id="sl_initVz" oninput="updateInitConfig()">
+    </div>
+    <div class="ctrl-row">
+      <div class="ctrl-label">Ve Main (m/s) <span id="lbl_ve">3000</span></div>
+      <input type="range" min="1000" max="5000" step="50" value="3000" id="sl_ve" oninput="updateInitConfig()">
+    </div>
+  </div>
+
+  <div class="panel-section">
+    <div class="section-title">Display Toggles</div>
+    <div class="toggle-row"><span>Trajectory</span><div class="toggle on" id="tog_traj" onclick="toggleOpt('traj')"></div></div>
+    <div class="toggle-row"><span>Forces</span><div class="toggle on" id="tog_forces" onclick="toggleOpt('forces')"></div></div>
+    <div class="toggle-row"><span>CoM Marker</span><div class="toggle on" id="tog_com" onclick="toggleOpt('com')"></div></div>
+    <div class="toggle-row"><span>Impact Point</span><div class="toggle on" id="tog_impact" onclick="toggleOpt('impact')"></div></div>
+    <div class="toggle-row"><span>Velocity Vec</span><div class="toggle on" id="tog_vel" onclick="toggleOpt('vel')"></div></div>
+    <div class="toggle-row"><span>Grid</span><div class="toggle on" id="tog_grid" onclick="toggleOpt('grid')"></div></div>
+    <div class="toggle-row"><span>Torque Arc</span><div class="toggle on" id="tog_torq" onclick="toggleOpt('torq')"></div></div>
+    <div class="toggle-row"><span>Drag Force</span><div class="toggle" id="tog_drag" onclick="toggleOpt('drag')"></div></div>
+    <div class="toggle-row"><span>RCS Fuel Sep.</span><div class="toggle on green" id="tog_rcsfuel" onclick="toggleOpt('rcsfuel')"></div></div>
+  </div>
+
+  <div class="panel-section">
+    <div class="section-title">Force Legend</div>
+    <div class="force-legend">
+      <div class="legend-item"><div class="legend-dot" style="background:#ff2244"></div><span>Gravity</span></div>
+      <div class="legend-item"><div class="legend-dot" style="background:#ff6b00"></div><span>Thrust</span></div>
+      <div class="legend-item"><div class="legend-dot" style="background:#00d4ff"></div><span>Drag</span></div>
+      <div class="legend-item"><div class="legend-dot" style="background:#00ff88"></div><span>Net Force</span></div>
+      <div class="legend-item"><div class="legend-dot" style="background:#ffcc00"></div><span>Velocity</span></div>
+      <div class="legend-item"><div class="legend-dot" style="background:#cc44ff"></div><span>CoM</span></div>
+      <div class="legend-item"><div class="legend-dot" style="background:#44ffff"></div><span>RCS</span></div>
+      <div class="legend-item"><div class="legend-dot" style="background:#ff44aa"></div><span>Torque</span></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ===== CENTER: 3 VIEWS + DATA TABLE ===== -->
+<div class="canvas-area">
+  <!-- XY View (Front) -->
+  <div class="view-wrap" id="wrap_xy">
+    <div class="view-label">X–Y (FRONT)</div>
+    <canvas id="cv_xy"></canvas>
+  </div>
+  <!-- ZY View (Side) -->
+  <div class="view-wrap" id="wrap_zy">
+    <div class="view-label">Z–Y (SIDE)</div>
+    <canvas id="cv_zy"></canvas>
+  </div>
+  <!-- XZ View (Top) -->
+  <div class="view-wrap" id="wrap_xz">
+    <div class="view-label">X–Z (TOP)</div>
+    <canvas id="cv_xz"></canvas>
+  </div>
+  <!-- Data Table (bottom-right) -->
+  <div class="data-table-wrap" id="dtWrap">
+    <div class="dt-section">
+      <div class="dt-head">── POSITION & VELOCITY ──</div>
+      <div class="data-row"><span class="key">X (m)</span><span class="val blue" id="d_x">0.00</span></div>
+      <div class="data-row"><span class="key">Y / Alt (m)</span><span class="val blue" id="d_y">0.00</span></div>
+      <div class="data-row"><span class="key">Z (m)</span><span class="val blue" id="d_z">0.00</span></div>
+      <div class="data-row"><span class="key">Vx (m/s)</span><span class="val" id="d_vx">0.000</span></div>
+      <div class="data-row"><span class="key">Vy (m/s)</span><span class="val" id="d_vy">0.000</span></div>
+      <div class="data-row"><span class="key">Vz (m/s)</span><span class="val" id="d_vz">0.000</span></div>
+      <div class="data-row"><span class="key">|V| (m/s)</span><span class="val warn" id="d_vmod">0.000</span></div>
+    </div>
+    <div class="dt-section">
+      <div class="dt-head">── ACCELERATION ──</div>
+      <div class="data-row"><span class="key">Ax (m/s²)</span><span class="val" id="d_ax">0.0000</span></div>
+      <div class="data-row"><span class="key">Ay (m/s²)</span><span class="val" id="d_ay">0.0000</span></div>
+      <div class="data-row"><span class="key">Az (m/s²)</span><span class="val" id="d_az">0.0000</span></div>
+      <div class="data-row"><span class="key">|A| (m/s²)</span><span class="val" id="d_amod">0.0000</span></div>
+    </div>
+    <div class="dt-section">
+      <div class="dt-head">── ATTITUDE (Euler ZYX) ──</div>
+      <div class="data-row"><span class="key">Roll α (°)</span><span class="val orange" id="d_roll">0.000</span></div>
+      <div class="data-row"><span class="key">Pitch β (°)</span><span class="val orange" id="d_pitch">0.000</span></div>
+      <div class="data-row"><span class="key">Yaw γ (°)</span><span class="val orange" id="d_yaw">0.000</span></div>
+      <div class="data-row"><span class="key">ωx (°/s)</span><span class="val" id="d_wx">0.000</span></div>
+      <div class="data-row"><span class="key">ωy (°/s)</span><span class="val" id="d_wy">0.000</span></div>
+      <div class="data-row"><span class="key">ωz (°/s)</span><span class="val" id="d_wz">0.000</span></div>
+      <div class="data-row"><span class="key">αx (°/s²)</span><span class="val" id="d_alx">0.0000</span></div>
+      <div class="data-row"><span class="key">αy (°/s²)</span><span class="val" id="d_aly">0.0000</span></div>
+      <div class="data-row"><span class="key">αz (°/s²)</span><span class="val" id="d_alz">0.0000</span></div>
+    </div>
+    <div class="dt-section">
+      <div class="dt-head">── FORCES (N) ──</div>
+      <div class="data-row"><span class="key">F_grav</span><span class="val danger" id="d_fg">0.0</span></div>
+      <div class="data-row"><span class="key">F_thrust</span><span class="val orange" id="d_ft">0.0</span></div>
+      <div class="data-row"><span class="key">F_drag</span><span class="val blue" id="d_fd">0.000</span></div>
+      <div class="data-row"><span class="key">F_rcs</span><span class="val" style="color:#44ffff" id="d_frcs">0.0</span></div>
+      <div class="data-row"><span class="key">F_net_x</span><span class="val" id="d_fnx">0.00</span></div>
+      <div class="data-row"><span class="key">F_net_y</span><span class="val" id="d_fny">0.00</span></div>
+      <div class="data-row"><span class="key">F_net_z</span><span class="val" id="d_fnz">0.00</span></div>
+    </div>
+    <div class="dt-section">
+      <div class="dt-head">── TORQUES (N·m) ──</div>
+      <div class="data-row"><span class="key">τ_thrust_x</span><span class="val" style="color:#ff44aa" id="d_ttx">0.00</span></div>
+      <div class="data-row"><span class="key">τ_thrust_y</span><span class="val" style="color:#ff44aa" id="d_tty">0.00</span></div>
+      <div class="data-row"><span class="key">τ_thrust_z</span><span class="val" style="color:#ff44aa" id="d_ttz">0.00</span></div>
+      <div class="data-row"><span class="key">τ_rcs_x</span><span class="val" style="color:#44ffff" id="d_trx">0.00</span></div>
+      <div class="data-row"><span class="key">τ_rcs_y</span><span class="val" style="color:#44ffff" id="d_try">0.00</span></div>
+      <div class="data-row"><span class="key">τ_rcs_z</span><span class="val" style="color:#44ffff" id="d_trz">0.00</span></div>
+      <div class="data-row"><span class="key">τ_net_x</span><span class="val" id="d_tnx">0.00</span></div>
+      <div class="data-row"><span class="key">τ_net_y</span><span class="val" id="d_tny">0.00</span></div>
+      <div class="data-row"><span class="key">τ_net_z</span><span class="val" id="d_tnz">0.00</span></div>
+    </div>
+    <div class="dt-section">
+      <div class="dt-head">── MASS & INERTIA ──</div>
+      <div class="data-row"><span class="key">Total Mass (kg)</span><span class="val" id="d_mass">8000.0</span></div>
+      <div class="data-row"><span class="key">Fuel Rem. (kg)</span><span class="val warn" id="d_fuel">3000.0</span></div>
+      <div class="data-row"><span class="key">RCS Fuel (kg)</span><span class="val" style="color:#44ffff" id="d_rcsfuel">200.0</span></div>
+      <div class="data-row"><span class="key">CoM (m from bot)</span><span class="val purple" id="d_com">10.000</span></div>
+      <div class="data-row"><span class="key">ṁ main (kg/s)</span><span class="val" id="d_mdot">0.000</span></div>
+      <div class="data-row"><span class="key">ṁ rcs (kg/s)</span><span class="val" id="d_mdotrcs">0.000</span></div>
+      <div class="data-row"><span class="key">Ixx (kg·m²)</span><span class="val" id="d_ixx">0.0</span></div>
+      <div class="data-row"><span class="key">Iyy (kg·m²)</span><span class="val" id="d_iyy">0.0</span></div>
+      <div class="data-row"><span class="key">Izz (kg·m²)</span><span class="val" id="d_izz">0.0</span></div>
+    </div>
+    <div class="dt-section">
+      <div class="dt-head">── TRAJECTORY ──</div>
+      <div class="data-row"><span class="key">Altitude (m)</span><span class="val blue" id="d_alt">0.00</span></div>
+      <div class="data-row"><span class="key">Downrange X (m)</span><span class="val" id="d_range">0.00</span></div>
+      <div class="data-row"><span class="key">Crossrange Z (m)</span><span class="val" id="d_cross">0.00</span></div>
+      <div class="data-row"><span class="key">Max Alt (m)</span><span class="val" id="d_maxAlt">0.00</span></div>
+      <div class="data-row"><span class="key">Incl. Angle (°)</span><span class="val warn" id="d_incl">90.00</span></div>
+      <div class="data-row"><span class="key">Impact X (m)</span><span class="val danger" id="d_impX">—</span></div>
+      <div class="data-row"><span class="key">Impact Z (m)</span><span class="val danger" id="d_impZ">—</span></div>
+      <div class="data-row"><span class="key">Time (s)</span><span class="val" id="d_time">0.00</span></div>
+    </div>
+    <div class="dt-section">
+      <div class="dt-head">── PROPULSION ──</div>
+      <div class="data-row"><span class="key">Ve main (m/s)</span><span class="val" id="d_ve">3000</span></div>
+      <div class="data-row"><span class="key">Ve RCS (m/s)</span><span class="val" id="d_vercs">1500</span></div>
+      <div class="data-row"><span class="key">Thrust (N)</span><span class="val orange" id="d_thr">0.0</span></div>
+      <div class="data-row"><span class="key">Gimbal Pitch (°)</span><span class="val" id="d_gp">0.0</span></div>
+      <div class="data-row"><span class="key">Gimbal Yaw (°)</span><span class="val" id="d_gy">0.0</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== RIGHT PANEL ===== -->
+<div class="right-panel">
+
+  <div class="panel-section">
+    <div class="section-title orange">Main Thruster</div>
+    <div class="ctrl-row">
+      <div class="ctrl-label">Thrust (N) <span id="lbl_mt">0</span></div>
+      <input type="range" class="orange" min="0" max="500000" step="1000" value="0" id="sl_mt" oninput="updateThrusters()">
+    </div>
+    <div class="ctrl-row">
+      <div class="ctrl-label">Gimbal Pitch (°) <span id="lbl_gp">0.0</span></div>
+      <input type="range" class="orange" min="-20" max="20" step="0.5" value="0" id="sl_gp" oninput="updateThrusters()">
+    </div>
+    <div class="ctrl-row">
+      <div class="ctrl-label">Gimbal Yaw (°) <span id="lbl_gy">0.0</span></div>
+      <input type="range" class="orange" min="-20" max="20" step="0.5" value="0" id="sl_gy" oninput="updateThrusters()">
+    </div>
+    <div class="gimbal-3d">
+      <div class="gimbal-item">
+        <div>PITCH</div>
+        <div class="gimbal-dial-sm"><div class="gimbal-needle-sm" id="needle_gp"></div></div>
+        <div id="nd_gp">0°</div>
+      </div>
+      <div class="gimbal-item">
+        <div>YAW</div>
+        <div class="gimbal-dial-sm" style="border-color:var(--accent3)"><div class="gimbal-needle-sm" id="needle_gy" style="background:var(--accent3)"></div></div>
+        <div id="nd_gy">0°</div>
+      </div>
+    </div>
+    <div style="font-size:8px;color:var(--dim);margin-top:4px;">
+      F = Ve × ṁ (Ve=const, ṁ varies with thrust)
+    </div>
+  </div>
+
+  <div class="panel-section">
+    <div class="section-title green">RCS Thrusters</div>
+    <div class="ctrl-row">
+      <div class="ctrl-label">RCS Force/Jet (N) <span class="green" id="lbl_rcsf">1000</span></div>
+      <input type="range" class="green" min="100" max="50000" step="100" value="1000" id="sl_rcsf" oninput="updateThrusters()">
+    </div>
+    <div style="font-size:8px;color:var(--dim);margin-bottom:4px;">Hold keys or click buttons:</div>
+    <div class="rcs-grid">
+      <div class="rcs-btn" id="rcsBtn_px" onmousedown="rcsPress('px')" onmouseup="rcsRelease('px')" ontouchstart="rcsPress('px')" ontouchend="rcsRelease('px')">+X →</div>
+      <div class="rcs-btn" id="rcsBtn_nx" onmousedown="rcsPress('nx')" onmouseup="rcsRelease('nx')" ontouchstart="rcsPress('nx')" ontouchend="rcsRelease('nx')">← -X</div>
+      <div class="rcs-btn" id="rcsBtn_pz" onmousedown="rcsPress('pz')" onmouseup="rcsRelease('pz')" ontouchstart="rcsPress('pz')" ontouchend="rcsRelease('pz')">+Z ↗</div>
+      <div class="rcs-btn" id="rcsBtn_nz" onmousedown="rcsPress('nz')" onmouseup="rcsRelease('nz')" ontouchstart="rcsPress('nz')" ontouchend="rcsRelease('nz')">↙ -Z</div>
+      <div class="rcs-btn" id="rcsBtn_rpitch" onmousedown="rcsPress('rpitch')" onmouseup="rcsRelease('rpitch')" ontouchstart="rcsPress('rpitch')" ontouchend="rcsRelease('rpitch')">↑ PITCH+</div>
+      <div class="rcs-btn" id="rcsBtn_lpitch" onmousedown="rcsPress('lpitch')" onmouseup="rcsRelease('lpitch')" ontouchstart="rcsPress('lpitch')" ontouchend="rcsRelease('lpitch')">PITCH- ↓</div>
+      <div class="rcs-btn" id="rcsBtn_ryaw" onmousedown="rcsPress('ryaw')" onmouseup="rcsRelease('ryaw')" ontouchstart="rcsPress('ryaw')" ontouchend="rcsRelease('ryaw')">YAW+ ↺</div>
+      <div class="rcs-btn" id="rcsBtn_lyaw" onmousedown="rcsPress('lyaw')" onmouseup="rcsRelease('lyaw')" ontouchstart="rcsPress('lyaw')" ontouchend="rcsRelease('lyaw')">↻ YAW-</div>
+      <div class="rcs-btn" id="rcsBtn_rroll" onmousedown="rcsPress('rroll')" onmouseup="rcsRelease('rroll')" ontouchstart="rcsPress('rroll')" ontouchend="rcsRelease('rroll')">ROLL+ ⟳</div>
+      <div class="rcs-btn" id="rcsBtn_lroll" onmousedown="rcsPress('lroll')" onmouseup="rcsRelease('lroll')" ontouchstart="rcsPress('lroll')" ontouchend="rcsRelease('lroll')">⟲ ROLL-</div>
+    </div>
+    <div style="font-size:8px;color:var(--dim);margin-top:4px;">
+      RCS Ve = 1500 m/s (cold gas)<br>
+      Fuel: <span id="rcsFuelPct" style="color:var(--accent3)">100%</span>
+      <div class="fuel-bar-bg"><div class="fuel-bar-fill" id="rcsFuelBar" style="width:100%"></div></div>
+    </div>
+  </div>
+
+  <div class="panel-section">
+    <div class="section-title">Fuel Status</div>
+    <div class="data-row"><span class="key">Total</span><span class="val" id="d_fuelTotal">3000 kg</span></div>
+    <div class="data-row"><span class="key">Remaining</span><span class="val warn" id="d_fuelRem">3000.0 kg</span></div>
+    <div class="fuel-bar-bg"><div class="fuel-bar-fill" id="fuelBar" style="width:100%"></div></div>
+    <div class="data-row"><span class="key">ṁ (kg/s)</span><span class="val" id="d_mdot2">0.000</span></div>
+    <div class="data-row"><span class="key">Ve (m/s)</span><span class="val" id="d_ve2">3000</span></div>
+    <div class="data-row" style="margin-top:4px"><span class="key" style="color:var(--accent3)">RCS Fuel</span><span class="val" style="color:var(--accent3)" id="d_rcsFuelRem">200.0 kg</span></div>
+    <div class="fuel-bar-bg"><div class="fuel-bar-fill" id="rcsFuelBar2" style="width:100%"></div></div>
+    <div class="data-row"><span class="key">RCS ṁ (kg/s)</span><span class="val" id="d_rcsmdot2">0.000</span></div>
+  </div>
+
+  <div class="panel-section">
+    <div class="section-title warn">Keyboard Controls</div>
+    <div style="font-size:8px;color:var(--dim);line-height:1.7;">
+      <b style="color:var(--warn)">SPACE</b> — Play/Pause<br>
+      <b style="color:var(--warn)">R</b> — Reset<br>
+      <b style="color:var(--accent2)">↑↓</b> — Main Thrust ±<br>
+      <b style="color:var(--accent2)">W/S</b> — Gimbal Pitch<br>
+      <b style="color:var(--accent2)">A/D</b> — Gimbal Yaw<br>
+      <b style="color:var(--accent3)">I/K</b> — RCS Pitch<br>
+      <b style="color:var(--accent3)">J/L</b> — RCS Yaw<br>
+      <b style="color:var(--accent3)">Q/E</b> — RCS Roll<br>
+      <b style="color:var(--accent3)">Numpad</b> — RCS Translate<br>
+    </div>
+  </div>
+
+</div>
+
+</div><!-- main-layout -->
+
+<script>
+// ================================================================
+//   3D ROCKET SIMULATION — FULL PHYSICS
+//   - 3D rigid body with Euler angle integration
+//   - Variable mass (Tsiolkovsky: Ve=const, mdot varies with F)
+//   - Dynamic CoM, Moments of Inertia (Ixx, Iyy, Izz)
+//   - Main thruster with 2-axis gimbal (pitch + yaw)
+//   - RCS jets (10 buttons: +X,-X,+Z,-Z, pitch±, yaw±, roll±)
+//   - Drag (optional)
+//   - 3 independent 2D canvas views: XY, ZY, XZ
+//   - Real-time trajectory + impact prediction
+//   - Full live data table
+// ================================================================
+
+// ──────────── CONSTANTS ────────────
+const Cd_ROCKET = 0.4;
+const RHO_AIR   = 1.225;
+const Ve_RCS    = 1500;   // m/s, cold-gas RCS exhaust velocity
+
+// ──────────── STATE ────────────
+let state = {};
+let running = false;
+let animId  = null;
+let lastTs  = null;
+let simTime = 0;
+let maxAlt  = 0;
+let trajectory = [];   // [{x,y,z}]
+let frozenImpact = null; // cached impact point — only recalc when forces change
+let opts = {
+  traj:true, forces:true, com:true, impact:true,
+  vel:true, grid:true, torq:true, drag:false, rcsfuel:true
+};
+
+// ──────────── INIT CONFIG ────────────
+let initCfg = {
+  dryMass: 5000, fuelMass: 3000,
+  rcsFuelMass: 200,
+  rocketH: 20, rocketW: 4,
+  initPitch: 0, initYaw: 0,
+  gravity: 9.81,
+  initAlt: 0, initVx: 0, initVz: 0,
+  Ve_MAIN: 3000,
+};
+
+// ──────────── CONTROLS ────────────
+let ctrl = {
+  mainThrust: 0,   // N
+  gimbalPitch: 0,  // deg from rocket axis (in rocket's local XZ plane)
+  gimbalYaw: 0,    // deg from rocket axis (in rocket's local YZ plane)
+  rcsForce: 1000,  // N per jet
+  // RCS active jets (set by keyboard / buttons)
+  rcs: {px:false, nx:false, pz:false, nz:false,
+        rpitch:false, lpitch:false, ryaw:false, lyaw:false,
+        rroll:false, lroll:false}
+};
+
+// ──────────── HELPERS ────────────
+function cross(a,b){
+  return {
+    x: a.y*b.z - a.z*b.y,
+    y: a.z*b.x - a.x*b.z,
+    z: a.x*b.y - a.y*b.x
+  };
+}
+function dot3(a,b){ return a.x*b.x + a.y*b.y + a.z*b.z; }
+function len3(a){ return Math.sqrt(a.x*a.x+a.y*a.y+a.z*a.z); }
+function norm3(a){ const l=len3(a)||1; return {x:a.x/l,y:a.y/l,z:a.z/l}; }
+function add3(a,b){ return {x:a.x+b.x,y:a.y+b.y,z:a.z+b.z}; }
+function scale3(a,s){ return {x:a.x*s,y:a.y*s,z:a.z*s}; }
+
+// ──────────────────────────────────────
+//   QUATERNION MATH
+//   Convention: q = [w, x, y, z]  (scalar first)
+//   Represents body→world rotation
+// ──────────────────────────────────────
+
+// Build quaternion from ZYX Euler angles (yaw→pitch→roll)
+// Used only during initialization to convert slider values
+function eulerToQuat(roll, pitch, yaw) {
+  const cr = Math.cos(roll*0.5),  sr = Math.sin(roll*0.5);
+  const cp = Math.cos(pitch*0.5), sp = Math.sin(pitch*0.5);
+  const cy = Math.cos(yaw*0.5),   sy = Math.sin(yaw*0.5);
+  // q = q_yaw * q_pitch * q_roll  (ZYX order)
+  return {
+    w: cr*cp*cy + sr*sp*sy,
+    x: sr*cp*cy - cr*sp*sy,
+    y: cr*sp*cy + sr*cp*sy,
+    z: cr*cp*sy - sr*sp*cy
+  };
+}
+
+// Build 3×3 rotation matrix from unit quaternion (body→world)
+function quatToR(q) {
+  const { w, x, y, z } = q;
+  const x2=x*x, y2=y*y, z2=z*z;
+  const wx=w*x, wy=w*y, wz=w*z;
+  const xy=x*y, xz=x*z, yz=y*z;
+  return [
+    [ 1-2*(y2+z2),   2*(xy - wz),   2*(xz + wy) ],
+    [ 2*(xy + wz),   1-2*(x2+z2),   2*(yz - wx) ],
+    [ 2*(xz - wy),   2*(yz + wx),   1-2*(x2+y2) ]
+  ];
+}
+
+// Quaternion multiplication: p ⊗ q
+function quatMul(p, q) {
+  return {
+    w: p.w*q.w - p.x*q.x - p.y*q.y - p.z*q.z,
+    x: p.w*q.x + p.x*q.w + p.y*q.z - p.z*q.y,
+    y: p.w*q.y - p.x*q.z + p.y*q.w + p.z*q.x,
+    z: p.w*q.z + p.x*q.y - p.y*q.x + p.z*q.w
+  };
+}
+
+// Normalize quaternion to unit length (prevents drift)
+function quatNorm(q) {
+  const n = Math.sqrt(q.w*q.w + q.x*q.x + q.y*q.y + q.z*q.z) || 1;
+  return { w: q.w/n, x: q.x/n, y: q.y/n, z: q.z/n };
+}
+
+// Extract ZYX Euler angles from quaternion — used ONLY for display purposes
+function quatToEuler(q) {
+  const { w, x, y, z } = q;
+  // roll (φ): rotation about X
+  const sinr_cosp = 2*(w*x + y*z);
+  const cosr_cosp = 1 - 2*(x*x + y*y);
+  const roll = Math.atan2(sinr_cosp, cosr_cosp);
+  // pitch (θ): rotation about Y  — clamp to avoid NaN at ±90°
+  const sinp = 2*(w*y - z*x);
+  const pitch = Math.abs(sinp) >= 1 ? Math.sign(sinp)*Math.PI/2 : Math.asin(sinp);
+  // yaw (ψ): rotation about Z
+  const siny_cosp = 2*(w*z + x*y);
+  const cosy_cosp = 1 - 2*(y*y + z*z);
+  const yaw = Math.atan2(siny_cosp, cosy_cosp);
+  return { roll, pitch, yaw };
+}
+
+function rotateVec(R, v) {
+  return {
+    x: R[0][0]*v.x + R[0][1]*v.y + R[0][2]*v.z,
+    y: R[1][0]*v.x + R[1][1]*v.y + R[1][2]*v.z,
+    z: R[2][0]*v.x + R[2][1]*v.y + R[2][2]*v.z,
+  };
+}
+
+// ──────────────────────────────────────
+//   CoM & INERTIA (dynamic)
+// ──────────────────────────────────────
+function computeCoM(fuelMass, dryMass, H) {
+  // Fuel occupies bottom 55% of rocket body
+  // Dry mass center = 0.5*H, Fuel center = 0.275*H
+  const totalMass = fuelMass + dryMass;
+  if (totalMass <= 0) return H * 0.5;
+  const fuelCom = 0.275 * H;
+  const dryCom  = 0.5   * H;
+  return (fuelMass * fuelCom + dryMass * dryCom) / totalMass;
+}
+
+function computeInertia(totalMass, fuelMass, dryMass, H, W, comH) {
+  // Cylinder (rocket body): thin rod + disk
+  // Ixx (about body X = perpendicular to axis) = m*(H²/12 + W²/16) (cylinder)
+  // Iyy (about body Y = axis) = 0.5*m*(W/2)² (solid cylinder about axis)
+  // Izz = Ixx (symmetric)
+  const r  = W / 2;
+  const Ixx = totalMass * (H*H/12 + r*r/4);
+  const Iyy = 0.5 * totalMass * r * r;
+  const Izz = Ixx;
+  return { Ixx, Iyy, Izz };
+}
+
+// ──────────────────────────────────────
+//   BUILD INITIAL STATE
+// ──────────────────────────────────────
+function buildInitState() {
+  const { dryMass, fuelMass, rcsFuelMass, rocketH, rocketW,
+          initPitch, initYaw, gravity, initAlt, initVx, initVz, Ve_MAIN } = initCfg;
+
+  const totalMass = dryMass + fuelMass + rcsFuelMass;
+  const comH = computeCoM(fuelMass, dryMass + rcsFuelMass, rocketH);
+  const { Ixx, Iyy, Izz } = computeInertia(totalMass, fuelMass, dryMass + rcsFuelMass, rocketH, rocketW, comH);
+
+  // Convert initial Euler angles (from sliders) to quaternion
+  // At rest: rocket pointing UP (+Y world). Body Y axis = world Y axis.
+  const pitchRad = initPitch * Math.PI / 180;
+  const yawRad   = initYaw   * Math.PI / 180;
+  // Initialize with zero roll, user-set pitch and yaw
+  const initQuat = quatNorm(eulerToQuat(0, pitchRad, yawRad));
+
+  // y = altitude of CoM above ground.
+  // When rocket sits on pad: CoM is at comH above ground.
+  // When initAlt slider > 0: rocket is that many meters ABOVE ground (y = comH + initAlt).
+  const startY = comH + initAlt;
+
+  return {
+    // Position (world frame)
+    x: 0, y: startY, z: 0,
+    // Velocity (world frame)
+    vx: initVx, vy: 0, vz: initVz,
+    // Acceleration (world frame)
+    ax: 0, ay: 0, az: 0,
+    // Orientation as unit quaternion (body→world), ZYX convention
+    qw: initQuat.w, qx: initQuat.x, qy: initQuat.y, qz: initQuat.z,
+    // Angular velocity (body frame)
+    wx: 0, wy: 0, wz: 0,
+    // Angular acceleration (body frame)
+    alx: 0, aly: 0, alz: 0,
+    // Mass
+    mass: totalMass,
+    dryMass: dryMass,
+    fuelMass: fuelMass,
+    fuelMassInit: fuelMass,
+    rcsFuelMass: rcsFuelMass,
+    rcsFuelMassInit: rcsFuelMass,
+    H: rocketH,
+    W: rocketW,
+    gravity: gravity,
+    Ve_MAIN: Ve_MAIN,
+    comH: comH,
+    Ixx: Ixx, Iyy: Iyy, Izz: Izz,
+    crashed: false,
+    // cached forces for display
+    _Fg:0, _Ft:0, _Fd:0, _Frcs:0,
+    _Fnx:0, _Fny:0, _Fnz:0,
+    _torqTx:0, _torqTy:0, _torqTz:0,
+    _torqRx:0, _torqRy:0, _torqRz:0,
+    _mdot:0, _mdotrcs:0,
+    _thr:0, _gp:0, _gy:0,
+  };
+}
+
+// ──────────────────────────────────────
+//   PHYSICS STEP (Euler integration)
+//   Real simulation — no pre-derived formulas
+//   Ve=const, mdot = F/Ve (varies with thrust)
+// ──────────────────────────────────────
+function physicsStep(dt) {
+  const s = state;
+  if (s.crashed) return;
+
+  const g = s.gravity;
+  const H = s.H;
+  const W = s.W;
+  const r = W / 2;
+
+  // ── 1. Rotation matrix (body→world) from quaternion ──
+  const q = { w: s.qw, x: s.qx, y: s.qy, z: s.qz };
+  const R = quatToR(q);
+
+  // Body axes in world frame
+  // Body +Y = rocket long axis (pointing "up" along rocket)
+  const bodyY = { x: R[0][1], y: R[1][1], z: R[2][1] }; // rocket axis direction
+  const bodyX = { x: R[0][0], y: R[1][0], z: R[2][0] };
+  const bodyZ = { x: R[0][2], y: R[1][2], z: R[2][2] };
+
+  // ── 2. CoM & Inertia ──
+  s.comH = computeCoM(s.fuelMass, s.dryMass, H);
+  const { Ixx, Iyy, Izz } = computeInertia(s.mass, s.fuelMass, s.dryMass, H, W, s.comH);
+  s.Ixx = Ixx; s.Iyy = Iyy; s.Izz = Izz;
+
+  // ── 3. Main Thrust ──
+  // Gimbal: rotate thrust vector in body frame
+  // gimbalPitch: rotation of nozzle about body X axis (tilts thrust in body YZ plane)
+  // gimbalYaw: rotation of nozzle about body Z axis (tilts thrust in body YX plane)
+  const gp = ctrl.gimbalPitch * Math.PI / 180;
+  const gy = ctrl.gimbalYaw   * Math.PI / 180;
+
+  // Thrust direction in BODY frame (nozzle points down = -bodyY, so thrust = +bodyY rotated by gimbal)
+  // Gimbal rotates thrust vector away from -bodyY axis
+  // Thrust in body = (sin(gp)*X + cos(gp)*cos(gy)*Y + cos(gp)*sin(gy)*Z) [rotated by gimbal]
+  // Actually: start from +bodyY (along axis), rotate by pitch gp about bodyX, then yaw gy about bodyZ
+  let tBody = {
+    x:  Math.sin(gp),
+    y:  Math.cos(gp) * Math.cos(gy),
+    z: -Math.sin(gy) * Math.cos(gp)
+  };
+  // Normalize (should be already unit)
+  tBody = norm3(tBody);
+
+  // Effective thrust magnitude (fuel check)
+  let F_thrust = 0;
+  let mdot     = 0;
+  if (s.fuelMass > 0 && ctrl.mainThrust > 0) {
+    F_thrust = ctrl.mainThrust;
+    mdot     = F_thrust / s.Ve_MAIN;   // kg/s consumed
+  }
+  s._mdot = mdot;
+  s._thr  = F_thrust;
+  s._gp   = ctrl.gimbalPitch;
+  s._gy   = ctrl.gimbalYaw;
+
+  // Thrust force in world frame
+  const F_thrust_world = rotateVec(R, scale3(tBody, F_thrust));
+
+  // Torque due to thrust:
+  // Application point: nozzle at bottom of rocket = (0, -comH, 0) in body frame from CoM
+  const r_nozzle_body = { x: 0, y: -s.comH, z: 0 };
+  // Thrust force in body frame
+  const F_thrust_body = scale3(tBody, F_thrust);
+  const torq_T_body   = cross(r_nozzle_body, F_thrust_body);
+
+  // ── 4. RCS Thrusters ──
+  // RCS jets mounted at top of rocket (at H - comH from CoM) pointing radially
+  // Each jet in body frame:
+  let F_rcs_body  = { x: 0, y: 0, z: 0 };
+  let torq_R_body = { x: 0, y: 0, z: 0 };
+  let rcs_mdot    = 0;
+  const rcsMomentArm = H - s.comH;   // distance from CoM to RCS ring (top)
+  const rcsForce = ctrl.rcsForce;
+
+  // Translational RCS jets (near CoM)
+  function addRcsJet(forceBody, posBody) {
+    if (s.rcsFuelMass <= 0) return;
+    F_rcs_body  = add3(F_rcs_body, forceBody);
+    torq_R_body = add3(torq_R_body, cross(posBody, forceBody));
+    rcs_mdot   += len3(forceBody) / Ve_RCS;
+  }
+
+  const halfH = rcsMomentArm;  // moment arm for rotational RCS
+
+  // Rotational RCS (torque-generating, mounted at top ring)
+  if (ctrl.rcs.rpitch && s.rcsFuelMass > 0)
+    addRcsJet({x: 0, y: 0, z: rcsForce}, {x: 0, y: halfH, z: 0});
+  if (ctrl.rcs.lpitch && s.rcsFuelMass > 0)
+    addRcsJet({x: 0, y: 0, z: -rcsForce}, {x: 0, y: halfH, z: 0});
+  if (ctrl.rcs.ryaw && s.rcsFuelMass > 0)
+    addRcsJet({x: rcsForce, y: 0, z: 0}, {x: 0, y: halfH, z: 0});
+  if (ctrl.rcs.lyaw && s.rcsFuelMass > 0)
+    addRcsJet({x: -rcsForce, y: 0, z: 0}, {x: 0, y: halfH, z: 0});
+  // Roll RCS (tangential, upper and lower ring)
+  if (ctrl.rcs.rroll && s.rcsFuelMass > 0) {
+    addRcsJet({x: rcsForce, y: 0, z: 0},  {x: 0, y:  halfH, z: 0});
+    addRcsJet({x: -rcsForce, y: 0, z: 0}, {x: 0, y: -s.comH/2, z: 0});
+  }
+  if (ctrl.rcs.lroll && s.rcsFuelMass > 0) {
+    addRcsJet({x: -rcsForce, y: 0, z: 0}, {x: 0, y:  halfH, z: 0});
+    addRcsJet({x:  rcsForce, y: 0, z: 0}, {x: 0, y: -s.comH/2, z: 0});
+  }
+  // Translational RCS (fire opposite pairs to translate without torque — near CoM)
+  if (ctrl.rcs.px && s.rcsFuelMass > 0)
+    addRcsJet({x: rcsForce, y: 0, z: 0}, {x: 0, y: 0, z: 0});
+  if (ctrl.rcs.nx && s.rcsFuelMass > 0)
+    addRcsJet({x: -rcsForce, y: 0, z: 0}, {x: 0, y: 0, z: 0});
+  if (ctrl.rcs.pz && s.rcsFuelMass > 0)
+    addRcsJet({x: 0, y: 0, z: rcsForce}, {x: 0, y: 0, z: 0});
+  if (ctrl.rcs.nz && s.rcsFuelMass > 0)
+    addRcsJet({x: 0, y: 0, z: -rcsForce}, {x: 0, y: 0, z: 0});
+
+  s._mdotrcs = rcs_mdot;
+
+  // RCS force in world frame
+  const F_rcs_world = rotateVec(R, F_rcs_body);
+
+  // ── 5. Gravity ──
+  const F_grav = { x: 0, y: -s.mass * g, z: 0 };
+  s._Fg = s.mass * g;
+
+  // ── 6. Drag (optional) ──
+  let F_drag = { x: 0, y: 0, z: 0 };
+  const vMag = Math.sqrt(s.vx*s.vx + s.vy*s.vy + s.vz*s.vz);
+  if (opts.drag && vMag > 0) {
+    const A_ref = Math.PI * r * r;  // cross section
+    const Fd_mag = 0.5 * RHO_AIR * Cd_ROCKET * A_ref * vMag * vMag;
+    F_drag = { x: -Fd_mag * s.vx/vMag, y: -Fd_mag * s.vy/vMag, z: -Fd_mag * s.vz/vMag };
+    s._Fd = Fd_mag;
+  } else {
+    s._Fd = 0;
+  }
+
+  // ── 7. Ground support force (normal reaction) ──
+  // If rocket is on/near ground and net downward force exists, ground pushes back
+  const onGround = (s.y <= s.comH + 0.05) && (s.vy <= 0.01);
+  let groundNormalY = 0;
+  if (onGround) {
+    // Net downward force before normal
+    const tentativeFy = F_grav.y + F_thrust_world.y + F_rcs_world.y + F_drag.y;
+    if (tentativeFy < 0) {
+      groundNormalY = -tentativeFy; // cancel downward force
+    }
+    // Also zero out downward velocity
+    if (s.vy < 0) s.vy = 0;
+  }
+
+  // ── 8. Net force (world frame) ──
+  const Fnx = F_grav.x + F_thrust_world.x + F_rcs_world.x + F_drag.x;
+  const Fny = F_grav.y + F_thrust_world.y + F_rcs_world.y + F_drag.y + groundNormalY;
+  const Fnz = F_grav.z + F_thrust_world.z + F_rcs_world.z + F_drag.z;
+
+  s._Ft   = F_thrust;
+  s._Frcs = len3(F_rcs_world);
+  s._Fnx  = Fnx; s._Fny = Fny; s._Fnz = Fnz;
+  s._torqTx = torq_T_body.x; s._torqTy = torq_T_body.y; s._torqTz = torq_T_body.z;
+  s._torqRx = torq_R_body.x; s._torqRy = torq_R_body.y; s._torqRz = torq_R_body.z;
+
+  // ── 9. Net torque in body frame ──
+  const torq_net_body = add3(torq_T_body, torq_R_body);
+
+  // ── 10. Translational dynamics ──
+  s.ax = Fnx / s.mass;
+  s.ay = Fny / s.mass;
+  s.az = Fnz / s.mass;
+
+  s.vx += s.ax * dt;
+  s.vy += s.ay * dt;
+  s.vz += s.az * dt;
+
+  s.x += s.vx * dt;
+  s.y += s.vy * dt;
+  s.z += s.vz * dt;
+
+  // ── 11. Rotational dynamics (body frame) ──
+  // Euler's equations for rigid body (body frame):
+  // Ixx * αx = τx - (Izz - Iyy)*wy*wz
+  // Iyy * αy = τy - (Ixx - Izz)*wx*wz
+  // Izz * αz = τz - (Iyy - Ixx)*wx*wy
+  s.alx = (torq_net_body.x - (Izz - Iyy) * s.wy * s.wz) / Ixx;
+  s.aly = (torq_net_body.y - (Ixx - Izz) * s.wx * s.wz) / Iyy;
+  s.alz = (torq_net_body.z - (Iyy - Ixx) * s.wx * s.wy) / Izz;
+
+  s.wx += s.alx * dt;
+  s.wy += s.aly * dt;
+  s.wz += s.alz * dt;
+
+  // ── 12. Quaternion kinematics ──
+  // dq/dt = 0.5 * q ⊗ ω_quat   where ω_quat = [0, wx, wy, wz] (pure quaternion)
+  // This maps body-frame angular velocity to quaternion rate of change.
+  // No gimbal lock, no singularities.
+  const omega_quat = { w: 0, x: s.wx, y: s.wy, z: s.wz };
+  const dq = quatMul(q, omega_quat);
+  s.qw += 0.5 * dq.w * dt;
+  s.qx += 0.5 * dq.x * dt;
+  s.qy += 0.5 * dq.y * dt;
+  s.qz += 0.5 * dq.z * dt;
+
+  // Re-normalize every step to prevent numerical drift
+  const qNew = quatNorm({ w: s.qw, x: s.qx, y: s.qy, z: s.qz });
+  s.qw = qNew.w; s.qx = qNew.x; s.qy = qNew.y; s.qz = qNew.z;
+
+  // ── 13. Mass update ──
+  const fuel_used     = mdot * dt;
+  const rcs_fuel_used = rcs_mdot * dt;
+
+  if (s.fuelMass > 0) {
+    s.fuelMass -= fuel_used;
+    if (s.fuelMass < 0) { s.fuelMass = 0; }
+    s.mass = s.dryMass + s.fuelMass + s.rcsFuelMass;
+  }
+  if (opts.rcsfuel && s.rcsFuelMass > 0) {
+    s.rcsFuelMass -= rcs_fuel_used;
+    if (s.rcsFuelMass < 0) { s.rcsFuelMass = 0; }
+    s.mass = s.dryMass + s.fuelMass + s.rcsFuelMass;
+  }
+
+  // ── 14. Ground check ──
+  // Rocket bottom is at (y - comH). Ground at y=0.
+  // Contact when y <= comH.
+  if (s.y <= s.comH) {
+    if (s.vy < -2.0) {
+      // Hard landing / crash
+      s.crashed = true;
+      s.y = s.comH;
+      s.vy = 0; s.vx = 0; s.vz = 0;
+      s.wx = 0; s.wy = 0; s.wz = 0;
+    } else {
+      // Gentle ground contact — stop vertical motion, sit on ground
+      s.vy = 0;
+      s.y = s.comH;
+    }
+  }
+}
+
+// ──────────────────────────────────────
+//   IMPACT PREDICTION
+//   Time from current vy, ay, height.
+//   X/Z from current vx/vz + ax/az at that time.
+// ──────────────────────────────────────
+function predictImpact() {
+  const s = state;
+  const groundY = s.comH;
+  if (s.y <= groundY) { frozenImpact = null; return null; }
+
+  // Solve: h + vy*t + 0.5*ay*t² = 0  where h = s.y - groundY
+  const h = s.y - groundY;
+  const vy = s.vy;
+  const ay = s.ay;
+
+  let t_imp;
+  if (Math.abs(ay) > 1e-6) {
+    // Quadratic: 0.5*ay*t² + vy*t + h = 0
+    const a = 0.5 * ay;
+    const b = vy;
+    const c = h;
+    const disc = b*b - 4*a*c;
+    if (disc < 0) { frozenImpact = null; return null; }
+    const sq = Math.sqrt(disc);
+    const t1 = (-b + sq) / (2*a);
+    const t2 = (-b - sq) / (2*a);
+    // Pick smallest positive t
+    const candidates = [t1, t2].filter(t => t > 1e-6);
+    if (candidates.length === 0) { frozenImpact = null; return null; }
+    t_imp = Math.min(...candidates);
+  } else {
+    // Linear: vy*t + h = 0 → t = -h/vy
+    if (Math.abs(vy) < 1e-6) { frozenImpact = null; return null; }
+    t_imp = -h / vy;
+    if (t_imp <= 0) { frozenImpact = null; return null; }
+  }
+
+  frozenImpact = {
+    x: s.x + s.vx * t_imp + 0.5 * s.ax * t_imp * t_imp,
+    z: s.z + s.vz * t_imp + 0.5 * s.az * t_imp * t_imp,
+    t: t_imp,
+  };
+  return frozenImpact;
+}
+
+// ──────────────────────────────────────
+//   CANVAS DRAWING
+// ──────────────────────────────────────
+
+const cvs = {
+  xy: document.getElementById('cv_xy'),
+  zy: document.getElementById('cv_zy'),
+  xz: document.getElementById('cv_xz'),
+};
+const ctxs = {
+  xy: cvs.xy.getContext('2d'),
+  zy: cvs.zy.getContext('2d'),
+  xz: cvs.xz.getContext('2d'),
+};
+
+// ──────────────────────────────────────
+//   CANVAS INIT — fixed size from CSS
+// ──────────────────────────────────────
+function initCanvasSizes() {
+  ['xy','zy','xz'].forEach(k => {
+    const wrap = cvs[k].parentElement;
+    cvs[k].width  = wrap.clientWidth  || 400;
+    cvs[k].height = wrap.clientHeight || 400;
+  });
+}
+
+// Compute scale: rocket height should be ~15% of canvas height
+function getScale(s) {
+  const cvH = cvs.xy.height || 400;
+  // Rocket height occupies ~15% of screen height → nice visible size
+  const targetRocketPx = cvH * 0.15;
+  const s1 = targetRocketPx / s.H;
+  return Math.max(Math.min(s1, 30), 0.05);
+}
+
+// Draw grid
+function drawGrid(ctx, W, H, cx, cy, scale, axisH) {
+  ctx.strokeStyle = 'rgba(10,40,64,0.6)';
+  ctx.lineWidth = 0.5;
+  // Spacing: pick nice round number
+  let step = 10;
+  const screenPx = step * scale;
+  if (screenPx < 15) step = 50;
+  if (screenPx < 15) step = 100;
+  if (screenPx < 15) step = 500;
+  if (screenPx > 120) step = 5;
+  if (screenPx > 120) step = 2;
+
+  const startX = Math.floor((0 - cx) / scale / step) * step;
+  const endX   = Math.ceil((W - cx) / scale / step) * step;
+  for (let gx = startX; gx <= endX; gx += step) {
+    const px = cx + gx * scale;
+    ctx.beginPath();
+    ctx.moveTo(px, 0); ctx.lineTo(px, H);
+    ctx.stroke();
+  }
+
+  const startY_world = Math.floor((axisH - cy) / scale / step) * step;
+  const endY_world   = Math.ceil((axisH + (H - cy)) / scale / step) * step;
+  for (let gy = startY_world; gy <= endY_world; gy += step) {
+    const py = cy - gy * scale;
+    ctx.beginPath();
+    ctx.moveTo(0, py); ctx.lineTo(W, py);
+    ctx.stroke();
+  }
+
+  // Axes
+  ctx.strokeStyle = 'rgba(0,212,255,0.3)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(cx, 0); ctx.lineTo(cx, H); ctx.stroke();
+  const groundY = cy;
+  ctx.strokeStyle = 'rgba(0,255,136,0.4)';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(0, groundY); ctx.lineTo(W, groundY); ctx.stroke();
+}
+
+// Draw rocket body in a 2D view
+// axisA = world axis for canvas-X, axisB = world axis for canvas-Y (increases upward)
+function drawRocket2D(ctx, s, cx, cy, scale, axisA, axisB, R) {
+  const H = s.H, D = s.W;
+  const r = D / 2;
+
+  // Rocket CoM in screen space
+  const px = cx + s[axisA] * scale;
+  const py = cy - s[axisB] * scale;
+
+  // Project body axes to this 2D view
+  // Body +Y = rocket long axis (nose direction)
+  const bYw = { x: R[0][1], y: R[1][1], z: R[2][1] };
+  const bXw = { x: R[0][0], y: R[1][0], z: R[2][0] };
+  const bZw = { x: R[0][2], y: R[1][2], z: R[2][2] };
+
+  function worldToScreen(w) {
+    let sa, sb;
+    if      (axisA==='x' && axisB==='y') { sa=w.x; sb=w.y; }
+    else if (axisA==='z' && axisB==='y') { sa=w.z; sb=w.y; }
+    else if (axisA==='x' && axisB==='z') { sa=w.x; sb=-w.z; }
+    else { sa=0; sb=1; }
+    return { sx: sa*scale, sy: -sb*scale };  // screen delta
+  }
+
+  // Along-axis and perp-axis screen projections for rocket body
+  const bodyY_screen = worldToScreen(bYw);  // along-axis direction on screen
+  const bodyX_screen = worldToScreen(bXw);  // width direction on screen
+
+  // Foreshortening of width (dot product of body width with view plane)
+  let widthFrac;
+  if      (axisA==='x' && axisB==='y') widthFrac = Math.abs(bXw.x) + Math.abs(bZw.x)*0.5;
+  else if (axisA==='z' && axisB==='y') widthFrac = Math.abs(bZw.z) + Math.abs(bXw.z)*0.5;
+  else widthFrac = 1;
+  widthFrac = Math.max(0.05, Math.min(widthFrac, 1));
+
+  const hPx     = H * scale;   // full rocket height in px
+  const rPx     = r * scale;   // radius in px
+  const comPx   = s.comH * scale;  // CoM from bottom in px
+
+  // Normalise along-axis unit vector on screen
+  const ayLen = Math.sqrt(bodyY_screen.sx**2 + bodyY_screen.sy**2) || 1;
+  const ay_nx = bodyY_screen.sx / ayLen;
+  const ay_ny = bodyY_screen.sy / ayLen;
+
+  // Perp on screen
+  const perp_nx = -ay_ny;
+  const perp_ny =  ay_nx;
+
+  // Bottom of rocket on screen (relative to CoM)
+  const botX = px - ay_nx * comPx;
+  const botY = py - ay_ny * comPx;
+  // Top of rocket on screen
+  const topX = px + ay_nx * (hPx - comPx);
+  const topY = py + ay_ny * (hPx - comPx);
+
+  const halfW = rPx * widthFrac;
+
+  ctx.save();
+
+  // ── Engine bell ──
+  const bellH = hPx * 0.1;
+  const bellW = halfW * 0.9;
+  ctx.fillStyle = '#223344';
+  ctx.beginPath();
+  ctx.moveTo(botX - bellW*0.5,  botY - ay_ny*0     - perp_ny*bellW*0.5);
+  ctx.lineTo(botX + bellW*1.0 * perp_nx - ay_nx*bellH,
+             botY + bellW*1.0 * perp_ny - ay_ny*bellH);
+  ctx.lineTo(botX - bellW*1.0 * perp_nx - ay_nx*bellH,
+             botY - bellW*1.0 * perp_ny - ay_ny*bellH);
+  // Simpler: just draw a rect-ish shape
+  ctx.restore(); ctx.save();
+
+  // Draw engine bell as a simple trapezoid
+  const b1x = botX + perp_nx*halfW*0.55,  b1y = botY + perp_ny*halfW*0.55;
+  const b2x = botX - perp_nx*halfW*0.55,  b2y = botY - perp_ny*halfW*0.55;
+  const t1x = botX + perp_nx*halfW*0.35 - ay_nx*bellH, t1y = botY + perp_ny*halfW*0.35 - ay_ny*bellH;
+  const t2x = botX - perp_nx*halfW*0.35 - ay_nx*bellH, t2y = botY - perp_ny*halfW*0.35 - ay_ny*bellH;
+  ctx.fillStyle = '#1a2e40';
+  ctx.strokeStyle = '#334455';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(b1x,b1y); ctx.lineTo(t1x,t1y); ctx.lineTo(t2x,t2y); ctx.lineTo(b2x,b2y); ctx.closePath();
+  ctx.fill(); ctx.stroke();
+
+  // ── Body ──
+  const bodyGrad = ctx.createLinearGradient(
+    px + perp_nx*halfW, py + perp_ny*halfW,
+    px - perp_nx*halfW, py - perp_ny*halfW
+  );
+  bodyGrad.addColorStop(0,   '#0d2035');
+  bodyGrad.addColorStop(0.2, '#1e5080');
+  bodyGrad.addColorStop(0.5, '#2a78b0');
+  bodyGrad.addColorStop(0.8, '#1e5080');
+  bodyGrad.addColorStop(1,   '#0d2035');
+  ctx.fillStyle = bodyGrad;
+  ctx.strokeStyle = '#3a8acc';
+  ctx.lineWidth = 0.5;
+  ctx.beginPath();
+  ctx.moveTo(botX + perp_nx*halfW, botY + perp_ny*halfW);
+  ctx.lineTo(botX - perp_nx*halfW, botY - perp_ny*halfW);
+  ctx.lineTo(topX - perp_nx*halfW, topY - perp_ny*halfW);
+  ctx.lineTo(topX + perp_nx*halfW, topY + perp_ny*halfW);
+  ctx.closePath();
+  ctx.fill(); ctx.stroke();
+
+  // ── Fuel section highlight (lower 55%) ──
+  const fuelFrac = s.fuelMassInit > 0 ? s.fuelMass / s.fuelMassInit : 0;
+  if (fuelFrac > 0.01) {
+    const fuelH = hPx * 0.55 * fuelFrac;
+    ctx.globalAlpha = 0.25;
+    ctx.fillStyle = fuelFrac > 0.3 ? '#00aaff' : (fuelFrac > 0.1 ? '#ffaa00' : '#ff2244');
+    ctx.beginPath();
+    ctx.moveTo(botX + perp_nx*halfW*0.8, botY + perp_ny*halfW*0.8);
+    ctx.lineTo(botX - perp_nx*halfW*0.8, botY - perp_ny*halfW*0.8);
+    ctx.lineTo(botX - perp_nx*halfW*0.8 + ay_nx*fuelH, botY - perp_ny*halfW*0.8 + ay_ny*fuelH);
+    ctx.lineTo(botX + perp_nx*halfW*0.8 + ay_nx*fuelH, botY + perp_ny*halfW*0.8 + ay_ny*fuelH);
+    ctx.closePath(); ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+
+  // ── Nose cone ──
+  const noseH = hPx * 0.22;
+  const noseGrad = ctx.createLinearGradient(
+    topX + perp_nx*halfW, topY + perp_ny*halfW,
+    topX - perp_nx*halfW, topY - perp_ny*halfW
+  );
+  noseGrad.addColorStop(0, '#1a4060');
+  noseGrad.addColorStop(0.5, '#4aacee');
+  noseGrad.addColorStop(1, '#1a4060');
+  ctx.fillStyle = noseGrad;
+  ctx.strokeStyle = '#3a8acc';
+  ctx.lineWidth = 0.5;
+  ctx.beginPath();
+  ctx.moveTo(topX - perp_nx*halfW, topY - perp_ny*halfW);
+  ctx.lineTo(topX + perp_nx*halfW, topY + perp_ny*halfW);
+  ctx.lineTo(topX + ay_nx*noseH, topY + ay_ny*noseH);
+  ctx.closePath();
+  ctx.fill(); ctx.stroke();
+
+  // ── Grid fins (top) ──
+  const finW2 = halfW * 0.7, finH2 = hPx * 0.1;
+  ctx.fillStyle = '#1a3a55';
+  ctx.strokeStyle = '#2a5a80';
+  ctx.lineWidth = 0.5;
+  // Left fin
+  const finBaseL1 = { x: topX - perp_nx*halfW,    y: topY - perp_ny*halfW };
+  const finBaseL2 = { x: topX - perp_nx*halfW - ay_nx*finH2, y: topY - perp_ny*halfW - ay_ny*finH2 };
+  ctx.beginPath();
+  ctx.moveTo(finBaseL1.x, finBaseL1.y);
+  ctx.lineTo(finBaseL2.x, finBaseL2.y);
+  ctx.lineTo(finBaseL2.x - perp_nx*finW2, finBaseL2.y - perp_ny*finW2);
+  ctx.lineTo(finBaseL1.x - perp_nx*finW2, finBaseL1.y - perp_ny*finW2);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  // Right fin
+  ctx.beginPath();
+  ctx.moveTo(finBaseL1.x + perp_nx*2*halfW, finBaseL1.y + perp_ny*2*halfW);
+  ctx.lineTo(finBaseL2.x + perp_nx*2*halfW, finBaseL2.y + perp_ny*2*halfW);
+  ctx.lineTo(finBaseL2.x + perp_nx*(2*halfW+finW2), finBaseL2.y + perp_ny*(2*halfW+finW2));
+  ctx.lineTo(finBaseL1.x + perp_nx*(2*halfW+finW2), finBaseL1.y + perp_ny*(2*halfW+finW2));
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+
+  // ── Landing legs / base fins ──
+  const legH = hPx * 0.18, legW = halfW * 1.3;
+  ctx.fillStyle = '#152535';
+  ctx.strokeStyle = '#2a4a60';
+  ctx.lineWidth = 0.5;
+  // Left
+  ctx.beginPath();
+  ctx.moveTo(botX - perp_nx*halfW, botY - perp_ny*halfW);
+  ctx.lineTo(botX - perp_nx*halfW - ay_nx*legH, botY - perp_ny*halfW - ay_ny*legH);
+  ctx.lineTo(botX - perp_nx*(halfW+legW) - ay_nx*legH*0.1, botY - perp_ny*(halfW+legW) - ay_ny*legH*0.1);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  // Right
+  ctx.beginPath();
+  ctx.moveTo(botX + perp_nx*halfW, botY + perp_ny*halfW);
+  ctx.lineTo(botX + perp_nx*halfW - ay_nx*legH, botY + perp_ny*halfW - ay_ny*legH);
+  ctx.lineTo(botX + perp_nx*(halfW+legW) - ay_nx*legH*0.1, botY + perp_ny*(halfW+legW) - ay_ny*legH*0.1);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+
+  // ── RCS dots (if active) ──
+  const rcsActive = Object.values(ctrl.rcs).some(v=>v);
+  if (rcsActive && s.rcsFuelMass > 0) {
+    const rcsPosY = (hPx - comPx) * 0.9;
+    const rcsLeft  = { x: topX - perp_nx*halfW*1.1 - ay_nx*rcsPosY*0.4, y: topY - perp_ny*halfW*1.1 - ay_ny*rcsPosY*0.4 };
+    const rcsRight = { x: topX + perp_nx*halfW*1.1 - ay_nx*rcsPosY*0.4, y: topY + perp_ny*halfW*1.1 - ay_ny*rcsPosY*0.4 };
+    ctx.fillStyle = '#44ffff';
+    ctx.beginPath(); ctx.arc(rcsLeft.x, rcsLeft.y, 2.5, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(rcsRight.x, rcsRight.y, 2.5, 0, Math.PI*2); ctx.fill();
+  }
+
+  // ── CoM marker ──
+  if (opts.com) {
+    ctx.strokeStyle = '#cc44ff';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(px, py, 4, 0, Math.PI*2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(px-7,py); ctx.lineTo(px+7,py); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(px,py-7); ctx.lineTo(px,py+7); ctx.stroke();
+  }
+
+  ctx.restore();
+
+  // ── Thrust flame ──
+  if (s._thr > 0 && s.fuelMass > 0) {
+    const maxThr = parseFloat(document.getElementById('sl_mt').max) || 500000;
+    const thrFrac = Math.sqrt(s._thr / maxThr);  // sqrt for better visual scaling
+
+    // Nozzle exit point (bottom of rocket, offset by gimbal)
+    const gp = s._gp * Math.PI / 180;
+    const gy_r = s._gy * Math.PI / 180;
+    // Thrust vector body
+    const tBody = { x:Math.sin(gp), y:Math.cos(gp)*Math.cos(gy_r), z:-Math.sin(gy_r)*Math.cos(gp) };
+    const tWorld = rotateVec(R, tBody);
+    let tsa, tsb;
+    if      (axisA==='x' && axisB==='y') { tsa=tWorld.x; tsb=tWorld.y; }
+    else if (axisA==='z' && axisB==='y') { tsa=tWorld.z; tsb=tWorld.y; }
+    else if (axisA==='x' && axisB==='z') { tsa=tWorld.x; tsb=-tWorld.z; }
+
+    const nozzleX = botX;
+    const nozzleY = botY;
+    const flameLen = Math.min(hPx * 1.8 * thrFrac + 12, hPx * 2.5);
+    const flameEndX = nozzleX - tsa  * flameLen;
+    const flameEndY = nozzleY + tsb  * flameLen;
+
+    // Flame core
+    const fg = ctx.createLinearGradient(nozzleX, nozzleY, flameEndX, flameEndY);
+    fg.addColorStop(0,   'rgba(255,255,200,1)');
+    fg.addColorStop(0.1, 'rgba(255,180,50,0.95)');
+    fg.addColorStop(0.4, 'rgba(255,80,10,0.7)');
+    fg.addColorStop(0.75,'rgba(255,30,0,0.3)');
+    fg.addColorStop(1,   'rgba(180,0,0,0)');
+
+    ctx.save();
+    ctx.strokeStyle = fg;
+    ctx.lineWidth = Math.max(3, halfW * 0.55 * thrFrac);
+    ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(nozzleX,nozzleY); ctx.lineTo(flameEndX,flameEndY); ctx.stroke();
+    // Outer glow
+    ctx.globalAlpha = 0.3;
+    ctx.lineWidth = Math.max(6, halfW * 1.2 * thrFrac);
+    ctx.strokeStyle = '#ff4400';
+    ctx.beginPath(); ctx.moveTo(nozzleX,nozzleY); ctx.lineTo(flameEndX*0.6+nozzleX*0.4,flameEndY*0.6+nozzleY*0.4); ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.lineCap = 'butt';
+    ctx.restore();
+  }
+}
+
+// Draw force vectors
+function drawForces(ctx, s, cx, cy, scale, axisA, axisB, R) {
+  const px = cx + s[axisA] * scale;
+  const py = cy - s[axisB] * scale;
+  const maxF = Math.max(s._Fg, s._Ft, s._Frcs, 1);
+  const maxLen = Math.min((axisB==='z' ? cvs.xz.height : cvs.xy.height) * 0.18, 70);
+
+  function proj(v) {
+    let sa, sb;
+    if      (axisA==='x' && axisB==='y') { sa=v.x; sb=v.y; }
+    else if (axisA==='z' && axisB==='y') { sa=v.z; sb=v.y; }
+    else if (axisA==='x' && axisB==='z') { sa=v.x; sb=-v.z; }
+    else { sa=0; sb=0; }
+    return { sx: sa/maxF*maxLen, sy: -sb/maxF*maxLen };
+  }
+
+  function arrow(dx, dy, color, label) {
+    const len = Math.sqrt(dx*dx+dy*dy);
+    if (len < 0.5) return;
+    const ex=px+dx, ey=py+dy;
+    ctx.save();
+    ctx.strokeStyle=color; ctx.fillStyle=color;
+    ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.moveTo(px,py); ctx.lineTo(ex,ey); ctx.stroke();
+    const a=Math.atan2(dy,dx);
+    ctx.beginPath();
+    ctx.moveTo(ex,ey);
+    ctx.lineTo(ex-7*Math.cos(a-0.45),ey-7*Math.sin(a-0.45));
+    ctx.lineTo(ex-7*Math.cos(a+0.45),ey-7*Math.sin(a+0.45));
+    ctx.closePath(); ctx.fill();
+    if(label){
+      ctx.font='8px Share Tech Mono';
+      ctx.fillText(label,ex+3,ey-3);
+    }
+    ctx.restore();
+  }
+
+  // Gravity
+  const gp=proj({x:0,y:-s._Fg,z:0});
+  arrow(gp.sx,gp.sy,'#ff2244','Fg');
+
+  // Thrust
+  if(s._thr>0){
+    const gpa=s._gp*Math.PI/180, gya=s._gy*Math.PI/180;
+    const tb={x:Math.sin(gpa),y:Math.cos(gpa)*Math.cos(gya),z:-Math.sin(gya)*Math.cos(gpa)};
+    const tw=rotateVec(R,tb);
+    const tp=proj(scale3(tw,s._thr));
+    arrow(tp.sx,tp.sy,'#ff6b00','Ft');
+  }
+
+  // RCS
+  if(s._Frcs>0.1){
+    const rp=proj({x:s._Fnx-s._Fg*0+s._Fnx*0,y:0,z:0}); // simplified — show net in view
+    // Actually show world-frame RCS force
+    const F_rcs_world_approx = {
+      x:s._Fnx-(s._Ft>0?(rotateVec(R,{x:Math.sin(s._gp*Math.PI/180),y:Math.cos(s._gp*Math.PI/180)*Math.cos(s._gy*Math.PI/180),z:-Math.sin(s._gy*Math.PI/180)*Math.cos(s._gp*Math.PI/180)}).x*s._Ft):0),
+      y:s._Fny-(-s._Fg)-(s._Ft>0?(rotateVec(R,{x:Math.sin(s._gp*Math.PI/180),y:Math.cos(s._gp*Math.PI/180)*Math.cos(s._gy*Math.PI/180),z:-Math.sin(s._gy*Math.PI/180)*Math.cos(s._gp*Math.PI/180)}).y*s._Ft):0),
+      z:s._Fnz-(s._Ft>0?(rotateVec(R,{x:Math.sin(s._gp*Math.PI/180),y:Math.cos(s._gp*Math.PI/180)*Math.cos(s._gy*Math.PI/180),z:-Math.sin(s._gy*Math.PI/180)*Math.cos(s._gp*Math.PI/180)}).z*s._Ft):0),
+    };
+    const rp2=proj(scale3(norm3({x:F_rcs_world_approx.x||0,y:F_rcs_world_approx.y||0,z:F_rcs_world_approx.z||0}),s._Frcs));
+    arrow(rp2.sx,rp2.sy,'#44ffff','Fr');
+  }
+
+  // Drag
+  if(opts.drag && s._Fd>0.1){
+    const vMag=Math.sqrt(s.vx**2+s.vy**2+s.vz**2);
+    if(vMag>0){
+      const dp=proj({x:-s._Fd*s.vx/vMag,y:-s._Fd*s.vy/vMag,z:-s._Fd*s.vz/vMag});
+      arrow(dp.sx,dp.sy,'#00d4ff','Fd');
+    }
+  }
+
+  // Net force
+  const np=proj({x:s._Fnx,y:s._Fny,z:s._Fnz});
+  arrow(np.sx,np.sy,'#00ff88','Fn');
+
+  // Velocity
+  if(opts.vel){
+    const vMag=Math.sqrt(s.vx**2+s.vy**2+s.vz**2);
+    if(vMag>0.1){
+      const vLen=Math.min(vMag*scale*0.3,maxLen*1.5);
+      const vp=proj({x:s.vx,y:s.vy,z:s.vz});
+      const vn=Math.sqrt(vp.sx**2+vp.sy**2)||1;
+      arrow(vp.sx/vn*vLen,vp.sy/vn*vLen,'#ffcc00','V');
+    }
+  }
+}
+
+function drawFrame() {
+  const s = state;
+  const scale = getScale(s);
+  const R = quatToR({ w: s.qw, x: s.qx, y: s.qy, z: s.qz });
+
+  // Impact prediction
+  const impact = predictImpact();
+
+  // ── XY view (front: X horizontal, Y vertical) ──
+  {
+    const ctx = ctxs.xy;
+    const W = cvs.xy.width, H = cvs.xy.height;
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = '#010810';
+    ctx.fillRect(0, 0, W, H);
+
+    // Rocket stays at screen center horizontally and vertically
+    const rocketScreenX = W * 0.5;
+    const rocketScreenY = H * 0.5;
+    // cx: world X=0 maps to screen X (so rocket at s.x → rocketScreenX)
+    const cx = rocketScreenX - s.x * scale;
+    // Ground (world Y=0) is below rocket
+    const groundScreenY = rocketScreenY + s.y * scale;
+
+    if (opts.grid) drawGrid(ctx, W, H, cx, groundScreenY, scale, 0);
+
+    // Ground fill (only if ground is visible on screen)
+    if (groundScreenY < H) {
+      ctx.fillStyle = 'rgba(0,255,136,0.06)';
+      ctx.fillRect(0, groundScreenY, W, H - groundScreenY);
+    }
+
+    // Trajectory
+    if (opts.traj && trajectory.length > 1) {
+      ctx.strokeStyle = 'rgba(0,212,255,0.55)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      trajectory.forEach((p,i) => {
+        const px2 = cx + p.x * scale;
+        const py2 = groundScreenY - p.y * scale;
+        if (i===0) ctx.moveTo(px2,py2); else ctx.lineTo(px2,py2);
+      });
+      ctx.stroke();
+    }
+
+    // Impact line — from rocket CoM to impact point on ground
+    if (opts.impact && impact) {
+      // impact.x is fixed world coord — position relative to rocket on screen
+      const ipx = rocketScreenX + (impact.x - s.x) * scale;
+      const ipy = groundScreenY;
+      // Dashed line from rocket to impact point
+      ctx.save();
+      ctx.setLineDash([5, 4]);
+      ctx.strokeStyle = 'rgba(255,34,68,0.85)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(rocketScreenX, rocketScreenY);
+      ctx.lineTo(ipx, ipy);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      // X marker on ground at impact
+      ctx.strokeStyle = '#ff2244';
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(ipx-8, ipy); ctx.lineTo(ipx+8, ipy); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(ipx, ipy-8); ctx.lineTo(ipx, ipy+8); ctx.stroke();
+      ctx.font='8px Share Tech Mono'; ctx.fillStyle='#ff2244';
+      ctx.fillText('IMPACT', ipx+5, ipy - 4);
+      ctx.restore();
+    }
+
+    if (opts.forces) drawForces(ctx, s, cx, groundScreenY, scale, 'x', 'y', R);
+    drawRocket2D(ctx, s, cx, groundScreenY, scale, 'x', 'y', R);
+
+    // Torque arc
+    if (opts.torq) {
+      const torqZ = s._torqTz + s._torqRz;
+      if (Math.abs(torqZ) > 0.1) {
+        const rpx = rocketScreenX;
+        const rpy = rocketScreenY;
+        ctx.strokeStyle = 'rgba(255,68,170,0.7)';
+        ctx.lineWidth = 2;
+        const arcR = Math.max(s.H*scale*0.65, 12);
+        const arcSpan = Math.min(Math.abs(torqZ)/Math.max(s.Izz,1) * 20, Math.PI*0.6);
+        ctx.beginPath();
+        ctx.arc(rpx, rpy, arcR, -Math.PI/2, -Math.PI/2 + (torqZ>0 ? arcSpan : -arcSpan));
+        ctx.stroke();
+        ctx.fillStyle='#ff44aa';
+        const endA = -Math.PI/2 + (torqZ>0 ? arcSpan : -arcSpan);
+        ctx.beginPath();
+        ctx.arc(rpx+arcR*Math.cos(endA), rpy+arcR*Math.sin(endA), 3, 0, Math.PI*2);
+        ctx.fill();
+      }
+    }
+
+    // Scale bar
+    const barLen = 100;  // 100m
+    ctx.fillStyle = 'rgba(0,212,255,0.6)';
+    ctx.fillRect(12, H-14, barLen*scale, 2);
+    ctx.font='8px Share Tech Mono'; ctx.fillStyle='rgba(168,216,234,0.7)';
+    ctx.fillText('100m', 12, H-4);
+
+    // Velocity inclination angle
+    const vMag = Math.sqrt(s.vx**2+s.vy**2+s.vz**2);
+    if (vMag > 0.1) {
+      const incl = Math.atan2(s.vy, Math.sqrt(s.vx**2+s.vz**2))*180/Math.PI;
+      ctx.fillStyle='rgba(255,204,0,0.85)'; ctx.font='9px Orbitron,monospace';
+      ctx.fillText(`γ=${incl.toFixed(1)}°`, W-90, 18);
+    }
+    // Attitude angles overlay (extracted from quaternion for display)
+    ctx.fillStyle='rgba(255,107,0,0.75)'; ctx.font='8px Share Tech Mono';
+    const xyEuler = quatToEuler({ w: s.qw, x: s.qx, y: s.qy, z: s.qz });
+    ctx.fillText(`p=${(xyEuler.pitch*180/Math.PI).toFixed(1)}° y=${(xyEuler.yaw*180/Math.PI).toFixed(1)}° r=${(xyEuler.roll*180/Math.PI).toFixed(1)}°`, 8, 16);
+  }
+
+  // ── ZY view (side: Z horizontal, Y vertical) ──
+  {
+    const ctx = ctxs.zy;
+    const W = cvs.zy.width, H = cvs.zy.height;
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle='#010810'; ctx.fillRect(0,0,W,H);
+
+    const rocketScreenX = W * 0.5;
+    const rocketScreenY = H * 0.5;
+    const cx = rocketScreenX - s.z*scale;
+    const groundScreenY = rocketScreenY + s.y*scale;
+
+    if (opts.grid) drawGrid(ctx,W,H,cx,groundScreenY,scale,0);
+    if (groundScreenY < H) {
+      ctx.fillStyle='rgba(0,255,136,0.05)';
+      ctx.fillRect(0,groundScreenY,W,H-groundScreenY);
+    }
+
+    if (opts.traj && trajectory.length>1) {
+      ctx.strokeStyle='rgba(0,255,136,0.45)'; ctx.lineWidth=1;
+      ctx.beginPath();
+      trajectory.forEach((p,i)=>{
+        const px2=cx+p.z*scale, py2=groundScreenY-p.y*scale;
+        if(i===0) ctx.moveTo(px2,py2); else ctx.lineTo(px2,py2);
+      });
+      ctx.stroke();
+    }
+
+    if(opts.impact && impact){
+      const ipz = rocketScreenX + (impact.z - s.z) * scale;
+      const ipy = groundScreenY;
+      ctx.save();
+      ctx.setLineDash([5,4]);
+      ctx.strokeStyle='rgba(255,34,68,0.85)'; ctx.lineWidth=1.5;
+      ctx.beginPath(); ctx.moveTo(rocketScreenX, rocketScreenY); ctx.lineTo(ipz, ipy); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.strokeStyle='#ff2244'; ctx.lineWidth=2;
+      ctx.beginPath(); ctx.moveTo(ipz-8,ipy); ctx.lineTo(ipz+8,ipy); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(ipz,ipy-8); ctx.lineTo(ipz,ipy+8); ctx.stroke();
+      ctx.restore();
+    }
+
+    if(opts.forces) drawForces(ctx,s,cx,groundScreenY,scale,'z','y',R);
+    drawRocket2D(ctx,s,cx,groundScreenY,scale,'z','y',R);
+
+    // Torque arc
+    if(opts.torq){
+      const torqX=s._torqTx+s._torqRx;
+      if(Math.abs(torqX)>0.1){
+        ctx.strokeStyle='rgba(255,68,170,0.7)'; ctx.lineWidth=2;
+        const arcR=Math.max(s.H*scale*0.65,12);
+        const arcSpan=Math.min(Math.abs(torqX)/Math.max(s.Ixx,1)*20,Math.PI*0.6);
+        ctx.beginPath();
+        ctx.arc(rocketScreenX,rocketScreenY,arcR,-Math.PI/2,-Math.PI/2+(torqX>0?arcSpan:-arcSpan));
+        ctx.stroke();
+      }
+    }
+
+    const barLen=100;
+    ctx.fillStyle='rgba(0,255,136,0.6)';
+    ctx.fillRect(12,H-14,barLen*scale,2);
+    ctx.font='8px Share Tech Mono'; ctx.fillStyle='rgba(168,216,234,0.7)';
+    ctx.fillText('100m',12,H-4);
+    ctx.fillStyle='rgba(255,107,0,0.75)'; ctx.font='8px Share Tech Mono';
+    const zyEuler = quatToEuler({ w: s.qw, x: s.qx, y: s.qy, z: s.qz });
+    ctx.fillText(`Yaw=${(zyEuler.yaw*180/Math.PI).toFixed(1)}°`,8,16);
+  }
+
+  // ── XZ view (top: X horizontal, Z vertical downward) ──
+  {
+    const ctx = ctxs.xz;
+    const W = cvs.xz.width, H = cvs.xz.height;
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle='#010810'; ctx.fillRect(0,0,W,H);
+
+    const cx = W*0.5 - s.x*scale;
+    const cy = H*0.5 + s.z*scale;
+
+    // Grid
+    if(opts.grid){
+      ctx.strokeStyle='rgba(10,40,64,0.6)'; ctx.lineWidth=0.5;
+      let step=10;
+      if(step*scale<15) step=50; if(step*scale<15) step=100; if(step*scale<15) step=500;
+      if(step*scale>100) step=5;
+      const ox=cx, oy=cy;
+      for(let gx=Math.floor(-ox/scale/step)*step; gx<Math.ceil((W-ox)/scale/step)*step; gx+=step){
+        const px2=ox+gx*scale; ctx.beginPath(); ctx.moveTo(px2,0); ctx.lineTo(px2,H); ctx.stroke();
+      }
+      for(let gz=Math.floor(-oy/scale/step)*step; gz<Math.ceil((H-oy)/scale/step)*step; gz+=step){
+        const py2=oy+gz*scale; ctx.beginPath(); ctx.moveTo(0,py2); ctx.lineTo(W,py2); ctx.stroke();
+      }
+      ctx.strokeStyle='rgba(0,212,255,0.3)'; ctx.lineWidth=1;
+      ctx.beginPath(); ctx.moveTo(cx,0); ctx.lineTo(cx,H); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0,cy); ctx.lineTo(W,cy); ctx.stroke();
+    }
+
+    // Trajectory top view
+    if(opts.traj && trajectory.length>1){
+      ctx.strokeStyle='rgba(255,204,0,0.5)'; ctx.lineWidth=1;
+      ctx.beginPath();
+      trajectory.forEach((p,i)=>{
+        const px2=cx+p.x*scale, py2=cy-p.z*scale;
+        if(i===0) ctx.moveTo(px2,py2); else ctx.lineTo(px2,py2);
+      });
+      ctx.stroke();
+    }
+
+    const rx=cx+s.x*scale, rz=cy-s.z*scale;
+
+    // Impact
+    if(opts.impact&&impact){
+      const ix=cx+impact.x*scale, iz=cy-impact.z*scale;
+      // Dashed line from rocket to impact
+      ctx.save();
+      ctx.setLineDash([5,4]);
+      ctx.strokeStyle='rgba(255,34,68,0.85)'; ctx.lineWidth=1.5;
+      ctx.beginPath(); ctx.moveTo(rx,rz); ctx.lineTo(ix,iz); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+      // Marker
+      ctx.strokeStyle='#ff2244'; ctx.lineWidth=2;
+      ctx.beginPath(); ctx.arc(ix,iz,7,0,Math.PI*2); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(ix-12,iz); ctx.lineTo(ix+12,iz); ctx.moveTo(ix,iz-12); ctx.lineTo(ix,iz+12); ctx.stroke();
+      ctx.font='8px Share Tech Mono'; ctx.fillStyle='#ff2244';
+      ctx.fillText('IMP',ix+8,iz-5);
+    }
+
+    // Rocket top-down view
+    const rW2 = Math.max(s.W*scale*0.5,3);
+    const rH2 = Math.max(s.H*scale*0.5,6);
+    // Heading projected onto XZ plane
+    const headX = R[0][1];  // body Y x-component
+    const headZ = R[2][1];  // body Y z-component
+    const headAng = Math.atan2(headX, headZ);
+
+    ctx.save();
+    ctx.translate(rx,rz);
+    ctx.rotate(headAng);
+    // Body shadow
+    ctx.fillStyle='rgba(42,96,144,0.4)';
+    ctx.beginPath(); ctx.ellipse(4,4,rW2,rH2,0,0,Math.PI*2); ctx.fill();
+    // Body
+    ctx.fillStyle='#2a6090';
+    ctx.beginPath(); ctx.ellipse(0,0,rW2,rH2,0,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle='#3a8acc'; ctx.lineWidth=1; ctx.stroke();
+    // Nose direction
+    ctx.strokeStyle='#ff6b00'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(0,-rH2*1.6); ctx.stroke();
+    ctx.fillStyle='#ff6b00';
+    ctx.beginPath(); ctx.moveTo(0,-rH2*1.6); ctx.lineTo(-3,-rH2*0.9); ctx.lineTo(3,-rH2*0.9); ctx.closePath(); ctx.fill();
+    // CoM
+    if(opts.com){
+      ctx.strokeStyle='#cc44ff'; ctx.lineWidth=1.5;
+      ctx.beginPath(); ctx.arc(0,0,3,0,Math.PI*2); ctx.stroke();
+    }
+    ctx.restore();
+
+    // Velocity vector (XZ)
+    if(opts.vel){
+      const vXZ=Math.sqrt(s.vx**2+s.vz**2);
+      if(vXZ>0.1){
+        const vLen=Math.min(vXZ*scale*0.4,60);
+        ctx.strokeStyle='#ffcc00'; ctx.lineWidth=1.5;
+        ctx.beginPath(); ctx.moveTo(rx,rz); ctx.lineTo(rx+s.vx/vXZ*vLen,rz-s.vz/vXZ*vLen); ctx.stroke();
+        // arrow
+        const va=Math.atan2(-s.vz/vXZ*vLen,s.vx/vXZ*vLen);
+        const vex=rx+s.vx/vXZ*vLen, vez=rz-s.vz/vXZ*vLen;
+        ctx.fillStyle='#ffcc00';
+        ctx.beginPath();
+        ctx.moveTo(vex,vez);
+        ctx.lineTo(vex-6*Math.cos(va-0.4),vez-6*Math.sin(va-0.4));
+        ctx.lineTo(vex-6*Math.cos(va+0.4),vez-6*Math.sin(va+0.4));
+        ctx.closePath(); ctx.fill();
+      }
+    }
+
+    // Scale bar
+    ctx.fillStyle='rgba(255,204,0,0.6)';
+    ctx.fillRect(12,H-14,100*scale,2);
+    ctx.font='8px Share Tech Mono'; ctx.fillStyle='rgba(168,216,234,0.7)';
+    ctx.fillText('100m',12,H-4);
+    ctx.fillStyle='rgba(255,107,0,0.75)'; ctx.font='8px Share Tech Mono';
+    const hdgEuler = quatToEuler({ w: s.qw, x: s.qx, y: s.qy, z: s.qz });
+    ctx.fillText(`Hdg=${(hdgEuler.yaw*180/Math.PI).toFixed(1)}°`,8,16);
+  }
+}
+
+// ──────────────────────────────────────
+//   UPDATE DATA PANEL
+// ──────────────────────────────────────
+function updateDataPanel() {
+  const s = state;
+  const r2d = 180/Math.PI;
+  const vMag = Math.sqrt(s.vx*s.vx+s.vy*s.vy+s.vz*s.vz);
+  const aMag = Math.sqrt(s.ax*s.ax+s.ay*s.ay+s.az*s.az);
+
+  function set(id,v) { const el=document.getElementById(id); if(el) el.textContent=v; }
+
+  set('d_x', s.x.toFixed(2));
+  set('d_y', s.y.toFixed(2));
+  set('d_z', s.z.toFixed(2));
+  set('d_vx', s.vx.toFixed(3));
+  set('d_vy', s.vy.toFixed(3));
+  set('d_vz', s.vz.toFixed(3));
+  set('d_vmod', vMag.toFixed(3));
+  set('d_ax', s.ax.toFixed(4));
+  set('d_ay', s.ay.toFixed(4));
+  set('d_az', s.az.toFixed(4));
+  set('d_amod', aMag.toFixed(4));
+
+  // Extract Euler angles from quaternion for display only
+  const euler = quatToEuler({ w: s.qw, x: s.qx, y: s.qy, z: s.qz });
+
+  set('d_roll',  (euler.roll  * r2d).toFixed(3));
+  set('d_pitch', (euler.pitch * r2d).toFixed(3));
+  set('d_yaw',   (euler.yaw   * r2d).toFixed(3));
+  set('d_wx',  (s.wx  * r2d).toFixed(3));
+  set('d_wy',  (s.wy  * r2d).toFixed(3));
+  set('d_wz',  (s.wz  * r2d).toFixed(3));
+  set('d_alx', (s.alx * r2d).toFixed(4));
+  set('d_aly', (s.aly * r2d).toFixed(4));
+  set('d_alz', (s.alz * r2d).toFixed(4));
+
+  set('d_fg',  s._Fg.toFixed(1));
+  set('d_ft',  s._Ft.toFixed(1));
+  set('d_fd',  s._Fd.toFixed(3));
+  set('d_frcs',s._Frcs.toFixed(1));
+  set('d_fnx', s._Fnx.toFixed(2));
+  set('d_fny', s._Fny.toFixed(2));
+  set('d_fnz', s._Fnz.toFixed(2));
+
+  set('d_ttx', s._torqTx.toFixed(2));
+  set('d_tty', s._torqTy.toFixed(2));
+  set('d_ttz', s._torqTz.toFixed(2));
+  set('d_trx', s._torqRx.toFixed(2));
+  set('d_try', s._torqRy.toFixed(2));
+  set('d_trz', s._torqRz.toFixed(2));
+  set('d_tnx', (s._torqTx+s._torqRx).toFixed(2));
+  set('d_tny', (s._torqTy+s._torqRy).toFixed(2));
+  set('d_tnz', (s._torqTz+s._torqRz).toFixed(2));
+
+  set('d_mass', s.mass.toFixed(1));
+  set('d_fuel', s.fuelMass.toFixed(1));
+  set('d_rcsfuel', s.rcsFuelMass.toFixed(1));
+  set('d_com',  s.comH.toFixed(3));
+  set('d_mdot', s._mdot.toFixed(4));
+  set('d_mdotrcs', s._mdotrcs.toFixed(4));
+  set('d_ixx',  s.Ixx.toFixed(1));
+  set('d_iyy',  s.Iyy.toFixed(1));
+  set('d_izz',  s.Izz.toFixed(1));
+
+  set('d_alt',   Math.max(0,s.y).toFixed(2));
+  set('d_range', s.x.toFixed(2));
+  set('d_cross', s.z.toFixed(2));
+  set('d_time',  simTime.toFixed(2));
+  if (maxAlt < s.y) maxAlt = s.y;
+  set('d_maxAlt', maxAlt.toFixed(2));
+
+  // Inclination angle
+  if (vMag > 0.01) {
+    const incl = Math.atan2(s.vy, Math.sqrt(s.vx*s.vx+s.vz*s.vz)) * r2d;
+    set('d_incl', incl.toFixed(2));
+  }
+
+  // Impact prediction
+  const imp = predictImpact();
+  set('d_impX', imp ? imp.x.toFixed(1) : '—');
+  set('d_impZ', imp ? imp.z.toFixed(1) : '—');
+
+  // Fuel bars
+  const fuelFrac = s.fuelMassInit > 0 ? s.fuelMass/s.fuelMassInit : 0;
+  const rcsFrac  = s.rcsFuelMassInit > 0 ? s.rcsFuelMass/s.rcsFuelMassInit : 0;
+  const fbEl  = document.getElementById('fuelBar');
+  const rfbEl = document.getElementById('rcsFuelBar');
+  const rfb2El= document.getElementById('rcsFuelBar2');
+  if (fbEl)  fbEl.style.width  = (fuelFrac*100).toFixed(1)+'%';
+  if (rfbEl) rfbEl.style.width = (rcsFrac*100).toFixed(1)+'%';
+  if (rfb2El) rfb2El.style.width = (rcsFrac*100).toFixed(1)+'%';
+
+  set('d_fuelTotal', s.fuelMassInit.toFixed(0)+' kg');
+  set('d_fuelRem',   s.fuelMass.toFixed(1)+' kg');
+  set('d_rcsFuelRem',s.rcsFuelMass.toFixed(1)+' kg');
+  set('d_mdot2',     s._mdot.toFixed(4));
+  set('d_ve2',       s.Ve_MAIN.toFixed(0));
+  set('d_rcsmdot2',  s._mdotrcs.toFixed(4));
+  set('d_ve',        s.Ve_MAIN.toFixed(0));
+  set('d_vercs',     Ve_RCS.toFixed(0));
+  set('d_thr',       s._thr.toFixed(1));
+  set('d_gp',        s._gp.toFixed(1));
+  set('d_gy',        s._gy.toFixed(1));
+
+  // Propulsion summary (right panel fuel section)
+  set('rcsFuelPct',  (rcsFrac*100).toFixed(0)+'%');
+
+  // Time
+  const mins = Math.floor(simTime/60).toString().padStart(2,'0');
+  const secs = Math.floor(simTime%60).toString().padStart(2,'0');
+  const tenths = Math.floor((simTime*10)%10);
+  set('timeDisplay', `T+${mins}:${secs}.${tenths}`);
+
+  // Color coding for danger
+  const fuelEl = document.getElementById('d_fuel');
+  if (fuelEl) {
+    fuelEl.className = 'val' + (fuelFrac < 0.1 ? ' danger' : fuelFrac < 0.25 ? ' warn' : '');
+  }
+}
+
+let _frameCount = 0;
+function loop(timestamp) {
+  if (!running) return;
+  if (lastTs === null) lastTs = timestamp;
+  let dt = (timestamp - lastTs) / 1000;
+  lastTs = timestamp;
+  dt = Math.min(dt, 0.05);
+
+  const speed = parseFloat(document.getElementById('simSpeed').value) || 1;
+  dt *= speed;
+
+  // Sub-stepping for accuracy (4 steps is plenty for visual sim)
+  const steps = 4;
+  const subDt = dt / steps;
+  for (let i=0; i<steps; i++) {
+    physicsStep(subDt);
+    simTime += subDt;
+    if (state.crashed) break;
+  }
+
+  // Record trajectory
+  const last = trajectory[trajectory.length-1];
+  if (!last || simTime - (trajectory._lastT||0) > 0.1) {
+    trajectory.push({x:state.x, y:state.y, z:state.z});
+    trajectory._lastT = simTime;
+    if (trajectory.length > 3000) trajectory.splice(0,200);
+  }
+
+  drawFrame();
+  _frameCount++;
+  if (_frameCount % 3 === 0) updateDataPanel();
+
+  if (state.crashed) {
+    updateDataPanel();
+    updateStatusUI('crashed');
+  } else {
+    animId = requestAnimationFrame(loop);
+  }
+}
+
+// ──────────────────────────────────────
+//   SIMULATION CONTROL
+// ──────────────────────────────────────
+function startSim() {
+  if (running) return;
+  if (state.crashed) resetSim();
+  running = true;
+  lastTs = null;
+  updateStatusUI('running');
+  animId = requestAnimationFrame(loop);
+}
+
+function stopSim() {
+  running = false;
+  if (animId) cancelAnimationFrame(animId);
+  animId = null;
+  lastTs = null;
+  updateStatusUI('stopped');
+}
+
+function resetSim() {
+  stopSim();
+  simTime = 0;
+  maxAlt = 0;
+  trajectory = [];
+  frozenImpact = null;
+  state = buildInitState();
+  ctrl.mainThrust = 0;
+  ctrl.gimbalPitch = 0;
+  ctrl.gimbalYaw   = 0;
+  document.getElementById('sl_mt').value = 0;
+  document.getElementById('sl_gp').value = 0;
+  document.getElementById('sl_gy').value = 0;
+  document.getElementById('lbl_mt').textContent = '0';
+  document.getElementById('lbl_gp').textContent = '0.0';
+  document.getElementById('lbl_gy').textContent = '0.0';
+  document.getElementById('needle_gp').style.transform = 'translateX(-50%) rotate(0deg)';
+  document.getElementById('needle_gy').style.transform = 'translateX(-50%) rotate(0deg)';
+  updateStatusUI('stopped');
+  drawFrame();
+  updateDataPanel();
+}
+
+function updateStatusUI(state_str) {
+  const dot  = document.getElementById('statusDot');
+  const text = document.getElementById('statusText');
+  dot.className = 'dot';
+  if (state_str==='running') { dot.classList.add('active');  text.textContent='RUNNING'; }
+  else if (state_str==='crashed') { dot.classList.add('crashed'); text.textContent='CRASHED'; }
+  else { dot.classList.add('stopped'); text.textContent='STOPPED'; }
+}
+
+// ──────────────────────────────────────
+//   THRUSTER CONTROLS
+// ──────────────────────────────────────
+function updateThrusters() {
+  ctrl.mainThrust  = parseFloat(document.getElementById('sl_mt').value);
+  ctrl.gimbalPitch = parseFloat(document.getElementById('sl_gp').value);
+  ctrl.gimbalYaw   = parseFloat(document.getElementById('sl_gy').value);
+  ctrl.rcsForce    = parseFloat(document.getElementById('sl_rcsf').value);
+  document.getElementById('lbl_mt').textContent = ctrl.mainThrust.toFixed(0);
+  document.getElementById('lbl_gp').textContent = ctrl.gimbalPitch.toFixed(1);
+  document.getElementById('lbl_gy').textContent = ctrl.gimbalYaw.toFixed(1);
+  document.getElementById('lbl_rcsf').textContent = ctrl.rcsForce.toFixed(0);
+  document.getElementById('needle_gp').style.transform = `translateX(-50%) rotate(${ctrl.gimbalPitch*4}deg)`;
+  document.getElementById('needle_gy').style.transform = `translateX(-50%) rotate(${ctrl.gimbalYaw*4}deg)`;
+  document.getElementById('nd_gp').textContent = ctrl.gimbalPitch.toFixed(1)+'°';
+  document.getElementById('nd_gy').textContent = ctrl.gimbalYaw.toFixed(1)+'°';
+  if (!running) { drawFrame(); updateDataPanel(); }
+}
+
+// ──────────────────────────────────────
+//   INIT CONFIG CONTROLS
+// ──────────────────────────────────────
+function updateInitConfig() {
+  initCfg.dryMass     = parseFloat(document.getElementById('sl_mass').value);
+  initCfg.fuelMass    = parseFloat(document.getElementById('sl_fuel').value);
+  initCfg.rocketH     = parseFloat(document.getElementById('sl_rh').value);
+  initCfg.rocketW     = parseFloat(document.getElementById('sl_rw').value);
+  initCfg.initPitch   = parseFloat(document.getElementById('sl_ang').value);
+  initCfg.initYaw     = parseFloat(document.getElementById('sl_yaw').value);
+  initCfg.gravity     = parseFloat(document.getElementById('sl_grav').value);
+  initCfg.initAlt     = parseFloat(document.getElementById('sl_initAlt').value);
+  initCfg.initVx      = parseFloat(document.getElementById('sl_initVx').value);
+  initCfg.initVz      = parseFloat(document.getElementById('sl_initVz').value);
+  initCfg.Ve_MAIN     = parseFloat(document.getElementById('sl_ve').value);
+
+  document.getElementById('lbl_mass').textContent  = initCfg.dryMass;
+  document.getElementById('lbl_fuel').textContent  = initCfg.fuelMass;
+  document.getElementById('lbl_rh').textContent    = initCfg.rocketH;
+  document.getElementById('lbl_rw').textContent    = initCfg.rocketW;
+  document.getElementById('lbl_ang').textContent   = initCfg.initPitch;
+  document.getElementById('lbl_yaw').textContent   = initCfg.initYaw;
+  document.getElementById('lbl_grav').textContent  = initCfg.gravity;
+  document.getElementById('lbl_initAlt').textContent = initCfg.initAlt;
+  document.getElementById('lbl_initVx').textContent  = initCfg.initVx;
+  document.getElementById('lbl_initVz').textContent  = initCfg.initVz;
+  document.getElementById('lbl_ve').textContent    = initCfg.Ve_MAIN;
+
+  if (!running) {
+    state = buildInitState();
+    drawFrame();
+    updateDataPanel();
+  }
+}
+
+// ──────────────────────────────────────
+//   TOGGLES
+// ──────────────────────────────────────
+function toggleOpt(key) {
+  opts[key] = !opts[key];
+  const el = document.getElementById('tog_' + key);
+  if (el) { if(opts[key]) el.classList.add('on'); else el.classList.remove('on'); }
+  if (!running) { drawFrame(); }
+}
+
+// ──────────────────────────────────────
+//   RCS BUTTONS
+// ──────────────────────────────────────
+function rcsPress(jet) {
+  ctrl.rcs[jet] = true;
+  const el = document.getElementById('rcsBtn_' + jet);
+  if (el) el.classList.add('active');
+}
+function rcsRelease(jet) {
+  ctrl.rcs[jet] = false;
+  const el = document.getElementById('rcsBtn_' + jet);
+  if (el) el.classList.remove('active');
+}
+
+// ──────────────────────────────────────
+//   KEYBOARD
+// ──────────────────────────────────────
+const keysDown = new Set();
+document.addEventListener('keydown', (e) => {
+  if (keysDown.has(e.code)) return;
+  keysDown.add(e.code);
+  switch(e.code) {
+    case 'Space': e.preventDefault(); running ? stopSim() : startSim(); break;
+    case 'KeyR': resetSim(); break;
+    case 'ArrowUp':
+      e.preventDefault();
+      document.getElementById('sl_mt').value = Math.min(500000, ctrl.mainThrust + 5000);
+      updateThrusters(); break;
+    case 'ArrowDown':
+      e.preventDefault();
+      document.getElementById('sl_mt').value = Math.max(0, ctrl.mainThrust - 5000);
+      updateThrusters(); break;
+    case 'KeyW':
+      document.getElementById('sl_gp').value = Math.min(20, ctrl.gimbalPitch + 0.5);
+      updateThrusters(); break;
+    case 'KeyS':
+      document.getElementById('sl_gp').value = Math.max(-20, ctrl.gimbalPitch - 0.5);
+      updateThrusters(); break;
+    case 'KeyA':
+      document.getElementById('sl_gy').value = Math.min(20, ctrl.gimbalYaw + 0.5);
+      updateThrusters(); break;
+    case 'KeyD':
+      document.getElementById('sl_gy').value = Math.max(-20, ctrl.gimbalYaw - 0.5);
+      updateThrusters(); break;
+    // RCS
+    case 'KeyI': rcsPress('rpitch'); break;
+    case 'KeyK': rcsPress('lpitch'); break;
+    case 'KeyJ': rcsPress('ryaw');   break;
+    case 'KeyL': rcsPress('lyaw');   break;
+    case 'KeyQ': rcsPress('rroll');  break;
+    case 'KeyE': rcsPress('lroll');  break;
+    case 'Numpad4': case 'ArrowLeft': e.preventDefault(); rcsPress('nx'); break;
+    case 'Numpad6': rcsPress('px'); break;
+    case 'Numpad8': rcsPress('pz'); break;
+    case 'Numpad2': rcsPress('nz'); break;
+  }
+});
+
+document.addEventListener('keyup', (e) => {
+  keysDown.delete(e.code);
+  switch(e.code) {
+    case 'KeyI': rcsRelease('rpitch'); break;
+    case 'KeyK': rcsRelease('lpitch'); break;
+    case 'KeyJ': rcsRelease('ryaw');   break;
+    case 'KeyL': rcsRelease('lyaw');   break;
+    case 'KeyQ': rcsRelease('rroll');  break;
+    case 'KeyE': rcsRelease('lroll');  break;
+    case 'Numpad4': case 'ArrowLeft': rcsRelease('nx'); break;
+    case 'Numpad6': rcsRelease('px'); break;
+    case 'Numpad8': rcsRelease('pz'); break;
+    case 'Numpad2': rcsRelease('nz'); break;
+  }
+});
+
+// ──────────────────────────────────────
+//   INIT
+// ──────────────────────────────────────
+initCanvasSizes();
+state = buildInitState();
+updateInitConfig();
+updateThrusters();
+drawFrame();
+updateDataPanel();
+updateStatusUI('stopped');
+</script>
+</body>
+</html>
