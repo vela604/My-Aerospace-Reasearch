@@ -1,0 +1,1559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>2D Rocket Landing Sim</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap');
+:root{
+  --bg:#030b14;--panel:#050f1c;--border:#0a2840;
+  --accent:#00d4ff;--accent2:#ff6b00;--accent3:#00ff88;
+  --warn:#ffcc00;--danger:#ff2244;--purple:#cc44ff;
+  --text:#a8d8ea;--dim:#3a5a6a;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:'Share Tech Mono',monospace;display:flex;flex-direction:column;height:100vh;overflow:hidden;}
+header{background:var(--panel);border-bottom:2px solid var(--border);padding:5px 14px;display:flex;align-items:center;gap:16px;flex-shrink:0;}
+header h1{font-family:'Orbitron',sans-serif;font-size:12px;font-weight:900;color:var(--accent);letter-spacing:3px;}
+.status-bar{display:flex;gap:14px;margin-left:auto;align-items:center;font-size:10px;}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--dim);display:inline-block;margin-right:4px;}
+.dot.active{background:var(--accent3);box-shadow:0 0 6px var(--accent3);animation:pulse 1s infinite;}
+.dot.stopped{background:var(--warn);}
+.dot.crashed{background:var(--danger);}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.time-display{font-family:'Orbitron',sans-serif;font-size:15px;color:var(--accent);letter-spacing:3px;}
+.main-layout{display:flex;flex:1;overflow:hidden;}
+.left-panel,.right-panel{width:198px;flex-shrink:0;background:var(--panel);display:flex;flex-direction:column;overflow-y:auto;padding:5px;gap:5px;}
+.left-panel{border-right:1px solid var(--border);}
+.right-panel{border-left:1px solid var(--border);}
+.canvas-area{flex:1;display:flex;flex-direction:column;background:#010810;overflow:hidden;position:relative;min-width:0;}
+.view-wrap{flex:1;position:relative;overflow:hidden;border:1px solid var(--border);min-width:0;min-height:0;}
+.view-wrap canvas{display:block;position:absolute;top:0;left:0;width:100%;height:100%;}
+.view-label{position:absolute;top:5px;left:7px;font-family:'Orbitron',sans-serif;font-size:7px;letter-spacing:2px;color:var(--accent);opacity:.8;z-index:10;pointer-events:none;background:rgba(3,11,20,.6);padding:1px 4px;border-radius:2px;}
+.panel-section{background:rgba(0,20,40,.6);border:1px solid var(--border);border-radius:4px;padding:6px;}
+.section-title{font-family:'Orbitron',sans-serif;font-size:7px;letter-spacing:2px;color:var(--accent);text-transform:uppercase;margin-bottom:5px;border-bottom:1px solid var(--border);padding-bottom:3px;}
+.section-title.orange{color:var(--accent2)}.section-title.green{color:var(--accent3)}.section-title.warn{color:var(--warn)}
+.ctrl-row{display:flex;flex-direction:column;gap:2px;margin-bottom:5px;}
+.ctrl-label{font-size:8px;color:var(--dim);display:flex;justify-content:space-between;}
+.ctrl-label span{color:var(--accent2)}.ctrl-label span.g{color:var(--accent3)}.ctrl-label span.b{color:var(--accent)}
+input[type=range]{-webkit-appearance:none;width:100%;height:3px;background:var(--border);border-radius:2px;outline:none;}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:10px;height:10px;border-radius:50%;background:var(--accent);cursor:pointer;box-shadow:0 0 4px var(--accent);}
+input[type=range].orange::-webkit-slider-thumb{background:var(--accent2);box-shadow:0 0 4px var(--accent2);}
+input[type=range].green::-webkit-slider-thumb{background:var(--accent3);box-shadow:0 0 4px var(--accent3);}
+.data-row{display:flex;justify-content:space-between;font-size:8px;padding:1px 0;border-bottom:1px solid rgba(10,40,64,.4);}
+.data-row .key{color:var(--dim)}.data-row .val{color:var(--accent3);font-weight:bold;}
+.data-row .val.warn{color:var(--warn)}.data-row .val.danger{color:var(--danger)}.data-row .val.blue{color:var(--accent)}.data-row .val.orange{color:var(--accent2)}
+.btn{font-family:'Orbitron',sans-serif;font-size:8px;letter-spacing:1px;border:1px solid;border-radius:3px;padding:4px 7px;cursor:pointer;text-transform:uppercase;background:transparent;transition:all .15s;width:100%;margin-bottom:3px;}
+.btn-start{border-color:var(--accent3);color:var(--accent3)}.btn-start:hover{background:var(--accent3);color:#000;}
+.btn-stop{border-color:var(--warn);color:var(--warn)}.btn-stop:hover{background:var(--warn);color:#000;}
+.btn-reset{border-color:var(--danger);color:var(--danger)}.btn-reset:hover{background:var(--danger);color:#fff;}
+.btn-land{border-color:var(--purple);color:var(--purple)}.btn-land:hover{background:var(--purple);color:#fff;}
+.btn-abort{border-color:var(--accent2);color:var(--accent2)}.btn-abort:hover{background:var(--accent2);color:#000;}
+.btn:disabled{opacity:.3;cursor:not-allowed;}
+.toggle-row{display:flex;align-items:center;justify-content:space-between;font-size:8px;margin-bottom:3px;}
+.toggle{width:24px;height:12px;background:var(--border);border-radius:6px;position:relative;cursor:pointer;transition:background .2s;flex-shrink:0;}
+.toggle.on{background:var(--accent)}.toggle.on.orange{background:var(--accent2)}.toggle.on.green{background:var(--accent3)}
+.toggle::after{content:'';position:absolute;width:8px;height:8px;background:#fff;border-radius:50%;top:2px;left:2px;transition:left .2s;}
+.toggle.on::after{left:14px;}
+.fuel-bar-bg{width:100%;height:5px;background:var(--border);border-radius:3px;overflow:hidden;margin:2px 0;}
+.fuel-bar-fill{height:100%;background:linear-gradient(90deg,var(--danger),var(--warn),var(--accent3));border-radius:3px;transition:width .1s;}
+.rcs2d-grid{display:grid;grid-template-columns:1fr 1fr;gap:3px;margin-top:3px;}
+.rcs-btn{font-family:'Orbitron',sans-serif;font-size:7px;border:1px solid var(--border);border-radius:3px;padding:3px 3px;cursor:pointer;background:rgba(0,20,40,.4);color:var(--dim);text-align:center;transition:all .1s;user-select:none;}
+.rcs-btn:active,.rcs-btn.active{background:rgba(0,212,255,.2);border-color:var(--accent);color:var(--accent);}
+.landing-input{background:rgba(0,20,40,.7);border:1px solid var(--border);color:var(--accent2);font-family:'Share Tech Mono',monospace;font-size:8px;width:52px;padding:1px 3px;border-radius:2px;text-align:right;}
+.landing-input:focus{outline:1px solid var(--accent2);}
+.landing-row{display:flex;justify-content:space-between;align-items:center;font-size:8px;margin-bottom:3px;color:var(--dim);}
+#landingStatus{font-size:8px;color:var(--warn);margin:3px 0;padding:3px 4px;background:rgba(0,0,0,.3);border-radius:2px;border-left:2px solid var(--warn);min-height:18px;}
+#landingStatus.success{color:var(--accent3);border-left-color:var(--accent3);}
+#landingStatus.fail{color:var(--danger);border-left-color:var(--danger);}
+.angle-display{display:flex;align-items:center;gap:5px;margin-top:2px;}
+.angle-dial{width:28px;height:28px;border:2px solid var(--accent2);border-radius:50%;position:relative;flex-shrink:0;}
+.angle-needle{position:absolute;width:2px;height:10px;background:var(--accent2);left:50%;bottom:50%;transform-origin:bottom center;transform:translateX(-50%) rotate(0deg);border-radius:2px;}
+::-webkit-scrollbar{width:3px;}::-webkit-scrollbar-track{background:transparent;}::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+#logContainer{flex-shrink:0;height:140px;background:rgba(1,8,16,0.97);border-top:1px solid var(--border);display:flex;flex-direction:column;}
+#logHeader{display:flex;align-items:center;gap:4px;padding:3px 8px;border-bottom:1px solid var(--border);flex-shrink:0;background:rgba(5,15,28,0.9);}
+#logPanel{flex:1;overflow-y:auto;padding:2px 6px;font-family:'Share Tech Mono',monospace;font-size:8px;line-height:1.7;}
+.log-row{border-left:2px solid var(--accent);padding:1px 0 1px 5px;margin-bottom:2px;background:rgba(0,20,40,0.4);border-radius:0 3px 3px 0;}
+.log-row:last-child{background:rgba(0,40,80,0.4);}
+.lv{margin-right:6px;color:var(--dim)}.lv b{color:var(--text)}
+.lv.dim{color:rgba(58,90,106,0.8)}.lv.dim b{color:rgba(168,216,234,0.6)}
+.lv.extra{color:var(--purple);font-size:7.5px;}.lv.extra b{color:#dd88ff}
+.log-btn{font-family:'Orbitron',sans-serif;font-size:7px;border:1px solid var(--border);border-radius:2px;padding:2px 5px;cursor:pointer;background:transparent;color:var(--dim);transition:all .1s;}
+.log-btn:hover{border-color:var(--accent);color:var(--accent);}
+.log-btn.paused{border-color:var(--warn);color:var(--warn);}
+</style>
+</head>
+<body>
+<header>
+  <h1>🚀 Rocket 2D Landing Sim</h1>
+  <div class="status-bar">
+    <div><span class="dot" id="statusDot"></span><span id="statusText" style="font-size:9px;">STOPPED</span></div>
+    <div class="time-display" id="timeDisplay">T+00:00.0</div>
+    <span style="font-size:9px;color:var(--dim)">SPD:</span>
+    <select id="simSpeed" style="background:var(--panel);color:var(--accent);border:1px solid var(--border);font-family:'Share Tech Mono',monospace;font-size:9px;padding:1px;">
+      <option value="0.25">0.25×</option><option value="0.5">0.5×</option>
+      <option value="1" selected>1×</option><option value="2">2×</option>
+      <option value="5">5×</option><option value="10">10×</option>
+    </select>
+  </div>
+</header>
+
+<div class="main-layout">
+<!-- LEFT PANEL -->
+<div class="left-panel">
+  <div class="panel-section">
+    <div class="section-title">Simulation</div>
+    <button class="btn btn-start" onclick="startSim()">▶ START</button>
+    <button class="btn btn-stop"  onclick="stopSim()">⏸ PAUSE</button>
+    <button class="btn btn-reset" onclick="resetSim()">↺ RESET</button>
+  </div>
+
+  <div class="panel-section">
+    <div class="section-title">Initial Config</div>
+    <div class="ctrl-row"><div class="ctrl-label">Dry Mass (kg)<span id="lbl_mass">5000</span></div><input type="range" min="500" max="20000" value="5000" id="sl_mass" oninput="updateInitConfig()"></div>
+    <div class="ctrl-row"><div class="ctrl-label">Fuel Mass (kg)<span id="lbl_fuel">8000</span></div><input type="range" min="100" max="30000" value="8000" id="sl_fuel" oninput="updateInitConfig()"></div>
+    <div class="ctrl-row"><div class="ctrl-label">Height (m)<span id="lbl_rh">20</span></div><input type="range" min="5" max="60" value="20" id="sl_rh" oninput="updateInitConfig()"></div>
+    <div class="ctrl-row"><div class="ctrl-label">Diameter (m)<span id="lbl_rw">4</span></div><input type="range" min="1" max="12" value="4" id="sl_rw" oninput="updateInitConfig()"></div>
+    <div class="ctrl-row"><div class="ctrl-label">Init Angle (°)<span id="lbl_ang">0</span></div><input type="range" min="-89" max="89" value="0" id="sl_ang" oninput="updateInitConfig()"></div>
+    <div class="ctrl-row"><div class="ctrl-label">Gravity (m/s²)<span id="lbl_grav">9.81</span></div><input type="range" min="0" max="25" step="0.01" value="9.81" id="sl_grav" oninput="updateInitConfig()"></div>
+    <div class="ctrl-row"><div class="ctrl-label">Init Alt (m)<span id="lbl_initAlt">0</span></div><input type="range" min="0" max="8000" step="10" value="0" id="sl_initAlt" oninput="updateInitConfig()"></div>
+    <div class="ctrl-row"><div class="ctrl-label">Init X (m)<span id="lbl_initX">0</span></div><input type="range" min="-2000" max="2000" step="10" value="0" id="sl_initX" oninput="updateInitConfig()"></div>
+    <div class="ctrl-row"><div class="ctrl-label">Init Vx (m/s)<span id="lbl_initVx">0</span></div><input type="range" min="-200" max="200" step="1" value="0" id="sl_initVx" oninput="updateInitConfig()"></div>
+    <div class="ctrl-row"><div class="ctrl-label">Init Vy (m/s)<span id="lbl_initVy">0</span></div><input type="range" min="-300" max="100" step="1" value="0" id="sl_initVy" oninput="updateInitConfig()"></div>
+    <div class="ctrl-row"><div class="ctrl-label">Init ω (°/s)<span id="lbl_initOmega">0</span></div><input type="range" min="-60" max="60" step="0.5" value="0" id="sl_initOmega" oninput="updateInitConfig()"></div>
+    <div class="ctrl-row"><div class="ctrl-label">Ve Main (m/s)<span id="lbl_ve">3000</span></div><input type="range" min="1000" max="5000" step="50" value="3000" id="sl_ve" oninput="updateInitConfig()"></div>
+  </div>
+
+  <div class="panel-section">
+    <div class="section-title">Display</div>
+    <div class="toggle-row"><span>Trajectory</span><div class="toggle on" id="tog_traj" onclick="toggleOpt('traj')"></div></div>
+    <div class="toggle-row"><span>Forces</span><div class="toggle on" id="tog_forces" onclick="toggleOpt('forces')"></div></div>
+    <div class="toggle-row"><span>CoM Marker</span><div class="toggle on" id="tog_com" onclick="toggleOpt('com')"></div></div>
+    <div class="toggle-row"><span>Grid</span><div class="toggle on" id="tog_grid" onclick="toggleOpt('grid')"></div></div>
+    <div class="toggle-row"><span>Drag</span><div class="toggle" id="tog_drag" onclick="toggleOpt('drag')"></div></div>
+  </div>
+
+  <div class="panel-section">
+    <div class="section-title">Legend</div>
+    <div style="display:flex;flex-wrap:wrap;gap:3px;font-size:7px;">
+      <span style="color:#ff2244">■ Grav</span><span style="color:#ff6b00">■ Thrust</span>
+      <span style="color:#00d4ff">■ Drag</span><span style="color:#00ff88">■ Net</span>
+      <span style="color:#ffcc00">■ Vel</span><span style="color:#cc44ff">■ CoM</span>
+      <span style="color:#44ffff">■ RCS</span><span style="color:#ff88cc">■ Target</span>
+    </div>
+  </div>
+</div>
+
+<!-- CANVAS -->
+<div class="canvas-area">
+  <div class="view-wrap" id="wrap_xy">
+    <div class="view-label">X – Y FRONT VIEW</div>
+    <canvas id="cv_xy"></canvas>
+  </div>
+  <!-- LOG PANEL -->
+  <div id="logContainer">
+    <div id="logHeader">
+      <span style="color:var(--accent);font-family:'Orbitron',sans-serif;font-size:8px;letter-spacing:2px;">📋 PHASE LOG</span>
+      <span style="color:var(--dim);font-size:8px;margin-left:8px;">— har 0.5s (simTime)</span>
+      <div style="margin-left:auto;display:flex;gap:6px;">
+        <button class="log-btn" onclick="clearLog()">CLR</button>
+        <button class="log-btn" onclick="exportLogCSV()">CSV</button>
+        <button class="log-btn" onclick="exportLogJSON()">JSON</button>
+        <button class="log-btn" id="logPauseBtn" onclick="toggleLogPause()">⏸ PAUSE</button>
+      </div>
+    </div>
+    <div id="logPanel"></div>
+  </div>
+
+  </div><!-- canvas-area -->
+
+<!-- RIGHT PANEL -->
+<div class="right-panel">
+
+  <div class="panel-section">
+    <div class="section-title orange">Main Thruster</div>
+    <div class="ctrl-row">
+      <div class="ctrl-label">Thrust (N)<span id="lbl_mt">0</span></div>
+      <input type="range" class="orange" min="0" max="500000" step="1000" value="0" id="sl_mt" oninput="updateThrusters()">
+    </div>
+    <div class="ctrl-row">
+      <div class="ctrl-label">Gimbal (°)<span id="lbl_gp">0.0</span></div>
+      <input type="range" class="orange" min="-20" max="20" step="0.5" value="0" id="sl_gp" oninput="updateThrusters()">
+    </div>
+    <div class="angle-display">
+      <div class="angle-dial"><div class="angle-needle" id="needle_gp"></div></div>
+      <span style="font-size:8px;color:var(--dim)">Gimbal:<span id="nd_gp" style="color:var(--accent2)">0°</span></span>
+    </div>
+  </div>
+
+  <div class="panel-section">
+    <div class="section-title green">RCS Thrusters</div>
+    <div class="ctrl-row">
+      <div class="ctrl-label">RCS Force (N)<span class="g" id="lbl_rcsf">2000</span></div>
+      <input type="range" class="green" min="100" max="50000" step="100" value="2000" id="sl_rcsf" oninput="updateThrusters()">
+    </div>
+    <div style="font-size:7px;color:var(--dim);margin-bottom:3px;">Hold keys / click:</div>
+    <div class="rcs2d-grid">
+      <div class="rcs-btn" id="rcsBtn_rpitch" onmousedown="rcsPress('rpitch')" onmouseup="rcsRelease('rpitch')" ontouchstart="rcsPress('rpitch')" ontouchend="rcsRelease('rpitch')">↺ CCW (A)</div>
+      <div class="rcs-btn" id="rcsBtn_lpitch" onmousedown="rcsPress('lpitch')" onmouseup="rcsRelease('lpitch')" ontouchstart="rcsPress('lpitch')" ontouchend="rcsRelease('lpitch')">↻ CW (D)</div>
+    </div>
+    <div style="margin-top:4px;">
+      <div class="ctrl-label" style="font-size:7px;">RCS Fuel<span class="g" id="rcsFuelPct">100%</span></div>
+      <div class="fuel-bar-bg"><div class="fuel-bar-fill" id="rcsFuelBar" style="width:100%"></div></div>
+    </div>
+  </div>
+
+  <div class="panel-section">
+    <div class="section-title warn">Mass & Fuel</div>
+    <div class="ctrl-label" style="font-size:7px;">Main Fuel<span class="g" id="fuelPct">100%</span></div>
+    <div class="fuel-bar-bg"><div class="fuel-bar-fill" id="fuelBar" style="width:100%"></div></div>
+    <div class="data-row"><span class="key">Total (kg)</span><span class="val" id="d_mass">–</span></div>
+    <div class="data-row"><span class="key">Fuel (kg)</span><span class="val warn" id="d_fuel">–</span></div>
+    <div class="data-row"><span class="key">ṁ (kg/s)</span><span class="val" id="d_mdot">–</span></div>
+    <div class="data-row"><span class="key">CoM (m)</span><span class="val blue" id="d_com">–</span></div>
+  </div>
+
+  <div class="panel-section">
+    <div class="section-title">State</div>
+    <div class="data-row"><span class="key">x (m)</span><span class="val blue" id="d_x">–</span></div>
+    <div class="data-row"><span class="key">y (m)</span><span class="val blue" id="d_y">–</span></div>
+    <div class="data-row"><span class="key">vx (m/s)</span><span class="val" id="d_vx">–</span></div>
+    <div class="data-row"><span class="key">vy (m/s)</span><span class="val" id="d_vy">–</span></div>
+    <div class="data-row"><span class="key">θ (°)</span><span class="val orange" id="d_pitch">–</span></div>
+    <div class="data-row"><span class="key">ω (°/s)</span><span class="val" id="d_omega">–</span></div>
+    <div class="data-row"><span class="key">Alt (m)</span><span class="val green" id="d_alt">–</span></div>
+    <div class="data-row"><span class="key">|V| (m/s)</span><span class="val" id="d_vmag">–</span></div>
+  </div>
+
+  <div class="panel-section">
+    <div class="section-title">Forces</div>
+    <div class="data-row"><span class="key">F_g (N)</span><span class="val danger" id="d_fg">–</span></div>
+    <div class="data-row"><span class="key">F_T (N)</span><span class="val orange" id="d_ft">–</span></div>
+    <div class="data-row"><span class="key">Gimbal (°)</span><span class="val orange" id="d_gp">–</span></div>
+    <div class="data-row"><span class="key">F_rcs (N)</span><span class="val" style="color:#44ffff" id="d_frcs">–</span></div>
+    <div class="data-row"><span class="key">Fn_x</span><span class="val" id="d_fnx">–</span></div>
+    <div class="data-row"><span class="key">Fn_y</span><span class="val" id="d_fny">–</span></div>
+  </div>
+
+  <!-- AUTOMATIC LANDING -->
+  <div class="panel-section" style="border-color:var(--purple);">
+    <div class="section-title warn">🪂 AUTO LANDING TEST</div>
+    <button class="btn btn-land" id="btnStartLanding" onclick="startLandingTest()">▶ START LANDING</button>
+    <button class="btn btn-abort" id="btnAbortLanding" onclick="abortLanding()">✕ ABORT</button>
+    <div id="landingStatus">Status: Idle</div>
+    <div style="margin-top:4px;">
+      <div class="landing-row">Target X<input class="landing-input" type="number" id="targetX" value="0" step="10"> m</div>
+      <div class="landing-row">T₁ phase1<input class="landing-input" type="number" id="T_p1" value="2.0" step="0.5"> s</div>
+      <div class="landing-row">T₂ phase2<input class="landing-input" type="number" id="T_p2" value="5.0" step="0.5"> s</div>
+      <div class="landing-row">T₄ phase4<input class="landing-input" type="number" id="T_p4" value="4.0" step="0.5"> s</div>
+      <div class="landing-row">T₅ phase5<input class="landing-input" type="number" id="T_p5" value="8.0" step="0.5"> s</div>
+      <div class="landing-row">H₀ trigger<input class="landing-input" type="number" id="H0_trigger" value="800" step="50"> m</div>
+      <div class="landing-row">Hs final alt<input class="landing-input" type="number" id="Hs_final" value="100" step="10"> m</div>
+      <div class="landing-row">V₀ tgt vy<input class="landing-input" type="number" id="V0_phase3" value="0" step="5"> m/s</div>
+      <div class="landing-row">Max Thr<input class="landing-input" type="number" id="maxThrustThresh" value="200000" step="10000"> N</div>
+    </div>
+  </div>
+
+  <div class="panel-section">
+    <div class="section-title warn">Keyboard</div>
+    <div style="font-size:7px;color:var(--dim);line-height:1.8;">
+      <b style="color:var(--warn)">SPACE</b> Play/Pause &nbsp;<b style="color:var(--danger)">R</b> Reset<br>
+      <b style="color:var(--accent2)">↑↓</b> Thrust &nbsp;<b style="color:var(--accent2)">W/S</b> Gimbal<br>
+      <b style="color:var(--accent3)">A/D</b> RCS CCW/CW<br>
+    </div>
+  </div>
+
+</div>
+</div><!-- main-layout -->
+
+<script>
+// ===================================================================
+//  2D ROCKET SIMULATION – X-Y PHYSICS + 5-PHASE AUTO LANDING
+// ===================================================================
+
+const Cd_ROCKET = 0.4;
+const RHO_AIR   = 1.225;
+const Ve_RCS    = 1500;
+
+let state = {};
+let running = false;
+let animId  = null;
+let lastTs  = null;
+let simTime = 0;
+let maxAlt  = 0;
+let trajectory = [];
+
+let opts = { traj:true, forces:true, com:true, grid:true, drag:false };
+
+let initCfg = {
+  dryMass:5000, fuelMass:8000, rcsFuelMass:500,
+  rocketH:20, rocketW:4,
+  initAngle:0, initOmega:0, gravity:9.81,
+  initAlt:0, initX:0, initVx:0, initVy:0,
+  Ve_MAIN:3000
+};
+
+let ctrl = {
+  mainThrust:0, gimbal:0,   // gimbal in degrees
+  rcsForce:2000,
+  rcs:{ rpitch:false, lpitch:false }
+};
+
+// ── LANDING CONTROLLER ──
+let landing = {
+  active: false,
+  phase: 0,
+  phaseTimer: 0,
+  // Phase 3 state
+  p3_sigma: 0, p3_A: 0, p3_T: 0, p3_Hi: 0, p3_waiting: true,
+  // Phase 5 state
+  p5_x0:0, p5_vx0:0, p5_k1:0, p5_k2:0, p5_A:0, p5_viZero:false,
+  // Phase 5 result
+  result: ''
+};
+
+// ── CoM & INERTIA ──
+function computeCoM(fuelM, dryM, H) {
+  const tot = fuelM + dryM;
+  if (tot <= 0) return H * 0.5;
+  return (fuelM * 0.275 * H + dryM * 0.5 * H) / tot;
+}
+function computeIzz(totalM, H, W) {
+  const r = W / 2;
+  return totalM * (H*H/12 + r*r/4);
+}
+
+// ── BUILD INITIAL STATE ──
+function buildInitState(cfg) {
+  cfg = cfg || initCfg;
+  const { dryMass, fuelMass, rcsFuelMass, rocketH, rocketW,
+          initAngle, initOmega, gravity, initAlt, initX, initVx, initVy, Ve_MAIN } = cfg;
+  const totalM = dryMass + fuelMass + rcsFuelMass;
+  const comH   = computeCoM(fuelMass, dryMass + rcsFuelMass, rocketH);
+  const Izz    = computeIzz(totalM, rocketH, rocketW);
+  const theta  = initAngle * Math.PI / 180;
+  const omega  = (initOmega || 0) * Math.PI / 180;  // deg/s → rad/s
+  return {
+    x: initX, y: comH + initAlt,
+    vx: initVx, vy: initVy,
+    ax:0, ay:0,
+    theta, omega, alpha:0,
+    mass: totalM, dryMass, fuelMass,
+    fuelMassInit: fuelMass,
+    rcsFuelMass, rcsFuelMassInit: rcsFuelMass,
+    H: rocketH, W: rocketW,
+    gravity, Ve_MAIN,
+    comH, Izz,
+    crashed: false,
+    _Fg:0,_Ft:0,_Fd:0,_Frcs:0,_Fnx:0,_Fny:0,_torq:0,
+    _mdot:0,_thr:0,_gp:0,_rcsT:0
+  };
+}
+
+// ── PHYSICS STEP ──
+function physicsStep(dt) {
+  const s = state;
+  if (s.crashed) return;
+
+  // Rocket axis (screen: theta=0 → up)
+  const nx =  Math.sin(s.theta);
+  const ny =  Math.cos(s.theta);
+  const px_ax =  ny, py_ax = -nx;  // perpendicular (right of nose)
+
+  // ── Main thrust ──
+  const gp_r = ctrl.gimbal * Math.PI / 180;
+  const tBx = nx * Math.cos(gp_r) + px_ax * Math.sin(gp_r);
+  const tBy = ny * Math.cos(gp_r) + py_ax * Math.sin(gp_r);
+
+  let F_thrust = 0, mdot = 0;
+  if (s.fuelMass > 0 && ctrl.mainThrust > 0) {
+    F_thrust = ctrl.mainThrust;
+    mdot     = F_thrust / s.Ve_MAIN;
+  }
+  s._mdot = mdot; s._thr = F_thrust; s._gp = ctrl.gimbal;
+
+  const Ftx = tBx * F_thrust;
+  const Fty = tBy * F_thrust;
+
+  // Torque from main thrust (nozzle arm = comH from CoM)
+  const r_nx = -nx * s.comH, r_ny = -ny * s.comH;
+  const torq_thrust = r_nx * Fty - r_ny * Ftx;
+
+  // ── RCS ──
+  let F_rcs_total = 0, torq_rcs = 0;
+  const arm_top = s.H - s.comH;
+  if (ctrl.rcs.rpitch && s.rcsFuelMass > 0) {
+    // CCW torque = positive
+    torq_rcs += ctrl.rcsForce * arm_top;
+    F_rcs_total += ctrl.rcsForce;
+    s.rcsFuelMass = Math.max(0, s.rcsFuelMass - (ctrl.rcsForce / Ve_RCS) * dt);
+  }
+  if (ctrl.rcs.lpitch && s.rcsFuelMass > 0) {
+    // CW torque = negative
+    torq_rcs -= ctrl.rcsForce * arm_top;
+    F_rcs_total += ctrl.rcsForce;
+    s.rcsFuelMass = Math.max(0, s.rcsFuelMass - (ctrl.rcsForce / Ve_RCS) * dt);
+  }
+  s._Frcs = F_rcs_total; s._rcsT = torq_rcs;
+
+  // ── Gravity ──
+  const Fg = s.mass * s.gravity;
+  s._Fg = Fg;
+  s._Ft = F_thrust;
+
+  // ── Drag (optional) ──
+  const vMag = Math.sqrt(s.vx*s.vx + s.vy*s.vy);
+  let Fdx=0, Fdy=0, Fd=0;
+  if (opts.drag && vMag > 0.01) {
+    const A_ref = s.W * s.H * 0.3;
+    Fd = 0.5 * RHO_AIR * Cd_ROCKET * A_ref * vMag * vMag;
+    Fdx = -Fd * s.vx / vMag;
+    Fdy = -Fd * s.vy / vMag;
+  }
+  s._Fd = Fd;
+
+  // ── Net force ──
+  const Fnx = Ftx + Fdx;
+  const Fny = Fty - Fg + Fdy;
+  s._Fnx = Fnx; s._Fny = Fny;
+
+  // ── Torque total ──
+  const torq_total = torq_thrust + torq_rcs;
+  s._torq = torq_total;
+
+  // ── Integrate ──
+  s.ax = Fnx / s.mass;
+  s.ay = Fny / s.mass;
+  s.alpha = torq_total / s.Izz;
+
+  s.vx += s.ax * dt;
+  s.vy += s.ay * dt;
+  s.omega += s.alpha * dt;
+
+  s.x += s.vx * dt;
+  s.y += s.vy * dt;
+  s.theta += s.omega * dt;
+
+  // Fuel consumption
+  if (mdot > 0) {
+    const consumed = mdot * dt;
+    s.fuelMass = Math.max(0, s.fuelMass - consumed);
+    s.mass = s.dryMass + s.fuelMass + s.rcsFuelMass;
+    s.comH = computeCoM(s.fuelMass, s.dryMass + s.rcsFuelMass, s.H);
+    s.Izz  = computeIzz(s.mass, s.H, s.W);
+  }
+
+  // ── Ground check ──
+  if (s.y <= s.comH) {
+    s.y = s.comH;
+    if (s.vy < -2) {
+      s.crashed = true;
+    } else {
+      s.vy = 0; s.vx *= 0.3; s.omega *= 0.1;
+    }
+  }
+}
+
+// ===================================================================
+//  LANDING CONTROLLER
+// ===================================================================
+
+function bisect(fn, lo, hi, tol, maxIter) {
+  let flo = fn(lo), fhi = fn(hi);
+  if (flo * fhi > 0) return null;
+  let mid = lo;
+  for (let i=0; i<maxIter; i++) {
+    mid = (lo + hi) / 2;
+    const fmid = fn(mid);
+    if (Math.abs(fmid) < tol || (hi-lo)/2 < tol) break;
+    if (flo * fmid < 0) { hi = mid; fhi = fmid; }
+    else                 { lo = mid; flo = fmid; }
+  }
+  return mid;
+}
+
+function setLandingStatus(msg, cls) {
+  const el = document.getElementById('landingStatus');
+  el.textContent = 'Status: ' + msg;
+  el.className = cls || '';
+  // Also push a phase-event banner to the log panel
+  if (window._logPhaseEvent) window._logPhaseEvent(msg);
+}
+
+function abortLanding() {
+  landing.active = false;
+  ctrl.mainThrust = 0; ctrl.gimbal = 0;
+  ctrl.rcs.rpitch = false; ctrl.rcs.lpitch = false;
+  setLandingStatus('Aborted', 'fail');
+  syncControlUI();
+}
+
+function startLandingTest() {
+  // Fixed initial conditions as specified
+  const cfg = {
+    dryMass: parseInt(document.getElementById('sl_mass').value) || 5000,
+    fuelMass: parseInt(document.getElementById('sl_fuel').value) || 8000,
+    rcsFuelMass: 500,
+    rocketH: parseInt(document.getElementById('sl_rh').value) || 20,
+    rocketW: parseInt(document.getElementById('sl_rw').value) || 4,
+    initAngle: 25,
+    gravity: parseFloat(document.getElementById('sl_grav').value) || 9.81,
+    initAlt: 5000,
+    initX: 0,
+    initVx: 80,
+    initVy: -120,
+    Ve_MAIN: parseInt(document.getElementById('sl_ve').value) || 3000,
+  };
+  stopSim();
+  simTime = 0; maxAlt = 0; trajectory = [];
+  state = buildInitState(cfg);
+  ctrl.mainThrust = 0; ctrl.gimbal = 0;
+  ctrl.rcs.rpitch = false; ctrl.rcs.lpitch = false;
+
+  landing.active = true;
+  landing.phase = 1;
+  landing.phaseTimer = 0;
+  landing.p3_waiting = true;
+  landing.result = '';
+  _lastLogTime = -999;
+  clearLog();
+
+  setLandingStatus('Phase 1/5: Cancelling rotation');
+  updateStatusUI('running');
+  running = true; lastTs = null;
+  animId = requestAnimationFrame(loop);
+  syncControlUI();
+}
+
+function updateLandingController(dt) {
+  const s = state;
+  const ld = landing;
+  if (!ld.active || s.crashed) return;
+
+  const T1 = parseFloat(document.getElementById('T_p1').value) || 2.0;
+  const T2 = parseFloat(document.getElementById('T_p2').value) || 5.0;
+  const T4 = parseFloat(document.getElementById('T_p4').value) || 4.0;
+  const T5 = parseFloat(document.getElementById('T_p5').value) || 8.0;
+  const H0 = parseFloat(document.getElementById('H0_trigger').value) || 800;
+  const V0 = parseFloat(document.getElementById('V0_phase3').value) || 0;
+  const maxThrThresh = parseFloat(document.getElementById('maxThrustThresh').value) || 200000;
+  const tgtX = parseFloat(document.getElementById('targetX').value) || 0;
+
+  const arm_top = s.H - s.comH;
+  const arm_noz = s.comH;
+
+  // Reset ctrl each step (landing overrides)
+  ctrl.mainThrust = 0; ctrl.gimbal = 0;
+  ctrl.rcs.rpitch = false; ctrl.rcs.lpitch = false;
+
+  // ── PHASE 1: Cancel angular velocity ──
+  if (ld.phase === 1) {
+    if (Math.abs(s.omega) > 0.01 && ld.phaseTimer < T1) {
+      if (s.omega > 0)  ctrl.rcs.lpitch = true;  // CW to reduce CCW spin
+      else              ctrl.rcs.rpitch = true;
+    } else {
+      ld.phase = 2; ld.phaseTimer = 0;
+      setLandingStatus('Phase 2/5: Attitude transition');
+      return;
+    }
+    ld.phaseTimer += dt;
+    return;
+  }
+
+  // ── PHASE 2: Attitude transition ──
+  if (ld.phase === 2) {
+    const t = ld.phaseTimer;
+    if (t >= T2) {
+      ld.phase = 3; ld.phaseTimer = 0; ld.p3_waiting = true;
+      setLandingStatus('Phase 3/5: Velocity cancel (waiting)');
+      return;
+    }
+
+    // Compute T_h: time to reach H0 from current y (freefall, g negative)
+    // H0 = y + vy·τ + ½·g·τ²   (g < 0)  →  ½g·τ² + vy·τ + (y - H0) = 0
+    const gN2 = -s.gravity;  // g negative
+    const a_coef = 0.5 * gN2;
+    const b_coef = s.vy;
+    const c_coef = s.y - H0;
+    let T_h = 0;
+    const disc = b_coef*b_coef - 4*a_coef*c_coef;
+    if (disc >= 0) {
+      const r1 = (-b_coef + Math.sqrt(disc)) / (2*a_coef);
+      const r2 = (-b_coef - Math.sqrt(disc)) / (2*a_coef);
+      T_h = (r1 > 0 && r2 > 0) ? Math.min(r1,r2) : Math.max(r1,r2);
+      if (T_h < 0) T_h = 0;
+    }
+
+    // theta_target = atan2(vx, vy + g·T_h)  — g negative so vy + gN2·T_h
+    const theta_target = Math.atan2(s.vx, s.vy + gN2 * T_h);
+    const dTheta = Math.atan2(Math.sin(theta_target - s.theta), Math.cos(theta_target - s.theta));
+
+    const alpha_desired = (2*Math.PI*dTheta / (T2*T2)) * Math.sin(2*Math.PI*t / T2);
+    const torq_needed   = s.Izz * alpha_desired;
+    let F_needed = (arm_top > 0.001) ? torq_needed / arm_top : 0;
+    const maxF = ctrl.rcsForce;
+    F_needed = Math.max(-maxF, Math.min(maxF, F_needed));
+
+    if (F_needed > 50)       ctrl.rcs.rpitch = true;
+    else if (F_needed < -50) ctrl.rcs.lpitch = true;
+
+    ld.phaseTimer += dt;
+    return;
+  }
+
+
+  // ── PHASE 3: Velocity cancellation (main engine) ──
+  if (ld.phase === 3) {
+    // Hs = final/landing altitude (separate from H0_trigger)
+    const Hs = parseFloat(document.getElementById('Hs_final').value) || 100;
+    // g is NEGATIVE in the formula (downward = negative convention)
+    const gNeg = -s.gravity;
+
+    if (ld.p3_waiting) {
+      const deltaV = s.vy - V0;  // vy negative (falling), V0 typically 0
+
+      if (Math.abs(deltaV) < 0.5) {
+        ld.phase = 4; ld.phaseTimer = 0;
+        setLandingStatus('Phase 4/5: Re-verticalisation');
+        return;
+      }
+
+      // Hi = current altitude — will be frozen as snapshot when we trigger
+      const Hi = s.y;
+
+      // F(σ) = g*(Hs-Hi) - (vy·ΔV)/tan(σ/2) - (ΔV²/tan²(σ/2))·(sinσ - σ)/sinσ
+      // g here = gNeg = -9.81
+      const F_sigma = (sigma) => {
+        const tanH = Math.tan(sigma / 2);
+        if (Math.abs(tanH) < 1e-9) return 1e9;
+        const sinS = Math.sin(sigma);
+        if (Math.abs(sinS) < 1e-9) return 1e9;
+        const term1 = gNeg * (Hs - Hi);
+        const term2 = -(s.vy * deltaV) / tanH;
+        const term3 = -(deltaV * deltaV / (tanH * tanH)) * (sinS - sigma) / sinS;
+        return term1 + term2 + term3;
+      };
+
+      const sigma = bisect(F_sigma, 0.001, Math.PI - 0.001, 1e-5, 100);
+      if (sigma === null) {
+        ld.phase = 4; ld.phaseTimer = 0;
+        setLandingStatus('Phase 4/5: Re-vert (p3 σ unsolvable)');
+        return;
+      }
+
+      // A = g / sinσ  (gNeg → A negative = deceleration upward)
+      const A_val = gNeg / Math.sin(sigma);
+      // T_p3 = σ·ΔV / (g·tan(σ/2))
+      const T_p3 = (sigma * deltaV) / (gNeg * Math.tan(sigma / 2));
+
+      // Peak thrust estimate for trigger check (occurs near t = T/2)
+      const cosTheta = Math.cos(s.theta);
+      const F_peak = s.mass * Math.abs(A_val) / Math.max(Math.abs(cosTheta), 0.15);
+
+      if (F_peak >= maxThrThresh || Hi <= Hs + 50) {
+        // TRIGGER: freeze Hi as snapshot now
+        ld.p3_sigma = sigma;
+        ld.p3_A     = A_val;
+        ld.p3_T     = Math.abs(T_p3);
+        ld.p3_Hi    = Hi;   // frozen – not updated again
+        ld.p3_waiting = false;
+        ld.phaseTimer = 0;
+        setLandingStatus('Phase 3/5: Velocity cancellation (active)');
+      }
+      return;
+    }
+
+    // ── Active phase 3 ──
+    const t = ld.phaseTimer;
+    if (t >= ld.p3_T || s.fuelMass <= 0) {
+      ld.phase = 4; ld.phaseTimer = 0;
+      setLandingStatus('Phase 4/5: Re-verticalisation');
+      ctrl.mainThrust = 0;
+      return;
+    }
+
+    // a_y_des(t) = -A·sin(σ·t/T)   [world Y, A<0 so -A>0 = upward decel]
+    const a_y_des = -ld.p3_A * Math.sin(ld.p3_sigma * t / Math.max(ld.p3_T, 0.001));
+    const cosT = Math.cos(s.theta);
+    // Net world Y: F·cos(θ)/m + gNeg = a_y_des  →  F = m·(a_y_des - gNeg)/cos(θ)
+    //            = m·(a_y_des + s.gravity)/cos(θ)   (since gNeg = -s.gravity)
+    const gNegA = -s.gravity;
+    const F_thr_raw = (Math.abs(cosT) > 0.05)
+      ? s.mass * (a_y_des - gNegA) / cosT
+      : s.mass * s.gravity;
+    ctrl.mainThrust = Math.max(0, Math.min(F_thr_raw, 500000));
+    ctrl.gimbal = 0;
+
+    ld.phaseTimer += dt;
+    return;
+  }
+
+  // ── PHASE 4: Re-verticalisation ──
+  if (ld.phase === 4) {
+    const t = ld.phaseTimer;
+    if (t >= T4) {
+      ld.phase = 5; ld.phaseTimer = 0;
+      // Init phase 5
+      ld.p5_x0  = s.x;
+      ld.p5_vx0 = s.vx;
+      const Vi = s.vx;
+      const D  = tgtX - s.x;
+      if (Math.abs(Vi) < 0.1) {
+        // Vi ≈ 0: divide-by-zero in acot formula — abort with error
+        landing.active = false;
+        setLandingStatus('ERR Phase5: Vi≈0, acot undefined (vx must ≠ 0)', 'fail');
+        ctrl.mainThrust = 0; ctrl.gimbal = 0;
+        syncControlUI();
+        return;
+      }
+      const acot_arg = Math.PI * (1 - (2*D) / (Vi*T5));
+      ld.p5_k1 = Math.atan2(1, acot_arg);   // acot(x) = atan2(1, x)
+      ld.p5_k2 = Math.asin(Math.max(-1, Math.min(1, -Vi / T5)));
+      ld.p5_A  = -Vi / (T5 * Math.sin(ld.p5_k1));
+      setLandingStatus('Phase 5/5: Precision landing');
+      return;
+    }
+
+    const dTheta = -s.theta; // target = 0
+    const alpha_des = (2*Math.PI*dTheta / (T4*T4)) * Math.sin(2*Math.PI*t / T4);
+    const Fx_body  = (arm_noz > 0.001) ? s.Izz * alpha_des / arm_noz : 0;
+    const sinT4 = Math.sin(s.theta), cosT4 = Math.cos(s.theta);
+    // To cancel gravity (g negative), need Fy_world = m·s.gravity (upward positive)
+    // Transform world-Y hover force to body frame: Fy_body = Fy_world·cos(θ) - Fx_world·sin(θ)
+    // Fx_world for hover = 0, so Fy_balance_body = m·s.gravity·cos(θ)
+    const Fy_balance = s.mass * s.gravity * cosT4;
+    const Fy_total   = Math.max(0, Fy_balance);
+
+    const thrust_mag  = Math.sqrt(Fx_body*Fx_body + Fy_total*Fy_total);
+    const gimbal_rad  = Math.atan2(Fx_body, Math.max(Fy_total, 1));
+    ctrl.mainThrust = Math.min(thrust_mag, 500000);
+    ctrl.gimbal     = gimbal_rad * 180 / Math.PI;
+
+    ld.phaseTimer += dt;
+    return;
+  }
+
+  // ── PHASE 5: Precision landing ──
+  if (ld.phase === 5) {
+    const t = ld.phaseTimer;
+    const w = 2*Math.PI / T5;
+    const Vi = ld.p5_vx0;
+    let a_x_des = 0;
+
+    a_x_des = -ld.p5_A * Math.sin(w*t - ld.p5_k1) - Math.sin(ld.p5_k2);
+
+    const Fx_world = s.mass * a_x_des;    // world X force for horizontal guidance
+    const Fy_world = s.mass * s.gravity;  // world Y force to cancel gravity (g negative → need +m*g upward)
+
+    // Transform world → body frame (rotate by -theta)
+    const sinT = Math.sin(s.theta), cosT = Math.cos(s.theta);
+    const Fx_body =  Fx_world * cosT + Fy_world * sinT;
+    const Fy_body = -Fx_world * sinT + Fy_world * cosT;
+
+    const thrust_mag = Math.sqrt(Fx_body*Fx_body + Fy_body*Fy_body);
+    const gimbal_rad = Math.atan2(Fx_body, Math.max(Fy_body, 1));
+    ctrl.mainThrust = Math.min(thrust_mag, 500000);
+    ctrl.gimbal     = Math.max(-20, Math.min(20, gimbal_rad * 180 / Math.PI));
+
+    // Success check
+    const onGround  = s.y <= s.comH + 0.5;
+    const velOK     = Math.abs(s.vx) < 0.5 && Math.abs(s.vy) < 0.5;
+    const rotOK     = Math.abs(s.omega) < 0.05 && Math.abs(s.theta) < 4*Math.PI/180;
+    const posOK     = Math.abs(s.x - tgtX) < 10;
+    const timeOK    = t >= T5;
+
+    if ((onGround && velOK && rotOK && posOK) || timeOK) {
+      ctrl.mainThrust = 0; ctrl.gimbal = 0;
+      landing.active = false;
+      if (onGround && velOK && posOK) {
+        setLandingStatus('🎯 LANDING SUCCESSFUL!', 'success');
+      } else {
+        setLandingStatus(`Phase 5 ended | x=${s.x.toFixed(1)} tgt=${tgtX}`, timeOK && !posOK ? 'fail' : 'success');
+      }
+      syncControlUI();
+      return;
+    }
+
+    ld.phaseTimer += dt;
+    return;
+  }
+}
+
+// ===================================================================
+//  CANVAS
+// ===================================================================
+
+const cv  = document.getElementById('cv_xy');
+const ctx = cv.getContext('2d');
+
+function initCanvasSize() {
+  const w = document.getElementById('wrap_xy');
+  cv.width  = w.clientWidth;
+  cv.height = w.clientHeight;
+}
+
+function drawFrame() {
+  const s = state;
+  const W = cv.width, H_cv = cv.height;
+  ctx.clearRect(0, 0, W, H_cv);
+  ctx.fillStyle = '#010810';
+  ctx.fillRect(0, 0, W, H_cv);
+
+  // Dynamic scale & camera
+  const altView  = Math.max(s.y * 1.3, s.H * 4, 100);
+  const scale    = (H_cv * 0.82) / altView;
+  const groundY  = H_cv - 30;
+  const cx       = W / 2 - s.x * scale;
+
+  // ── Grid ──
+  if (opts.grid) {
+    ctx.strokeStyle = 'rgba(10,40,64,0.8)'; ctx.lineWidth = 0.5;
+    const gridStep = Math.pow(10, Math.floor(Math.log10(altView / 5)));
+    for (let gx = Math.floor(-W/scale/2/gridStep)*gridStep; gx < W/scale*1.5; gx += gridStep) {
+      const sx = cx + gx * scale;
+      ctx.beginPath(); ctx.moveTo(sx, 0); ctx.lineTo(sx, H_cv); ctx.stroke();
+    }
+    for (let gy = 0; gy < altView * 1.2; gy += gridStep) {
+      const sy = groundY - gy * scale;
+      ctx.beginPath(); ctx.moveTo(0, sy); ctx.lineTo(W, sy); ctx.stroke();
+    }
+    ctx.fillStyle = 'rgba(60,90,110,0.5)'; ctx.font = '7px Share Tech Mono';
+    for (let gy = 0; gy < altView * 1.2; gy += gridStep) {
+      ctx.fillText(gy + 'm', 3, groundY - gy * scale - 2);
+    }
+  }
+
+  // ── Ground ──
+  const groundGrad = ctx.createLinearGradient(0, groundY, 0, groundY + 25);
+  groundGrad.addColorStop(0, 'rgba(0,100,60,0.9)'); groundGrad.addColorStop(1, 'rgba(0,40,20,0)');
+  ctx.fillStyle = groundGrad;
+  ctx.fillRect(0, groundY, W, 30);
+  ctx.strokeStyle = '#00cc44'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(0, groundY); ctx.lineTo(W, groundY); ctx.stroke();
+
+  // ── Target X marker ──
+  const tgtX_val = parseFloat(document.getElementById('targetX').value) || 0;
+  const tgtSx    = cx + tgtX_val * scale;
+  ctx.strokeStyle = '#ff88cc'; ctx.lineWidth = 1; ctx.setLineDash([4,3]);
+  ctx.beginPath(); ctx.moveTo(tgtSx, 0); ctx.lineTo(tgtSx, groundY); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = '#ff88cc'; ctx.font = '9px Share Tech Mono';
+  ctx.fillText('TGT', tgtSx + 3, 14);
+  // Landing pad
+  ctx.strokeStyle = '#ff88cc'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(tgtSx - 20, groundY); ctx.lineTo(tgtSx + 20, groundY); ctx.stroke();
+  ctx.beginPath(); ctx.arc(tgtSx, groundY, 6, 0, Math.PI*2); ctx.stroke();
+
+  // ── Trajectory ──
+  if (opts.traj && trajectory.length > 1) {
+    ctx.strokeStyle = 'rgba(0,212,255,0.35)'; ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let i=0; i<trajectory.length; i++) {
+      const pt = trajectory[i];
+      const sx = cx + pt.x * scale;
+      const sy = groundY - pt.y * scale;
+      i===0 ? ctx.moveTo(sx,sy) : ctx.lineTo(sx,sy);
+    }
+    ctx.stroke();
+  }
+
+  // ── Draw rocket ──
+  drawRocket(s, cx, groundY, scale);
+
+  // ── Forces ──
+  if (opts.forces) drawForces(s, cx, groundY, scale);
+
+  // ── HUD ──
+  ctx.fillStyle = 'rgba(255,107,0,0.85)'; ctx.font = '8px Share Tech Mono';
+  ctx.fillText(`θ=${(s.theta*180/Math.PI).toFixed(1)}° ω=${(s.omega*180/Math.PI).toFixed(1)}°/s`, 8, 16);
+  ctx.fillStyle = 'rgba(0,212,255,0.7)';
+  ctx.fillText(`x=${s.x.toFixed(0)}m  y=${s.y.toFixed(0)}m`, 8, 26);
+  ctx.fillText(`vx=${s.vx.toFixed(1)}  vy=${s.vy.toFixed(1)} m/s`, 8, 36);
+
+  if (s.crashed) {
+    ctx.save();
+    ctx.fillStyle = 'rgba(255,34,68,0.18)'; ctx.fillRect(0,0,W,H_cv);
+    ctx.font='900 36px Orbitron,monospace'; ctx.fillStyle='#ff2244';
+    ctx.textAlign='center'; ctx.fillText('CRASHED',W/2,H_cv/2);
+    ctx.font='11px Share Tech Mono'; ctx.fillStyle='#a8d8ea';
+    ctx.fillText('Press R to reset',W/2,H_cv/2+28);
+    ctx.textAlign='left'; ctx.restore();
+  }
+}
+
+function drawRocket(s, cx, groundY, scale) {
+  const H = s.H, D = s.W;
+  const r = D/2;
+  const hPx = H*scale, rPx = r*scale;
+
+  const rpx = cx + s.x * scale;
+  const rpy = groundY - s.y * scale;
+
+  // Screen axis vectors
+  const ax  =  Math.sin(s.theta);  // along rocket (screen X)
+  const ay  = -Math.cos(s.theta);  // along rocket (screen Y, up = -ve)
+  const px_s = -ay, py_s = ax;     // perpendicular right
+
+  const comPx = s.comH * scale;
+  const halfW = rPx;
+
+  const botX = rpx - ax * comPx,  botY = rpy - ay * comPx;
+  const topX = rpx + ax * (hPx - comPx), topY = rpy + ay * (hPx - comPx);
+
+  ctx.save();
+
+  // ── Engine bell ──
+  const bellH = hPx * 0.1;
+  ctx.fillStyle='#1a2e40'; ctx.strokeStyle='#334455'; ctx.lineWidth=1;
+  ctx.beginPath();
+  ctx.moveTo(botX + px_s*halfW*0.55, botY + py_s*halfW*0.55);
+  ctx.lineTo(botX - px_s*halfW*0.55, botY - py_s*halfW*0.55);
+  ctx.lineTo(botX - px_s*halfW*0.35 + ax*bellH, botY - py_s*halfW*0.35 + ay*bellH);
+  ctx.lineTo(botX + px_s*halfW*0.35 + ax*bellH, botY + py_s*halfW*0.35 + ay*bellH);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+
+  // ── Body ──
+  const bodyGrad = ctx.createLinearGradient(rpx+px_s*halfW, rpy+py_s*halfW, rpx-px_s*halfW, rpy-py_s*halfW);
+  bodyGrad.addColorStop(0,'#0d2035'); bodyGrad.addColorStop(0.2,'#1e5080');
+  bodyGrad.addColorStop(0.5,'#2a78b0'); bodyGrad.addColorStop(0.8,'#1e5080');
+  bodyGrad.addColorStop(1,'#0d2035');
+  ctx.fillStyle=bodyGrad; ctx.strokeStyle='#3a8acc'; ctx.lineWidth=0.5;
+  ctx.beginPath();
+  ctx.moveTo(botX+px_s*halfW, botY+py_s*halfW);
+  ctx.lineTo(botX-px_s*halfW, botY-py_s*halfW);
+  ctx.lineTo(topX-px_s*halfW, topY-py_s*halfW);
+  ctx.lineTo(topX+px_s*halfW, topY+py_s*halfW);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+
+  // ── Fuel level (bottom→up, clipped) ──
+  const fuelFrac = s.fuelMassInit > 0 ? s.fuelMass/s.fuelMassInit : 0;
+  if (fuelFrac > 0.01) {
+    const fuelMaxH = hPx * 0.55;
+    const fuelH    = fuelMaxH * fuelFrac;
+    const fw       = halfW * 0.75;
+    const fuelColor = fuelFrac > 0.3 ? 'rgba(0,160,255,0.32)'
+                    : fuelFrac > 0.1 ? 'rgba(255,160,0,0.38)'
+                                     : 'rgba(255,30,50,0.42)';
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(botX+px_s*halfW, botY+py_s*halfW);
+    ctx.lineTo(botX-px_s*halfW, botY-py_s*halfW);
+    ctx.lineTo(topX-px_s*halfW, topY-py_s*halfW);
+    ctx.lineTo(topX+px_s*halfW, topY+py_s*halfW);
+    ctx.closePath(); ctx.clip();
+    ctx.fillStyle = fuelColor;
+    ctx.beginPath();
+    ctx.moveTo(botX+px_s*fw, botY+py_s*fw);
+    ctx.lineTo(botX-px_s*fw, botY-py_s*fw);
+    ctx.lineTo(botX-px_s*fw+ax*fuelH, botY-py_s*fw+ay*fuelH);
+    ctx.lineTo(botX+px_s*fw+ax*fuelH, botY+py_s*fw+ay*fuelH);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = fuelFrac > 0.3 ? 'rgba(80,200,255,0.5)' : 'rgba(255,200,60,0.5)';
+    ctx.lineWidth = 0.8;
+    ctx.beginPath();
+    ctx.moveTo(botX-px_s*fw+ax*fuelH, botY-py_s*fw+ay*fuelH);
+    ctx.lineTo(botX+px_s*fw+ax*fuelH, botY+py_s*fw+ay*fuelH);
+    ctx.stroke(); ctx.restore();
+  }
+
+  // ── Nose cone (ogive) ──
+  const noseH  = hPx * 0.28;
+  const noseTX = topX + ax * noseH, noseTY = topY + ay * noseH;
+  const noseGrad = ctx.createLinearGradient(topX+px_s*halfW, topY+py_s*halfW, topX-px_s*halfW, topY-py_s*halfW);
+  noseGrad.addColorStop(0,'#0e2a40'); noseGrad.addColorStop(0.35,'#2a7ab8');
+  noseGrad.addColorStop(0.5,'#5ac8f0'); noseGrad.addColorStop(0.65,'#2a7ab8'); noseGrad.addColorStop(1,'#0e2a40');
+  ctx.fillStyle=noseGrad; ctx.strokeStyle='#3a8acc'; ctx.lineWidth=0.8;
+  ctx.beginPath();
+  ctx.moveTo(topX-px_s*halfW, topY-py_s*halfW);
+  ctx.lineTo(topX+px_s*halfW, topY+py_s*halfW);
+  ctx.quadraticCurveTo(topX+px_s*halfW*0.3+ax*noseH*0.6, topY+py_s*halfW*0.3+ay*noseH*0.6, noseTX, noseTY);
+  ctx.quadraticCurveTo(topX-px_s*halfW*0.3+ax*noseH*0.6, topY-py_s*halfW*0.3+ay*noseH*0.6, topX-px_s*halfW, topY-py_s*halfW);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  // Nose highlight
+  ctx.save(); ctx.globalAlpha=0.35; ctx.strokeStyle='#aaeeff'; ctx.lineWidth=1.5;
+  ctx.beginPath();
+  ctx.moveTo(topX+px_s*halfW*0.15, topY+py_s*halfW*0.15);
+  ctx.quadraticCurveTo(topX+px_s*halfW*0.08+ax*noseH*0.55, topY+py_s*halfW*0.08+ay*noseH*0.55, noseTX, noseTY);
+  ctx.stroke(); ctx.restore();
+
+  // ── Grid fins (near top, swept) ──
+  const finDist  = hPx * 0.15;
+  const finAX    = topX - ax * finDist, finAY = topY - ay * finDist;
+  const finH2    = hPx * 0.13, finOutW = halfW * 0.9, finSweep = finH2 * 0.35;
+  ctx.fillStyle='#1a3a55'; ctx.strokeStyle='#4a8ab0'; ctx.lineWidth=0.8;
+  // Left
+  ctx.beginPath();
+  ctx.moveTo(finAX - px_s*halfW, finAY - py_s*halfW);
+  ctx.lineTo(finAX - ax*finH2 - px_s*halfW, finAY - ay*finH2 - py_s*halfW);
+  ctx.lineTo(finAX - ax*finH2 - px_s*(halfW+finOutW), finAY - ay*finH2 - py_s*(halfW+finOutW));
+  ctx.lineTo(finAX - px_s*(halfW+finOutW*0.55) + ax*finSweep, finAY - py_s*(halfW+finOutW*0.55) + ay*finSweep);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  // Right
+  ctx.beginPath();
+  ctx.moveTo(finAX + px_s*halfW, finAY + py_s*halfW);
+  ctx.lineTo(finAX - ax*finH2 + px_s*halfW, finAY - ay*finH2 + py_s*halfW);
+  ctx.lineTo(finAX - ax*finH2 + px_s*(halfW+finOutW), finAY - ay*finH2 + py_s*(halfW+finOutW));
+  ctx.lineTo(finAX + px_s*(halfW+finOutW*0.55) + ax*finSweep, finAY + py_s*(halfW+finOutW*0.55) + ay*finSweep);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+
+  // ── Landing legs ──
+  const legH = hPx*0.18, legW = halfW*1.3;
+  ctx.fillStyle='#152535'; ctx.strokeStyle='#2a4a60'; ctx.lineWidth=0.5;
+  ctx.beginPath();
+  ctx.moveTo(botX-px_s*halfW, botY-py_s*halfW);
+  ctx.lineTo(botX-px_s*halfW+ax*legH, botY-py_s*halfW+ay*legH);
+  ctx.lineTo(botX-px_s*(halfW+legW)+ax*legH*0.1, botY-py_s*(halfW+legW)+ay*legH*0.1);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(botX+px_s*halfW, botY+py_s*halfW);
+  ctx.lineTo(botX+px_s*halfW+ax*legH, botY+py_s*halfW+ay*legH);
+  ctx.lineTo(botX+px_s*(halfW+legW)+ax*legH*0.1, botY+py_s*(halfW+legW)+ay*legH*0.1);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+
+  // ── RCS glow ──
+  const rcsActive = ctrl.rcs.rpitch || ctrl.rcs.lpitch;
+  if (rcsActive && s.rcsFuelMass > 0) {
+    const rcsDist = (hPx - comPx) * 0.85;
+    ctx.fillStyle = '#44ffff';
+    ctx.beginPath(); ctx.arc(rpx+ax*rcsDist-px_s*halfW*1.1, rpy+ay*rcsDist-py_s*halfW*1.1, 2.5, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(rpx+ax*rcsDist+px_s*halfW*1.1, rpy+ay*rcsDist+py_s*halfW*1.1, 2.5, 0, Math.PI*2); ctx.fill();
+  }
+
+  // ── CoM marker ──
+  if (opts.com) {
+    ctx.strokeStyle='#cc44ff'; ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.arc(rpx, rpy, 4, 0, Math.PI*2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(rpx-7,rpy); ctx.lineTo(rpx+7,rpy); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(rpx,rpy-7); ctx.lineTo(rpx,rpy+7); ctx.stroke();
+  }
+
+  ctx.restore();
+
+  // ── Flame (outside save/restore for blending) ──
+  if (s._thr > 0 && s.fuelMass > 0) {
+    const maxThr = 500000;
+    const thrFrac = Math.sqrt(s._thr / maxThr);
+    const gp_r = s._gp * Math.PI / 180;
+    // Thrust direction on screen
+    const tDirX =  ax * Math.cos(gp_r) + px_s * Math.sin(gp_r);
+    const tDirY =  ay * Math.cos(gp_r) + py_s * Math.sin(gp_r);
+    // Flame exits OPPOSITE to thrust
+    const fDirX = -tDirX, fDirY = -tDirY;
+    const fPerpX = -fDirY, fPerpY = fDirX;
+
+    const flicker  = 1 + 0.12*Math.sin(Date.now()*0.04) + 0.06*Math.sin(Date.now()*0.073);
+    const flameLen = Math.min(hPx * 1.8 * thrFrac * flicker + 10, hPx * 2.6);
+    const flameEndX= botX + fDirX * flameLen, flameEndY = botY + fDirY * flameLen;
+    const baseW    = Math.max(rPx * 0.5, halfW * 0.45 * thrFrac);
+
+    ctx.save();
+
+    // Outer glow
+    const glowEnd = flameLen * 0.65;
+    const glowGrad = ctx.createRadialGradient(botX,botY,0, botX,botY,glowEnd);
+    glowGrad.addColorStop(0,'rgba(255,160,30,0.18)'); glowGrad.addColorStop(0.5,'rgba(255,80,0,0.09)'); glowGrad.addColorStop(1,'rgba(255,30,0,0)');
+    ctx.beginPath();
+    ctx.moveTo(botX+fPerpX*baseW*1.8, botY+fPerpY*baseW*1.8);
+    ctx.lineTo(botX-fPerpX*baseW*1.8, botY-fPerpY*baseW*1.8);
+    ctx.lineTo(botX+fDirX*glowEnd, botY+fDirY*glowEnd);
+    ctx.closePath(); ctx.fillStyle=glowGrad; ctx.fill();
+
+    // Main cone
+    const wobble  = Math.sin(Date.now()*0.05)*baseW*0.15;
+    const midX = botX+fDirX*flameLen*0.35, midY = botY+fDirY*flameLen*0.35;
+    const flamGrad = ctx.createLinearGradient(botX,botY, flameEndX,flameEndY);
+    flamGrad.addColorStop(0,'rgba(255,255,220,1)'); flamGrad.addColorStop(0.08,'rgba(255,220,80,1)');
+    flamGrad.addColorStop(0.25,'rgba(255,120,20,0.92)'); flamGrad.addColorStop(0.55,'rgba(255,50,5,0.65)');
+    flamGrad.addColorStop(0.8,'rgba(200,20,0,0.25)'); flamGrad.addColorStop(1,'rgba(150,0,0,0)');
+    ctx.beginPath();
+    ctx.moveTo(botX+fPerpX*baseW, botY+fPerpY*baseW);
+    ctx.lineTo(botX-fPerpX*baseW, botY-fPerpY*baseW);
+    ctx.quadraticCurveTo(midX+fPerpX*baseW*0.3+wobble*fPerpX, midY+fPerpY*baseW*0.3+wobble*fPerpY, flameEndX, flameEndY);
+    ctx.closePath(); ctx.fillStyle=flamGrad; ctx.fill();
+
+    // Inner core
+    const coreLen = flameLen*0.38;
+    const coreW   = baseW*0.38;
+    const coreGrad = ctx.createLinearGradient(botX,botY, botX+fDirX*coreLen, botY+fDirY*coreLen);
+    coreGrad.addColorStop(0,'rgba(255,255,255,1)'); coreGrad.addColorStop(0.2,'rgba(255,255,180,0.95)');
+    coreGrad.addColorStop(0.7,'rgba(255,200,60,0.6)'); coreGrad.addColorStop(1,'rgba(255,120,0,0)');
+    ctx.beginPath();
+    ctx.moveTo(botX+fPerpX*coreW, botY+fPerpY*coreW);
+    ctx.lineTo(botX-fPerpX*coreW, botY-fPerpY*coreW);
+    ctx.lineTo(botX+fDirX*coreLen, botY+fDirY*coreLen);
+    ctx.closePath(); ctx.fillStyle=coreGrad; ctx.fill();
+
+    // Nozzle glow
+    const nGlow = ctx.createRadialGradient(botX,botY,0, botX,botY,baseW*1.1);
+    nGlow.addColorStop(0,'rgba(255,255,220,0.9)'); nGlow.addColorStop(0.4,'rgba(255,160,30,0.5)'); nGlow.addColorStop(1,'rgba(255,60,0,0)');
+    ctx.beginPath(); ctx.arc(botX,botY,baseW*1.1,0,Math.PI*2); ctx.fillStyle=nGlow; ctx.fill();
+
+    ctx.restore();
+  }
+}
+
+function drawForces(s, cx, groundY, scale) {
+  const rpx = cx + s.x * scale;
+  const rpy = groundY - s.y * scale;
+  const maxF  = Math.max(s._Fg, s._Ft, s._Frcs, 1);
+  const maxLen = Math.min(cv.height * 0.16, 65);
+
+  function arrow(dx, dy, color, label) {
+    const len = Math.sqrt(dx*dx+dy*dy);
+    if (len < 0.5) return;
+    const ex=rpx+dx, ey=rpy+dy;
+    ctx.save(); ctx.strokeStyle=color; ctx.fillStyle=color; ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.moveTo(rpx,rpy); ctx.lineTo(ex,ey); ctx.stroke();
+    const a = Math.atan2(dy,dx);
+    ctx.beginPath(); ctx.moveTo(ex,ey);
+    ctx.lineTo(ex-7*Math.cos(a-0.45),ey-7*Math.sin(a-0.45));
+    ctx.lineTo(ex-7*Math.cos(a+0.45),ey-7*Math.sin(a+0.45));
+    ctx.closePath(); ctx.fill();
+    if(label){ ctx.font='7px Share Tech Mono'; ctx.fillText(label,ex+3,ey-3); }
+    ctx.restore();
+  }
+
+  // Gravity (down)
+  arrow(0, s._Fg/maxF*maxLen, '#ff2244', 'Fg');
+
+  // Thrust
+  if (s._thr > 0) {
+    const gp_r = s._gp*Math.PI/180;
+    const nxa =  Math.sin(s.theta), nya = -Math.cos(s.theta);
+    const pxa = -nya, pya = nxa;
+    const tBx = nxa*Math.cos(gp_r)+pxa*Math.sin(gp_r);
+    const tBy = nya*Math.cos(gp_r)+pya*Math.sin(gp_r);
+    arrow(tBx/maxF*maxLen*s._thr, -tBy/maxF*maxLen*s._thr, '#ff6b00', 'Ft');
+  }
+
+  if (opts.drag && s._Fd > 0.1) {
+    const vm = Math.sqrt(s.vx*s.vx+s.vy*s.vy);
+    if (vm > 0) arrow(-s._Fd*s.vx/vm/maxF*maxLen, s._Fd*s.vy/vm/maxF*maxLen, '#00d4ff', 'Fd');
+  }
+
+  arrow(s._Fnx/maxF*maxLen, -s._Fny/maxF*maxLen, '#00ff88', 'Fn');
+
+  if (Math.sqrt(s.vx*s.vx+s.vy*s.vy) > 0.1) {
+    const vm = Math.sqrt(s.vx*s.vx+s.vy*s.vy);
+    const vLen = Math.min(vm*scale*0.3, maxLen*1.5);
+    arrow(s.vx/vm*vLen, -s.vy/vm*vLen, '#ffcc00', 'V');
+  }
+}
+
+// ===================================================================
+//  UI UPDATE
+// ===================================================================
+
+function updateDataPanel() {
+  const s = state;
+  const r2d = 180/Math.PI;
+  const vMag = Math.sqrt(s.vx*s.vx+s.vy*s.vy);
+  function set(id,v){const el=document.getElementById(id);if(el)el.textContent=v;}
+  set('d_x', s.x.toFixed(1));   set('d_y', s.y.toFixed(1));
+  set('d_vx', s.vx.toFixed(2)); set('d_vy', s.vy.toFixed(2));
+  set('d_pitch', (s.theta*r2d).toFixed(2));
+  set('d_omega', (s.omega*r2d).toFixed(2));
+  set('d_alt',   Math.max(0, s.y - s.comH).toFixed(1));
+  set('d_vmag',  vMag.toFixed(2));
+  set('d_fg',    s._Fg.toFixed(1));
+  set('d_ft',    s._Ft.toFixed(1));
+  set('d_gp',    s._gp.toFixed(1));
+  set('d_frcs',  s._Frcs.toFixed(1));
+  set('d_fnx',   s._Fnx.toFixed(2));
+  set('d_fny',   s._Fny.toFixed(2));
+  set('d_mass',  s.mass.toFixed(1));
+  set('d_fuel',  s.fuelMass.toFixed(1));
+  set('d_mdot',  s._mdot.toFixed(3));
+  set('d_com',   s.comH.toFixed(3));
+
+  const ff = s.fuelMassInit>0 ? s.fuelMass/s.fuelMassInit : 0;
+  const rf = s.rcsFuelMassInit>0 ? s.rcsFuelMass/s.rcsFuelMassInit : 0;
+  const fbEl  = document.getElementById('fuelBar');
+  const rfbEl = document.getElementById('rcsFuelBar');
+  if(fbEl)  fbEl.style.width  = (ff*100).toFixed(1)+'%';
+  if(rfbEl) rfbEl.style.width = (rf*100).toFixed(1)+'%';
+  set('fuelPct',    (ff*100).toFixed(0)+'%');
+  set('rcsFuelPct', (rf*100).toFixed(0)+'%');
+
+  const fuelEl = document.getElementById('d_fuel');
+  if(fuelEl) fuelEl.className='val'+(ff<0.1?' danger':ff<0.25?' warn':'');
+
+  const mins  = Math.floor(simTime/60).toString().padStart(2,'0');
+  const secs  = Math.floor(simTime%60).toString().padStart(2,'0');
+  const tenth = Math.floor((simTime*10)%10);
+  set('timeDisplay',`T+${mins}:${secs}.${tenth}`);
+}
+
+// ===================================================================
+//  SIMULATION LOOP
+// ===================================================================
+
+let _fc = 0;
+let _lastLogTime = -999;   // last simTime jab log hua
+const LOG_INTERVAL = 0.5;  // har 0.5 second
+let logBuffer = [];         // {t, phase, ...data}
+
+function doPhaseLog() {
+  const s = state;
+  const ld = landing;
+  if (!ld.active || logPaused) return;
+
+  const r2d = 180 / Math.PI;
+  const entry = {
+    t:          simTime.toFixed(2),
+    phase:      ld.phase,
+    phTimer:    ld.phaseTimer.toFixed(3),
+    // state
+    x:          s.x.toFixed(2),
+    y:          s.y.toFixed(2),
+    vx:         s.vx.toFixed(3),
+    vy:         s.vy.toFixed(3),
+    theta_deg:  (s.theta * r2d).toFixed(3),
+    omega_dps:  (s.omega * r2d).toFixed(3),
+    // actuation
+    thrust:     ctrl.mainThrust.toFixed(1),
+    gimbal_deg: ctrl.gimbal.toFixed(2),
+    rcs_ccw:    ctrl.rcs.rpitch ? 1 : 0,
+    rcs_cw:     ctrl.rcs.lpitch ? 1 : 0,
+    // mass
+    fuel:       s.fuelMass.toFixed(1),
+    rcsFuel:    s.rcsFuelMass.toFixed(1),
+    mass:       s.mass.toFixed(1),
+  };
+
+  // Phase-specific extras
+  if (ld.phase === 3 && !ld.p3_waiting) {
+    entry.p3_sigma  = ld.p3_sigma  !== undefined ? ld.p3_sigma.toFixed(5)  : '–';
+    entry.p3_A      = ld.p3_A      !== undefined ? ld.p3_A.toFixed(4)      : '–';
+    entry.p3_T      = ld.p3_T      !== undefined ? ld.p3_T.toFixed(4)      : '–';
+    entry.p3_Hi     = ld.p3_Hi     !== undefined ? ld.p3_Hi.toFixed(2)     : '–';
+    const Hs = parseFloat(document.getElementById('Hs_final').value) || 100;
+    entry.p3_Hs     = Hs.toFixed(2);
+    entry.p3_deltaV = (s.vy - (parseFloat(document.getElementById('V0_phase3').value)||0)).toFixed(3);
+  }
+  if (ld.phase === 5) {
+    entry.p5_x0     = ld.p5_x0  !== undefined ? ld.p5_x0.toFixed(2)  : '–';
+    entry.p5_vx0    = ld.p5_vx0 !== undefined ? ld.p5_vx0.toFixed(3) : '–';
+    entry.p5_k1     = ld.p5_k1  !== undefined ? ld.p5_k1.toFixed(5)  : '–';
+    entry.p5_k2     = ld.p5_k2  !== undefined ? ld.p5_k2.toFixed(5)  : '–';
+    entry.p5_A      = ld.p5_A   !== undefined ? ld.p5_A.toFixed(4)   : '–';
+    const tgtX = parseFloat(document.getElementById('targetX').value) || 0;
+    entry.dx_to_tgt = (s.x - tgtX).toFixed(2);
+  }
+
+  logBuffer.push(entry);
+  renderLogPanel(entry);
+
+  // Console group per phase
+  const phLabel = ['','P1:CancelOmega','P2:Attitude','P3:VelCancel','P4:Revert','P5:Landing'][ld.phase] || `P${ld.phase}`;
+  const style = ['color:#ffcc00','color:#00d4ff','color:#ff6b00','color:#00ff88','color:#cc44ff'][ld.phase-1] || '';
+  console.groupCollapsed(`%c[T+${entry.t}s] ${phLabel} | y=${entry.y}m vx=${entry.vx} vy=${entry.vy} θ=${entry.theta_deg}°`, style);
+  console.table(entry);
+  console.groupEnd();
+}
+
+function renderLogPanel(entry) {
+  const panel = document.getElementById('logPanel');
+  if (!panel) return;
+  const phColors = ['','#ffcc00','#00d4ff','#ff6b00','#00ff88','#cc44ff'];
+  const c = phColors[entry.phase] || '#a8d8ea';
+  const row = document.createElement('div');
+  row.className = 'log-row';
+  row.style.borderLeftColor = c;
+
+  const phName = ['','Cancelω','Attitude','VelCancel','Revert','Landing'][entry.phase] || `P${entry.phase}`;
+
+  // Core line
+  let html = `<span style="color:${c};font-weight:bold">T+${entry.t}s P${entry.phase}·${phName}</span> `;
+  html += `<span class="lv">y=<b>${entry.y}</b>m</span> `;
+  html += `<span class="lv">vx=<b>${entry.vx}</b></span> `;
+  html += `<span class="lv">vy=<b>${entry.vy}</b></span> `;
+  html += `<span class="lv">θ=<b>${entry.theta_deg}</b>°</span> `;
+  html += `<span class="lv">ω=<b>${entry.omega_dps}</b>°/s</span><br>`;
+  html += `<span class="lv dim">  Thr=<b>${entry.thrust}</b>N</span> `;
+  html += `<span class="lv dim">  Gmbl=<b>${entry.gimbal_deg}</b>°</span> `;
+  html += `<span class="lv dim">  Fuel=<b>${entry.fuel}</b>kg</span> `;
+  html += `<span class="lv dim">  Mass=<b>${entry.mass}</b>kg</span>`;
+
+  // Phase extras
+  if (entry.p3_sigma) {
+    html += `<br><span class="lv extra">  σ=<b>${entry.p3_sigma}</b> A=<b>${entry.p3_A}</b> T=<b>${entry.p3_T}</b>s Hi=<b>${entry.p3_Hi}</b>m Hs=<b>${entry.p3_Hs}</b>m ΔV=<b>${entry.p3_deltaV}</b></span>`;
+  }
+  if (entry.p5_k1) {
+    html += `<br><span class="lv extra">  k1=<b>${entry.p5_k1}</b> k2=<b>${entry.p5_k2}</b> A=<b>${entry.p5_A}</b> Δx_tgt=<b>${entry.dx_to_tgt}</b>m</span>`;
+  }
+
+  row.innerHTML = html;
+  panel.appendChild(row);
+  panel.scrollTop = panel.scrollHeight;
+
+  // Keep max 200 rows in DOM
+  while (panel.children.length > 200) panel.removeChild(panel.firstChild);
+}
+
+// ── LOG UTILITIES ──
+let logPaused = false;
+
+function clearLog() {
+  logBuffer = [];
+  const panel = document.getElementById('logPanel');
+  if (panel) panel.innerHTML = '';
+}
+
+function toggleLogPause() {
+  logPaused = !logPaused;
+  const btn = document.getElementById('logPauseBtn');
+  if (btn) {
+    btn.textContent = logPaused ? '▶ RESUME' : '⏸ PAUSE';
+    btn.classList.toggle('paused', logPaused);
+  }
+}
+
+function exportLogCSV() {
+  if (!logBuffer.length) return;
+  const keys = Object.keys(logBuffer[0]);
+  const lines = [keys.join(',')];
+  logBuffer.forEach(e => lines.push(keys.map(k => e[k] ?? '').join(',')));
+  downloadText(lines.join('\n'), 'rocket_log.csv', 'text/csv');
+}
+
+function exportLogJSON() {
+  if (!logBuffer.length) return;
+  downloadText(JSON.stringify(logBuffer, null, 2), 'rocket_log.json', 'application/json');
+}
+
+function downloadText(content, filename, type) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([content], {type}));
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// Phase transition log (event-based, instant — not interval)
+function logPhaseEvent(msg) {
+  if (logPaused) return;
+  const panel = document.getElementById('logPanel');
+  if (!panel) return;
+  const row = document.createElement('div');
+  row.style.cssText = 'border-left:2px solid #ff6b00;padding:1px 0 1px 5px;margin:3px 0;background:rgba(40,20,0,0.5);border-radius:0 3px 3px 0;font-size:8px;color:#ff6b00;font-weight:bold;';
+  row.textContent = `── T+${simTime.toFixed(2)}s  ${msg} ──`;
+  panel.appendChild(row);
+  panel.scrollTop = panel.scrollHeight;
+}
+
+window._logPhaseEvent = logPhaseEvent;  // expose for controller
+
+function loop(ts) {
+  if (!running) return;
+  if (lastTs===null) lastTs=ts;
+  let dt = (ts - lastTs)/1000;
+  lastTs = ts;
+  dt = Math.min(dt, 0.05);
+
+  const spd = parseFloat(document.getElementById('simSpeed').value)||1;
+  dt *= spd;
+
+  const steps = 4, subDt = dt/steps;
+  for (let i=0; i<steps; i++) {
+    if (landing.active) updateLandingController(subDt);
+    physicsStep(subDt);
+    simTime += subDt;
+    if (state.crashed) break;
+  }
+
+  // ── Phase logging every 0.5s simTime ──
+  if (landing.active && simTime - _lastLogTime >= LOG_INTERVAL) {
+    _lastLogTime = simTime;
+    doPhaseLog();
+  }
+
+  // Record trajectory
+  const last = trajectory[trajectory.length-1];
+  if (!last || simTime-(trajectory._lastT||0)>0.1) {
+    trajectory.push({x:state.x, y:state.y});
+    trajectory._lastT = simTime;
+    if (trajectory.length>3000) trajectory.splice(0,200);
+  }
+
+  drawFrame();
+  _fc++;
+  if (_fc%3===0) updateDataPanel();
+  syncControlUI();
+
+  if (state.crashed) {
+    updateDataPanel();
+    updateStatusUI('crashed');
+    if (landing.active) { landing.active=false; setLandingStatus('CRASHED – test failed','fail'); }
+  } else {
+    animId = requestAnimationFrame(loop);
+  }
+}
+
+// ── SYNC MANUAL CONTROL UI ──
+function syncControlUI() {
+  const dis = landing.active;
+  ['sl_mt','sl_gp','sl_rcsf','rcsBtn_rpitch','rcsBtn_lpitch'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.disabled=dis;
+  });
+  // Keep slider display in sync when landing is active
+  if (landing.active) {
+    const mt_el = document.getElementById('sl_mt');
+    const gp_el = document.getElementById('sl_gp');
+    if(mt_el){ mt_el.value = Math.min(ctrl.mainThrust, 500000); document.getElementById('lbl_mt').textContent=ctrl.mainThrust.toFixed(0); }
+    if(gp_el){ gp_el.value = ctrl.gimbal; document.getElementById('lbl_gp').textContent=ctrl.gimbal.toFixed(1); }
+    document.getElementById('needle_gp').style.transform=`translateX(-50%) rotate(${ctrl.gimbal*4}deg)`;
+    document.getElementById('nd_gp').textContent=ctrl.gimbal.toFixed(1)+'°';
+    if(ctrl.rcs.rpitch) document.getElementById('rcsBtn_rpitch').classList.add('active'); else document.getElementById('rcsBtn_rpitch').classList.remove('active');
+    if(ctrl.rcs.lpitch) document.getElementById('rcsBtn_lpitch').classList.add('active'); else document.getElementById('rcsBtn_lpitch').classList.remove('active');
+  }
+}
+
+// ===================================================================
+//  CONTROLS
+// ===================================================================
+
+function startSim() {
+  if (running) return;
+  if (state.crashed) resetSim();
+  running=true; lastTs=null;
+  updateStatusUI('running');
+  animId=requestAnimationFrame(loop);
+}
+function stopSim() {
+  running=false;
+  if(animId) cancelAnimationFrame(animId);
+  animId=null; lastTs=null;
+  updateStatusUI('stopped');
+}
+function resetSim() {
+  stopSim();
+  landing.active=false;
+  simTime=0; maxAlt=0; trajectory=[];
+  state = buildInitState();
+  ctrl.mainThrust=0; ctrl.gimbal=0;
+  ctrl.rcs.rpitch=false; ctrl.rcs.lpitch=false;
+  document.getElementById('sl_mt').value=0;
+  document.getElementById('sl_gp').value=0;
+  document.getElementById('lbl_mt').textContent='0';
+  document.getElementById('lbl_gp').textContent='0.0';
+  document.getElementById('needle_gp').style.transform='translateX(-50%) rotate(0deg)';
+  document.getElementById('nd_gp').textContent='0°';
+  setLandingStatus('Idle');
+  updateStatusUI('stopped');
+  drawFrame(); updateDataPanel();
+  syncControlUI();
+}
+function updateStatusUI(st) {
+  const dot=document.getElementById('statusDot'), txt=document.getElementById('statusText');
+  dot.className='dot';
+  if(st==='running'){ dot.classList.add('active'); txt.textContent='RUNNING'; }
+  else if(st==='crashed'){ dot.classList.add('crashed'); txt.textContent='CRASHED'; }
+  else{ dot.classList.add('stopped'); txt.textContent='STOPPED'; }
+}
+
+function updateThrusters() {
+  if (landing.active) return;
+  ctrl.mainThrust = parseFloat(document.getElementById('sl_mt').value);
+  ctrl.gimbal     = parseFloat(document.getElementById('sl_gp').value);
+  ctrl.rcsForce   = parseFloat(document.getElementById('sl_rcsf').value);
+  document.getElementById('lbl_mt').textContent  = ctrl.mainThrust.toFixed(0);
+  document.getElementById('lbl_gp').textContent  = ctrl.gimbal.toFixed(1);
+  document.getElementById('lbl_rcsf').textContent= ctrl.rcsForce.toFixed(0);
+  document.getElementById('needle_gp').style.transform=`translateX(-50%) rotate(${ctrl.gimbal*4}deg)`;
+  document.getElementById('nd_gp').textContent=ctrl.gimbal.toFixed(1)+'°';
+  if(!running){ drawFrame(); updateDataPanel(); }
+}
+
+function updateInitConfig() {
+  initCfg.dryMass    = parseFloat(document.getElementById('sl_mass').value);
+  initCfg.fuelMass   = parseFloat(document.getElementById('sl_fuel').value);
+  initCfg.rocketH    = parseFloat(document.getElementById('sl_rh').value);
+  initCfg.rocketW    = parseFloat(document.getElementById('sl_rw').value);
+  initCfg.initAngle  = parseFloat(document.getElementById('sl_ang').value);
+  initCfg.initOmega  = parseFloat(document.getElementById('sl_initOmega').value);
+  initCfg.gravity    = parseFloat(document.getElementById('sl_grav').value);
+  initCfg.initAlt    = parseFloat(document.getElementById('sl_initAlt').value);
+  initCfg.initX      = parseFloat(document.getElementById('sl_initX').value);
+  initCfg.initVx     = parseFloat(document.getElementById('sl_initVx').value);
+  initCfg.initVy     = parseFloat(document.getElementById('sl_initVy').value);
+  initCfg.Ve_MAIN    = parseFloat(document.getElementById('sl_ve').value);
+
+  document.getElementById('lbl_mass').textContent    = initCfg.dryMass;
+  document.getElementById('lbl_fuel').textContent    = initCfg.fuelMass;
+  document.getElementById('lbl_rh').textContent      = initCfg.rocketH;
+  document.getElementById('lbl_rw').textContent      = initCfg.rocketW;
+  document.getElementById('lbl_ang').textContent     = initCfg.initAngle;
+  document.getElementById('lbl_initOmega').textContent = initCfg.initOmega;
+  document.getElementById('lbl_grav').textContent    = initCfg.gravity;
+  document.getElementById('lbl_initAlt').textContent = initCfg.initAlt;
+  document.getElementById('lbl_initX').textContent   = initCfg.initX;
+  document.getElementById('lbl_initVx').textContent  = initCfg.initVx;
+  document.getElementById('lbl_initVy').textContent  = initCfg.initVy;
+  document.getElementById('lbl_ve').textContent      = initCfg.Ve_MAIN;
+
+  if(!running){ state=buildInitState(); drawFrame(); updateDataPanel(); }
+}
+
+function toggleOpt(key) {
+  opts[key]=!opts[key];
+  const el=document.getElementById('tog_'+key);
+  if(el){ if(opts[key]) el.classList.add('on'); else el.classList.remove('on'); }
+  if(!running) drawFrame();
+}
+
+function rcsPress(jet) {
+  if(landing.active) return;
+  ctrl.rcs[jet]=true;
+  const el=document.getElementById('rcsBtn_'+jet);
+  if(el) el.classList.add('active');
+}
+function rcsRelease(jet) {
+  if(landing.active) return;
+  ctrl.rcs[jet]=false;
+  const el=document.getElementById('rcsBtn_'+jet);
+  if(el) el.classList.remove('active');
+}
+
+// ── Keyboard ──
+const keysDown=new Set();
+document.addEventListener('keydown',(e)=>{
+  if(keysDown.has(e.code)) return;
+  keysDown.add(e.code);
+  if(landing.active){ if(e.code==='Space'){e.preventDefault();} return; }
+  switch(e.code){
+    case 'Space': e.preventDefault(); running?stopSim():startSim(); break;
+    case 'KeyR':  resetSim(); break;
+    case 'ArrowUp':   e.preventDefault(); document.getElementById('sl_mt').value=Math.min(500000,ctrl.mainThrust+5000); updateThrusters(); break;
+    case 'ArrowDown': e.preventDefault(); document.getElementById('sl_mt').value=Math.max(0,ctrl.mainThrust-5000); updateThrusters(); break;
+    case 'KeyW': document.getElementById('sl_gp').value=Math.min(20,ctrl.gimbal+0.5); updateThrusters(); break;
+    case 'KeyS': document.getElementById('sl_gp').value=Math.max(-20,ctrl.gimbal-0.5); updateThrusters(); break;
+    case 'KeyA': rcsPress('rpitch'); break;
+    case 'KeyD': rcsPress('lpitch'); break;
+  }
+});
+document.addEventListener('keyup',(e)=>{
+  keysDown.delete(e.code);
+  if(landing.active) return;
+  switch(e.code){
+    case 'KeyA': rcsRelease('rpitch'); break;
+    case 'KeyD': rcsRelease('lpitch'); break;
+  }
+});
+
+window.addEventListener('resize',()=>{ initCanvasSize(); if(!running) drawFrame(); });
+
+// ── INIT ──
+initCanvasSize();
+state = buildInitState();
+updateInitConfig();
+updateThrusters();
+drawFrame();
+updateDataPanel();
+updateStatusUI('stopped');
+setLandingStatus('Idle');
+</script>
+</body>
+</html>

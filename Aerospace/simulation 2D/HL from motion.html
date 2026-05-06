@@ -744,7 +744,7 @@ let hl = {
   // Initial velocities at landing start
   Vi_X: 0, Vi_Y: 0,
   // Target positions
-  targetX: 0, targetY: 0,
+  targetX: -99.9, targetY: 0,
   // Start positions (for comparison panel)
   startX: 0, startY: 0,
   // Live display values
@@ -829,11 +829,11 @@ function loadHLPreset() {
     rocketH  : 20,
     rocketW  : 4,
     gravity  : 9.81,
-    x        : -100,   // start position
+    x        : 100,   // start position
     y        : 500,    // altitude 300m
-    vx       : 10,     // rightward drift
+    vx       : -10,     // rightward drift
     vy       : -15,    // falling
-    theta    : 15,     // deg tilted
+    theta    : -15,     // deg tilted
     omega    : -0.05,  // rad/s spin
   };
 
@@ -1250,12 +1250,12 @@ function loadPreset() {
     rocketW  : 4,      // m
     gravity  : 9.81,   // m/s²
     // Mid-air state
-    x        : -100,      // m  (horizontal position)
+    x        : 100,      // m  (horizontal position)
     y        : 800,    // m  (altitude — enough time for RE + decel)
-    vx       : 15,      // m/s  (rightward drift)
+    vx       : -15,      // m/s  (rightward drift)
     vy       : -15,    // m/s  (falling — negative = downward)
-    theta    : 30,     // deg  (tilted CCW from vertical)
-    omega    : -0.05,    // rad/s  (CCW spin, positive)
+    theta    : -30,     // deg  (tilted CCW from vertical)
+    omega    : 0.05,    // rad/s  (CCW spin, positive)
   };
 
   // ── Sync initCfg sliders to preset values ──
