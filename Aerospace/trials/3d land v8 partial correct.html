@@ -2527,16 +2527,15 @@ function worldToBody(q, vWorld) {
 }
 
 // ── Helper: bisection root-finder for sigma (Phase 3) ──
-// F(σ) = g*(Hs-Hi) - (vy*ΔV*σ)/tan(σ/2) - (ΔV²/tan²(σ/2))*(sin(σ)-σ)/sin(σ)
+// F(σ) = -g*(Hs-Hi) - (vy*ΔV*σ)/tan(σ/2) - (ΔV²/tan²(σ/2))*(sin(σ)-σ)/sin(σ)
 function solveSigma(g, Hi, Hs, vy_i, V0) {
-  const dV = V0 - vy_i; // ΔV (what we need to add to current vy to reach V0)
-  // F(σ): must equal zero
+  const dV = -(V0 - vy_i);
   function F(sig) {
     const t2  = Math.tan(sig / 2);
     if (Math.abs(t2) < 1e-10) return Infinity;
     const sin_s = Math.sin(sig);
     if (Math.abs(sin_s) < 1e-10) return Infinity;
-    return g * (Hs - Hi)
+    return -g * (Hs - Hi)
            - (vy_i * dV * sig) / t2
            - (dV * dV / (t2 * t2)) * (sin_s - sig) / sin_s;
   }
@@ -3138,7 +3137,7 @@ function updateLandingController(dt) {
       landing.p4_dWy = angle * ab.y; // body-Y: RCS roll controls wy
       landing.p4_dWz = angle * ab.z; // body-Z: gimbalPitch controls wz
 
-      // A = 2π*Δθ/T4² per axis
+      // A = -2π*Δθ/T4² per axis (negative sign for correct direction)
       landing.p4_Ax = -2*Math.PI * landing.p4_dWx / (T4*T4);
       landing.p4_Ay = -2*Math.PI * landing.p4_dWy / (T4*T4);
       landing.p4_Az = -2*Math.PI * landing.p4_dWz / (T4*T4);
@@ -3180,12 +3179,12 @@ function updateLandingController(dt) {
       else             ctrl.rcs.rroll = true;   // need -αy
     }
 
-    // Apply gimbal (clamped to ±20°)
-    const maxG = 20*Math.PI/180;
-    ctrl.gimbalPitch = Math.max(-maxG, Math.min(maxG, gp));
-    ctrl.gimbalYaw   = Math.max(-maxG, Math.min(maxG, gy));
+    // ctrl stores degrees — convert radians to degrees
+    const maxG_deg = 20.0;
+    ctrl.gimbalPitch = Math.max(-maxG_deg, Math.min(maxG_deg, gp * 180/Math.PI));
+    ctrl.gimbalYaw   = Math.max(-maxG_deg, Math.min(maxG_deg, gy * 180/Math.PI));
     ctrl.mainThrust  = Math.min(
-      Math.abs(Fy_hover) / Math.max(Math.cos(ctrl.gimbalPitch)*Math.cos(ctrl.gimbalYaw), 0.2),
+      Math.abs(Fy_hover) / Math.max(Math.cos(gp)*Math.cos(gy), 0.2),
       500000
     );
 
@@ -3267,12 +3266,12 @@ function updateLandingController(dt) {
 
     const thrust_mag5 = Math.sqrt(Fx_b*Fx_b + Fy_b*Fy_b + Fz_b*Fz_b);
     ctrl.mainThrust  = Math.min(thrust_mag5, 500000);
-    ctrl.gimbalPitch = (thrust_mag5 > 1) ? Math.atan2(Fx_b, Fy_b) : 0;
-    ctrl.gimbalYaw   = (thrust_mag5 > 1) ? Math.atan2(Fz_b, Fy_b) : 0;
+    ctrl.gimbalPitch = (thrust_mag5 > 1) ? Math.atan2(Fx_b, Fy_b) * 180/Math.PI : 0;
+    ctrl.gimbalYaw   = (thrust_mag5 > 1) ? Math.atan2(Fz_b, Fy_b) * 180/Math.PI : 0;
 
-    // Clamp gimbal
-    ctrl.gimbalPitch = Math.max(-20*Math.PI/180, Math.min(20*Math.PI/180, ctrl.gimbalPitch));
-    ctrl.gimbalYaw   = Math.max(-20*Math.PI/180, Math.min(20*Math.PI/180, ctrl.gimbalYaw));
+    // Clamp gimbal (degrees)
+    ctrl.gimbalPitch = Math.max(-20, Math.min(20, ctrl.gimbalPitch));
+    ctrl.gimbalYaw   = Math.max(-20, Math.min(20, ctrl.gimbalYaw));
 
     // Distance to target (XZ only)
     const distXZ = Math.sqrt((s.x - lp.targetX)**2 + (s.z - lp.targetZ)**2);
