@@ -733,7 +733,7 @@ input[type=range].warn::-webkit-slider-thumb { background:var(--warn); box-shado
     </div>
     <div class="ctrl-row">
       <div class="ctrl-label">V₀ – final vy (m/s) <span class="blue" id="lbl_lv0">0</span></div>
-      <input type="range" min="-20" max="0" step="1" value="0" id="sl_lv0" oninput="updateLandingParams()">
+      <input type="range" min="-20" max="0" step="1" value="-3" id="sl_lv0" oninput="updateLandingParams()">
     </div>
     <div class="ctrl-row">
       <div class="ctrl-label">MaxThrust trig (N) <span class="blue" id="lbl_lmt">200000</span></div>
@@ -2148,7 +2148,7 @@ function logLandingState() {
     `att=p${(euler.pitch*r2d).toFixed(1)}°y${(euler.yaw*r2d).toFixed(1)}°r${(euler.roll*r2d).toFixed(1)}° | ` +
     `ω=(${(s.wx*r2d).toFixed(2)},${(s.wy*r2d).toFixed(2)},${(s.wz*r2d).toFixed(2)})°/s | ` +
     `fuel=${s.fuelMass.toFixed(1)}kg rcs=${s.rcsFuelMass.toFixed(1)}kg | ` +
-    `thr=${ctrl.mainThrust.toFixed(0)}N gp=${(ctrl.gimbalPitch*r2d).toFixed(1)}°gy=${(ctrl.gimbalYaw*r2d).toFixed(1)}° | ` +
+    `thr=${ctrl.mainThrust.toFixed(0)}N gp=${ctrl.gimbalPitch.toFixed(1)}°gy=${ctrl.gimbalYaw.toFixed(1)}° | ` +
     `mass=${s.mass.toFixed(1)}kg`
   );
 }
@@ -2408,10 +2408,10 @@ let landingParams = {
   T_p1: 2.0,       // Phase 1 duration (omega cancellation) [s]
   T_p2: 5.0,       // Phase 2 duration (attitude transition) [s]
   T_p4: 4.0,       // Phase 4 duration (re-verticalisation) [s]
-  T_p5: 20.0,       // Phase 5 duration (precision landing) [s]
+  T_p5: 60.0,       // Phase 5 duration (precision landing) [s]
   H0:   800,       // Trigger altitude for phase 3 [m]
   Hs:   300,       // Final target altitude for sigma formula [m]
-  V0:   0,         // Desired final vertical velocity after phase 3 [m/s]
+  V0:   -3,        // Desired final vertical velocity after phase 3 [m/s]
   maxThrustThreshold: 200000, // Phase 3 trigger thrust [N]
   targetX: 0,
   targetZ: 0,
@@ -2458,8 +2458,8 @@ let landing = {
   p4_flipThX: 0,   p4_flipThY: 0,  p4_flipThZ: 0,
 
   // Phase 5 recorded state
-  p5_x0: 0, p5_z0: 0,
-  p5_vx0: 0, p5_vz0: 0,
+  p5_x0: 0, p5_z0: 0, p5_y0: 0,
+  p5_vx0: 0, p5_vz0: 0, p5_vy0: 0,
 
   // Phase 5 finish holddown
   successHold: false,
@@ -2788,10 +2788,9 @@ function nextPhase() {
   }
 
   else if (landing.phase === 5) {
-    // Record phase 5 initial state
-    landing.p5_x0  = s.x;  landing.p5_z0  = s.z;
-    landing.p5_vx0 = s.vx; landing.p5_vz0 = s.vz;
-    console.log(`[Landing] Phase 5: pos=(${s.x.toFixed(1)},${s.z.toFixed(1)}) vel=(${s.vx.toFixed(2)},${s.vz.toFixed(2)})`);
+    landing.p5_x0  = s.x;  landing.p5_z0  = s.z;  landing.p5_y0  = s.y;
+    landing.p5_vx0 = s.vx; landing.p5_vz0 = s.vz; landing.p5_vy0 = s.vy;
+    console.log(`[Landing] Phase 5: pos=(${s.x.toFixed(1)},${s.y.toFixed(1)},${s.z.toFixed(1)}) vel=(${s.vx.toFixed(2)},${s.vy.toFixed(2)},${s.vz.toFixed(2)})`);
     setLandingStatus('Phase 5/5: Precision land…', 'var(--accent3)');
     updatePhaseBar(5);
   }
@@ -3263,76 +3262,88 @@ function updateLandingController(dt) {
     return;
   }
 
+// ── hlFormula: same as 2D reference implementation ──
+// Returns { a, v, x } given time t, total time T, initial velocity Vi, displacement D
+function hlFormula(t, T, Vi, D) {
+  const omega = 2 * Math.PI / T;
+  if (Math.abs(Vi) < 0.01) return { a: 0, v: 0, x: 0 };
+
+  // k1 = arccot( π*(1 - 2D/(Vi*T)) )
+  const cotArg = Math.PI * (1 - (2 * D) / (Vi * T));
+  const k1 = Math.atan2(1, cotArg);
+
+  // k2 = arcsin( -Vi/T )
+  const k2 = Math.asin(Math.max(-1, Math.min(1, -Vi / T)));
+
+  // A = -Vi / (T * sin(k1))
+  const sinK1 = Math.sin(k1);
+  const A = (Math.abs(sinK1) < 1e-6) ? 0 : -Vi / (T * sinK1);
+
+  // a(t) = -A*sin(ω*t - k1) - sin(k2)
+  const phase = omega * t - k1;
+  const a = -A * Math.sin(phase) - Math.sin(k2);
+
+  return { a, k1, k2, A, omega };
+}
+
   // ════════════════════════
-  //   PHASE 5: Precision landing
+  //   PHASE 5: Precision landing (HL formula — all 3 axes)
   // ════════════════════════
   if (landing.phase === 5) {
     Object.keys(ctrl.rcs).forEach(k => ctrl.rcs[k] = false);
 
-    const t   = landing.phaseTimer;
-    const T5  = lp.T_p5;
-    const w5  = 2*Math.PI / T5;
+    const t  = landing.phaseTimer;
+    const T5 = lp.T_p5;
 
-    // ── X axis guidance ──
-    const Dx  = lp.targetX - landing.p5_x0;
-    const Vi_x = landing.p5_vx0;
-    const k1x  = Math.atan(1 / (Math.PI * (1 - (2*Dx) / (Vi_x * T5 + 1e-9))));
-    const k2x  = Math.asin(Math.max(-1, Math.min(1, -Vi_x / T5)));
-    const Ax   = -Vi_x / (T5 * Math.sin(k1x) + 1e-9);
-    const ax_des = -Ax * Math.sin(w5*t - k1x) - Math.sin(k2x);
+    // ── X axis ──
+    const Dx   = lp.targetX - landing.p5_x0;
+    const fX   = hlFormula(t, T5, landing.p5_vx0, Dx);
+    const Fx_world = s.mass * (-fX.a);
 
-    // ── Z axis guidance ──
+    // ── Z axis ──
     const Dz   = lp.targetZ - landing.p5_z0;
-    const Vi_z = landing.p5_vz0;
-    const k1z  = Math.atan(1 / (Math.PI * (1 - (2*Dz) / (Vi_z * T5 + 1e-9))));
-    const k2z  = Math.asin(Math.max(-1, Math.min(1, -Vi_z / T5)));
-    const Az   = -Vi_z / (T5 * Math.sin(k1z) + 1e-9);
-    const az_des = -Az * Math.sin(w5*t - k1z) - Math.sin(k2z);
+    const fZ   = hlFormula(t, T5, landing.p5_vz0, Dz);
+    const Fz_world = s.mass * (-fZ.a);
 
-    // ── World frame force vector ──
-    // Horizontal corrections + vertical hover
-    const Fx_world = s.mass * ax_des;
-    const Fz_world = s.mass * az_des;
-    const Fy_world = s.mass * g;  // maintain altitude
+    // ── Y axis (same as 2D: Fy = M*(g + (-fY.a))) ──
+    // Dy = negative displacement (going down to ground)
+    const Dy   = -(landing.p5_y0 - s.comH); // distance to ground (positive)
+    const fY   = hlFormula(t, T5, landing.p5_vy0, -Dy); // D negative = going down
+    const Fy_world = s.mass * (g + (-fY.a));
 
-    // Transform to body frame
+    // ── World → Body frame ──
     const F_world_vec = { x: Fx_world, y: Fy_world, z: Fz_world };
     const F_body_vec  = worldToBody(q, F_world_vec);
-
     const Fx_b = F_body_vec.x;
     const Fy_b = F_body_vec.y;
     const Fz_b = F_body_vec.z;
 
+    // ── Thrust & gimbal ──
     const thrust_mag5 = Math.sqrt(Fx_b*Fx_b + Fy_b*Fy_b + Fz_b*Fz_b);
-    ctrl.mainThrust  = Math.min(thrust_mag5, 500000);
+    ctrl.mainThrust  = Math.min(Math.max(thrust_mag5, 0), 500000);
     ctrl.gimbalPitch = (thrust_mag5 > 1) ? Math.atan2(Fx_b, Fy_b) * 180/Math.PI : 0;
     ctrl.gimbalYaw   = (thrust_mag5 > 1) ? Math.atan2(Fz_b, Fy_b) * 180/Math.PI : 0;
-
-    // Clamp gimbal (degrees)
     ctrl.gimbalPitch = Math.max(-20, Math.min(20, ctrl.gimbalPitch));
     ctrl.gimbalYaw   = Math.max(-20, Math.min(20, ctrl.gimbalYaw));
 
-    // Distance to target (XZ only)
-    const distXZ = Math.sqrt((s.x - lp.targetX)**2 + (s.z - lp.targetZ)**2);
-
+    const distXZ = Math.sqrt((s.x-lp.targetX)**2 + (s.z-lp.targetZ)**2);
     setLandingDebug(
       `t=${t.toFixed(1)}/${T5}s\n`+
-      `dx=${distXZ.toFixed(1)}m vx=${s.vx.toFixed(2)} vz=${s.vz.toFixed(2)}\n`+
-      `vy=${s.vy.toFixed(2)} F=${ctrl.mainThrust.toFixed(0)}N`
+      `dx=${distXZ.toFixed(1)}m dy=${(s.y-s.comH).toFixed(1)}m\n`+
+      `vx=${s.vx.toFixed(2)} vy=${s.vy.toFixed(2)} vz=${s.vz.toFixed(2)}\n`+
+      `F=${ctrl.mainThrust.toFixed(0)}N gp=${ctrl.gimbalPitch.toFixed(1)}° gy=${ctrl.gimbalYaw.toFixed(1)}°`
     );
 
-    // ── Landing success check ──
-    const onOrNearGround = s.y <= s.comH + 0.5;
-    const velOk = Math.abs(s.vx) < 0.5 && Math.abs(s.vz) < 0.5 && Math.abs(s.vy) < 0.5;
-    const omegaOk = Math.abs(s.wx) < 0.01 && Math.abs(s.wz) < 0.01;
-    const attOk   = Math.abs(euler.pitch) < 2*Math.PI/180 && Math.abs(euler.yaw) < 2*Math.PI/180;
-    const posOk   = distXZ < 5;
+    // ── Success / end ──
+    const onGround = s.y <= s.comH + 0.5;
+    const velOk    = Math.abs(s.vx)<1 && Math.abs(s.vz)<1 && Math.abs(s.vy)<2;
+    const attOk    = Math.abs(euler.pitch)<3*Math.PI/180 && Math.abs(euler.yaw)<3*Math.PI/180;
+    const posOk    = distXZ < 10;
 
-    if ((t >= T5 || (velOk && attOk && posOk)) && onOrNearGround) {
-      ctrl.mainThrust  = 0;
-      ctrl.gimbalPitch = 0;
-      ctrl.gimbalYaw   = 0;
-      nextPhase(); // → success hold
+    if (t >= T5 || (onGround && velOk && attOk && posOk)) {
+      ctrl.mainThrust = 0; ctrl.gimbalPitch = 0; ctrl.gimbalYaw = 0;
+      console.log(`[Landing] Phase 5 END: pos=(${s.x.toFixed(1)},${s.y.toFixed(1)},${s.z.toFixed(1)}) vel=(${s.vx.toFixed(2)},${s.vy.toFixed(2)},${s.vz.toFixed(2)}) distXZ=${distXZ.toFixed(1)}m`);
+      nextPhase();
     }
     return;
   }

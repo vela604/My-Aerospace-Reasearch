@@ -733,7 +733,7 @@ input[type=range].warn::-webkit-slider-thumb { background:var(--warn); box-shado
     </div>
     <div class="ctrl-row">
       <div class="ctrl-label">V₀ – final vy (m/s) <span class="blue" id="lbl_lv0">0</span></div>
-      <input type="range" min="-20" max="0" step="1" value="0" id="sl_lv0" oninput="updateLandingParams()">
+      <input type="range" min="-20" max="0" step="1" value="-3" id="sl_lv0" oninput="updateLandingParams()">
     </div>
     <div class="ctrl-row">
       <div class="ctrl-label">MaxThrust trig (N) <span class="blue" id="lbl_lmt">200000</span></div>
@@ -753,6 +753,94 @@ input[type=range].warn::-webkit-slider-thumb { background:var(--warn); box-shado
 
     <!-- Live debug info -->
     <div id="landingDebug" style="font-size:7px;color:var(--dim);line-height:1.5;margin-top:3px;"></div>
+  </div>
+
+  <!-- ===== HOVER TEST PANEL ===== -->
+  <div class="panel-section" id="hoverTestPanel">
+    <div class="section-title" style="color:#cc44ff;">🚀 HOVER TEST (Ph1→Ph5)</div>
+    <div style="font-size:7px;color:var(--dim);line-height:1.5;margin-bottom:5px;">
+      Phase A: Rocket spawns upright, stationary hover (vx=vy=vz=0).<br>
+      Phase B: Ph-B velocities injected → HL precision landing to target.
+    </div>
+
+    <button class="btn" id="btnStartHover" onclick="startHoverTest()"
+      style="border-color:#cc44ff;color:#cc44ff;width:100%;margin-bottom:3px;">
+      🛸 HOVER TEST
+    </button>
+    <button class="btn btn-stop" id="btnAbortHover" onclick="abortHoverTest()" style="margin-top:0;margin-bottom:4px;">
+      ⛔ ABORT
+    </button>
+
+    <!-- Phase progress bar for hover test -->
+    <div style="font-size:9px;color:#cc44ff;margin-bottom:3px;" id="hoverStatus">Status: Idle</div>
+    <div style="font-size:8px;display:flex;gap:3px;margin-bottom:5px;" id="hoverPhaseBar">
+      <div style="flex:1;height:4px;border-radius:2px;background:var(--border);border:1px solid #cc44ff44;" id="hpb1"></div>
+      <div style="flex:1;height:4px;border-radius:2px;background:var(--border);border:1px solid #cc44ff44;" id="hpb2"></div>
+    </div>
+
+    <!-- Initial rocket position & velocity -->
+    <div style="font-size:8px;color:#cc44ff;border-bottom:1px solid var(--border);padding-bottom:2px;margin-bottom:4px;font-family:'Orbitron',sans-serif;letter-spacing:1px;">ROCKET INIT STATE</div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px;margin-bottom:4px;">
+      <div>
+        <div style="font-size:7px;color:var(--dim);margin-bottom:1px;">Init X (m)</div>
+        <input type="number" id="ht_initX" value="200" step="10"
+          style="width:100%;background:var(--bg);color:#cc44ff;border:1px solid #cc44ff44;border-radius:2px;font-size:9px;padding:2px 4px;font-family:'Share Tech Mono',monospace;">
+      </div>
+      <div>
+        <div style="font-size:7px;color:var(--dim);margin-bottom:1px;">Init Y/Alt (m)</div>
+        <input type="number" id="ht_initY" value="200" step="10"
+          style="width:100%;background:var(--bg);color:#cc44ff;border:1px solid #cc44ff44;border-radius:2px;font-size:9px;padding:2px 4px;font-family:'Share Tech Mono',monospace;">
+      </div>
+      <div>
+        <div style="font-size:7px;color:var(--dim);margin-bottom:1px;">Init Z (m)</div>
+        <input type="number" id="ht_initZ" value="200" step="10"
+          style="width:100%;background:var(--bg);color:#cc44ff;border:1px solid #cc44ff44;border-radius:2px;font-size:9px;padding:2px 4px;font-family:'Share Tech Mono',monospace;">
+      </div>
+      <div>
+        <div style="font-size:7px;color:var(--dim);margin-bottom:1px;">Ph-B Vx (m/s)</div>
+        <input type="number" id="ht_initVx" value="-10" step="1"
+          style="width:100%;background:var(--bg);color:#cc44ff;border:1px solid #cc44ff44;border-radius:2px;font-size:9px;padding:2px 4px;font-family:'Share Tech Mono',monospace;">
+      </div>
+      <div>
+        <div style="font-size:7px;color:var(--dim);margin-bottom:1px;">Ph-B Vy (m/s)</div>
+        <input type="number" id="ht_initVy" value="-10" step="1"
+          style="width:100%;background:var(--bg);color:#cc44ff;border:1px solid #cc44ff44;border-radius:2px;font-size:9px;padding:2px 4px;font-family:'Share Tech Mono',monospace;">
+      </div>
+      <div>
+        <div style="font-size:7px;color:var(--dim);margin-bottom:1px;">Ph-B Vz (m/s)</div>
+        <input type="number" id="ht_initVz" value="-10" step="1"
+          style="width:100%;background:var(--bg);color:#cc44ff;border:1px solid #cc44ff44;border-radius:2px;font-size:9px;padding:2px 4px;font-family:'Share Tech Mono',monospace;">
+      </div>
+    </div>
+
+    <!-- Target landing coordinates -->
+    <div style="font-size:8px;color:#cc44ff;border-bottom:1px solid var(--border);padding-bottom:2px;margin-bottom:4px;font-family:'Orbitron',sans-serif;letter-spacing:1px;">TARGET LANDING</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px;margin-bottom:4px;">
+      <div>
+        <div style="font-size:7px;color:var(--dim);margin-bottom:1px;">Target X (m)</div>
+        <input type="number" id="ht_tgtX" value="0" step="10"
+          style="width:100%;background:var(--bg);color:var(--accent3);border:1px solid var(--border);border-radius:2px;font-size:9px;padding:2px 4px;font-family:'Share Tech Mono',monospace;">
+      </div>
+      <div>
+        <div style="font-size:7px;color:var(--dim);margin-bottom:1px;">Target Y (m)</div>
+        <input type="number" id="ht_tgtY" value="0" step="10"
+          style="width:100%;background:var(--bg);color:var(--accent3);border:1px solid var(--border);border-radius:2px;font-size:9px;padding:2px 4px;font-family:'Share Tech Mono',monospace;">
+      </div>
+      <div>
+        <div style="font-size:7px;color:var(--dim);margin-bottom:1px;">Target Z (m)</div>
+        <input type="number" id="ht_tgtZ" value="0" step="10"
+          style="width:100%;background:var(--bg);color:var(--accent3);border:1px solid var(--border);border-radius:2px;font-size:9px;padding:2px 4px;font-family:'Share Tech Mono',monospace;">
+      </div>
+      <div>
+        <div style="font-size:7px;color:var(--dim);margin-bottom:1px;">Phase B T (s)</div>
+        <input type="number" id="ht_hoverT" value="15" step="0.5" min="1" max="60"
+          style="width:100%;background:var(--bg);color:var(--accent);border:1px solid var(--border);border-radius:2px;font-size:9px;padding:2px 4px;font-family:'Share Tech Mono',monospace;">
+      </div>
+    </div>
+
+    <!-- Live debug -->
+    <div id="hoverDebug" style="font-size:7px;color:var(--dim);line-height:1.5;margin-top:3px;"></div>
   </div>
 
   <div class="panel-section">
@@ -1018,232 +1106,226 @@ function physicsStep(dt) {
   const W = s.W;
   const r = W / 2;
 
-  // ── 1. Rotation matrix (body→world) from quaternion ──
-  const q = { w: s.qw, x: s.qx, y: s.qy, z: s.qz };
-  const R = quatToR(q);
-
-  // Body axes in world frame
-  // Body +Y = rocket long axis (pointing "up" along rocket)
-  const bodyY = { x: R[0][1], y: R[1][1], z: R[2][1] }; // rocket axis direction
-  const bodyX = { x: R[0][0], y: R[1][0], z: R[2][0] };
-  const bodyZ = { x: R[0][2], y: R[1][2], z: R[2][2] };
-
-  // ── 2. CoM & Inertia ──
+  // ── CoM & Inertia (from current fuel state) ──
   s.comH = computeCoM(s.fuelMass, s.dryMass, H);
   const { Ixx, Iyy, Izz } = computeInertia(s.mass, s.fuelMass, s.dryMass, H, W, s.comH);
   s.Ixx = Ixx; s.Iyy = Iyy; s.Izz = Izz;
 
-  // ── 3. Main Thrust ──
-  // Gimbal: rotate thrust vector in body frame
-  // gimbalPitch: rotation of nozzle about body X axis (tilts thrust in body YZ plane)
-  // gimbalYaw: rotation of nozzle about body Z axis (tilts thrust in body YX plane)
-  const gp = ctrl.gimbalPitch * Math.PI / 180;
-  const gy = ctrl.gimbalYaw   * Math.PI / 180;
-
-  // Thrust direction in BODY frame (nozzle points down = -bodyY, so thrust = +bodyY rotated by gimbal)
-  // Gimbal rotates thrust vector away from -bodyY axis
-  // Thrust in body = (sin(gp)*X + cos(gp)*cos(gy)*Y + cos(gp)*sin(gy)*Z) [rotated by gimbal]
-  // Actually: start from +bodyY (along axis), rotate by pitch gp about bodyX, then yaw gy about bodyZ
-  let tBody = {
-    x:  Math.sin(gp),
-    y:  Math.cos(gp) * Math.cos(gy),
-    z: -Math.sin(gy) * Math.cos(gp)
-  };
-  // Normalize (should be already unit)
-  tBody = norm3(tBody);
-
-  // Effective thrust magnitude (fuel check)
-  let F_thrust = 0;
-  let mdot     = 0;
-  if (s.fuelMass > 0 && ctrl.mainThrust > 0) {
-    F_thrust = ctrl.mainThrust;
-    mdot     = F_thrust / s.Ve_MAIN;   // kg/s consumed
-  }
-  s._mdot = mdot;
-  s._thr  = F_thrust;
-  s._gp   = ctrl.gimbalPitch;
-  s._gy   = ctrl.gimbalYaw;
-
-  // Thrust force in world frame
-  const F_thrust_world = rotateVec(R, scale3(tBody, F_thrust));
-
-  // Torque due to thrust:
-  // Application point: nozzle at bottom of rocket = (0, -comH, 0) in body frame from CoM
-  const r_nozzle_body = { x: 0, y: -s.comH, z: 0 };
-  // Thrust force in body frame
-  const F_thrust_body = scale3(tBody, F_thrust);
-  const torq_T_body   = cross(r_nozzle_body, F_thrust_body);
-
-  // ── 4. RCS Thrusters ──
-  // RCS jets mounted at top of rocket (at H - comH from CoM) pointing radially
-  // Each jet in body frame:
+  // ── RCS torque in body frame (constant across RK4 — RCS doesn't depend on attitude for torque) ──
   let F_rcs_body  = { x: 0, y: 0, z: 0 };
   let torq_R_body = { x: 0, y: 0, z: 0 };
   let rcs_mdot    = 0;
-  const rcsMomentArm = H - s.comH;   // distance from CoM to RCS ring (top)
+  const rcsMomentArm = H - s.comH;
   const rcsForce = ctrl.rcsForce;
 
-  // Translational RCS jets (near CoM)
   function addRcsJet(forceBody, posBody) {
     if (s.rcsFuelMass <= 0) return;
     F_rcs_body  = add3(F_rcs_body, forceBody);
     torq_R_body = add3(torq_R_body, cross(posBody, forceBody));
     rcs_mdot   += len3(forceBody) / Ve_RCS;
   }
-
-  const halfH = rcsMomentArm;  // moment arm for rotational RCS
-
-  // Rotational RCS (torque-generating, mounted at top ring)
-  if (ctrl.rcs.rpitch && s.rcsFuelMass > 0)
-    addRcsJet({x: 0, y: 0, z: rcsForce}, {x: 0, y: halfH, z: 0});
-  if (ctrl.rcs.lpitch && s.rcsFuelMass > 0)
-    addRcsJet({x: 0, y: 0, z: -rcsForce}, {x: 0, y: halfH, z: 0});
-  if (ctrl.rcs.ryaw && s.rcsFuelMass > 0)
-    addRcsJet({x: rcsForce, y: 0, z: 0}, {x: 0, y: halfH, z: 0});
-  if (ctrl.rcs.lyaw && s.rcsFuelMass > 0)
-    addRcsJet({x: -rcsForce, y: 0, z: 0}, {x: 0, y: halfH, z: 0});
-  // Roll RCS — jets fire in Z direction at X offset from body axis
-  // τ = r × F: r=(±W/2, 0, 0), F=(0,0,±F)
-  // τy = rz*Fx - rx*Fz = 0 - (±W/2)*(±F) = pure roll torque ✓
-  // τz = rx*Fy - ry*Fx = 0 ✓  τx = ry*Fz - rz*Fy = 0 ✓
-  const rollArm = s.W * 0.5; // half-width = moment arm for roll
-  if (ctrl.rcs.rroll && s.rcsFuelMass > 0) {
-    // Positive τy (right roll): F in +Z at +X, F in -Z at -X
-    addRcsJet({x: 0, y: 0, z:  rcsForce}, {x:  rollArm, y: 0, z: 0});
-    addRcsJet({x: 0, y: 0, z: -rcsForce}, {x: -rollArm, y: 0, z: 0});
+  const halfH = rcsMomentArm;
+  const rollArm = s.W * 0.5;
+  if (ctrl.rcs.rpitch && s.rcsFuelMass > 0) addRcsJet({x:0,y:0,z:rcsForce},  {x:0,y:halfH,z:0});
+  if (ctrl.rcs.lpitch && s.rcsFuelMass > 0) addRcsJet({x:0,y:0,z:-rcsForce}, {x:0,y:halfH,z:0});
+  if (ctrl.rcs.ryaw   && s.rcsFuelMass > 0) addRcsJet({x:rcsForce,y:0,z:0},  {x:0,y:halfH,z:0});
+  if (ctrl.rcs.lyaw   && s.rcsFuelMass > 0) addRcsJet({x:-rcsForce,y:0,z:0}, {x:0,y:halfH,z:0});
+  if (ctrl.rcs.rroll  && s.rcsFuelMass > 0) {
+    addRcsJet({x:0,y:0,z:rcsForce},  {x:rollArm,y:0,z:0});
+    addRcsJet({x:0,y:0,z:-rcsForce}, {x:-rollArm,y:0,z:0});
   }
-  if (ctrl.rcs.lroll && s.rcsFuelMass > 0) {
-    // Negative τy (left roll): F in -Z at +X, F in +Z at -X
-    addRcsJet({x: 0, y: 0, z: -rcsForce}, {x:  rollArm, y: 0, z: 0});
-    addRcsJet({x: 0, y: 0, z:  rcsForce}, {x: -rollArm, y: 0, z: 0});
+  if (ctrl.rcs.lroll  && s.rcsFuelMass > 0) {
+    addRcsJet({x:0,y:0,z:-rcsForce}, {x:rollArm,y:0,z:0});
+    addRcsJet({x:0,y:0,z:rcsForce},  {x:-rollArm,y:0,z:0});
   }
-  // Translational RCS (fire opposite pairs to translate without torque — near CoM)
-  if (ctrl.rcs.px && s.rcsFuelMass > 0)
-    addRcsJet({x: rcsForce, y: 0, z: 0}, {x: 0, y: 0, z: 0});
-  if (ctrl.rcs.nx && s.rcsFuelMass > 0)
-    addRcsJet({x: -rcsForce, y: 0, z: 0}, {x: 0, y: 0, z: 0});
-  if (ctrl.rcs.pz && s.rcsFuelMass > 0)
-    addRcsJet({x: 0, y: 0, z: rcsForce}, {x: 0, y: 0, z: 0});
-  if (ctrl.rcs.nz && s.rcsFuelMass > 0)
-    addRcsJet({x: 0, y: 0, z: -rcsForce}, {x: 0, y: 0, z: 0});
-
+  if (ctrl.rcs.px && s.rcsFuelMass > 0) addRcsJet({x:rcsForce,y:0,z:0},  {x:0,y:0,z:0});
+  if (ctrl.rcs.nx && s.rcsFuelMass > 0) addRcsJet({x:-rcsForce,y:0,z:0}, {x:0,y:0,z:0});
+  if (ctrl.rcs.pz && s.rcsFuelMass > 0) addRcsJet({x:0,y:0,z:rcsForce},  {x:0,y:0,z:0});
+  if (ctrl.rcs.nz && s.rcsFuelMass > 0) addRcsJet({x:0,y:0,z:-rcsForce}, {x:0,y:0,z:0});
   s._mdotrcs = rcs_mdot;
 
-  // RCS force in world frame
-  const F_rcs_world = rotateVec(R, F_rcs_body);
-
-  // ── 5. Gravity ──
-  const F_grav = { x: 0, y: -s.mass * g, z: 0 };
-  s._Fg = s.mass * g;
-
-  // ── 6. Drag (optional) ──
-  let F_drag = { x: 0, y: 0, z: 0 };
-  const vMag = Math.sqrt(s.vx*s.vx + s.vy*s.vy + s.vz*s.vz);
-  if (opts.drag && vMag > 0) {
-    const A_ref = Math.PI * r * r;  // cross section
-    const Fd_mag = 0.5 * RHO_AIR * Cd_ROCKET * A_ref * vMag * vMag;
-    F_drag = { x: -Fd_mag * s.vx/vMag, y: -Fd_mag * s.vy/vMag, z: -Fd_mag * s.vz/vMag };
-    s._Fd = Fd_mag;
-  } else {
-    s._Fd = 0;
-  }
-
-  // ── 7. Ground support force (normal reaction) ──
-  // If rocket is on/near ground and net downward force exists, ground pushes back
-  const onGround = (s.y <= s.comH + 0.05) && (s.vy <= 0.01);
-  let groundNormalY = 0;
-  if (onGround) {
-    // Net downward force before normal
-    const tentativeFy = F_grav.y + F_thrust_world.y + F_rcs_world.y + F_drag.y;
-    if (tentativeFy < 0) {
-      groundNormalY = -tentativeFy; // cancel downward force
+  // ── World-frame desired force from controller (fixed for this timestep) ──
+  // We store F_world so each RK4 sub-step can reproject into current body frame
+  // This is exactly what 2D does: Fx_world/Fy_world fixed, then decompose by current theta each k
+  let F_ctrl_world = { x: 0, y: 0, z: 0 };  // world-frame thrust target
+  let F_thrust_mag = 0;
+  if (s.fuelMass > 0 && ctrl.mainThrust > 0) {
+    F_thrust_mag = ctrl.mainThrust;
+    if (ctrl.tBodyOverride) {
+      // Controller gave us a world-frame desired force implicitly via tBodyOverride
+      // We reconstruct the world force: it was originally F_world that got worldToBody'd
+      // Store the world-frame force directly so RK4 can re-decompose each step
+      // F_world was set in hover controller — retrieve it from ctrl if stored, else recompute
+      if (ctrl.F_world) {
+        F_ctrl_world = ctrl.F_world;  // use stored world force
+      } else {
+        // Fallback: use current quaternion to get world force from tBodyOverride
+        const q0 = { w:s.qw, x:s.qx, y:s.qy, z:s.qz };
+        const R0 = quatToR(q0);
+        const tW = rotateVec(R0, ctrl.tBodyOverride);
+        F_ctrl_world = scale3(tW, F_thrust_mag);
+      }
+    } else {
+      // Manual gimbal — convert to world frame using current quaternion
+      const gp = ctrl.gimbalPitch * Math.PI / 180;
+      const gy = ctrl.gimbalYaw   * Math.PI / 180;
+      const tB = { x: Math.sin(gp), y: Math.cos(gp)*Math.cos(gy), z: -Math.sin(gy)*Math.cos(gp) };
+      const q0 = { w:s.qw, x:s.qx, y:s.qy, z:s.qz };
+      const R0 = quatToR(q0);
+      F_ctrl_world = scale3(rotateVec(R0, tB), F_thrust_mag);
     }
-    // Also zero out downward velocity
-    if (s.vy < 0) s.vy = 0;
   }
 
-  // ── 8. Net force (world frame) ──
-  const Fnx = F_grav.x + F_thrust_world.x + F_rcs_world.x + F_drag.x;
-  const Fny = F_grav.y + F_thrust_world.y + F_rcs_world.y + F_drag.y + groundNormalY;
-  const Fnz = F_grav.z + F_thrust_world.z + F_rcs_world.z + F_drag.z;
+  // ── RK4 derivatives function ──
+  // At each intermediate step, reproject F_ctrl_world into current body frame
+  // → this is the 2D trick: world force fixed, body decomposition live with attitude
+  function derivs(pos, vel, quat, omega) {
+    const qq = quatNorm(quat);
+    const Rr = quatToR(qq);
 
-  s._Ft   = F_thrust;
-  s._Frcs = len3(F_rcs_world);
-  s._Fnx  = Fnx; s._Fny = Fny; s._Fnz = Fnz;
-  s._torqTx = torq_T_body.x; s._torqTy = torq_T_body.y; s._torqTz = torq_T_body.z;
-  s._torqRx = torq_R_body.x; s._torqRy = torq_R_body.y; s._torqRz = torq_R_body.z;
+    // Reproject world-frame controller force into current body frame → get tBody
+    let thr_world = { x:0, y:0, z:0 };
+    let torq_T = { x:0, y:0, z:0 };
+    if (F_thrust_mag > 0) {
+      // Decompose F_ctrl_world into body frame using current orientation
+      const F_body = worldToBody(qq, F_ctrl_world);
+      const F_body_mag = len3(F_body);
+      if (F_body_mag > 0.01) {
+        const tB = { x: F_body.x/F_body_mag, y: F_body.y/F_body_mag, z: F_body.z/F_body_mag };
+        // Actual thrust in world = rotate tB back to world (= F_ctrl_world direction, magnitude F_thrust_mag)
+        // This preserves the world-frame force exactly regardless of attitude
+        thr_world = rotateVec(Rr, scale3(tB, F_thrust_mag));
+        // Torque from nozzle offset (real physics — nozzle at bottom of rocket)
+        const r_nozzle = { x:0, y:-s.comH, z:0 };
+        torq_T = cross(r_nozzle, scale3(tB, F_thrust_mag));
+      }
+    }
 
-  // ── 9. Net torque in body frame ──
-  const torq_net_body = add3(torq_T_body, torq_R_body);
+    // RCS world force
+    const rcs_world = rotateVec(Rr, F_rcs_body);
 
-  // ── 10. Translational dynamics ──
+    // Gravity
+    const F_grav_y = -s.mass * g;
+
+    // Net world force → linear acceleration
+    const ax = (thr_world.x + rcs_world.x) / s.mass;
+    const ay = (thr_world.y + rcs_world.y + F_grav_y) / s.mass;
+    const az = (thr_world.z + rcs_world.z) / s.mass;
+
+    // Net torque body frame
+    const torq_net = add3(torq_T, torq_R_body);
+
+    // Euler rotational equations
+    const wx = omega.x, wy = omega.y, wz = omega.z;
+    const alx = (torq_net.x - (Izz - Iyy)*wy*wz) / Ixx;
+    const aly = (torq_net.y - (Ixx - Izz)*wx*wz) / Iyy;
+    const alz = (torq_net.z - (Iyy - Ixx)*wx*wy) / Izz;
+
+    // Quaternion kinematics: dq = 0.5 * q ⊗ [0, wx, wy, wz]
+    const w_q = { w:0, x:wx, y:wy, z:wz };
+    const dq  = quatMul(qq, w_q);
+
+    return {
+      dx: vel.x, dy: vel.y, dz: vel.z,
+      dvx: ax, dvy: ay, dvz: az,
+      dqw: 0.5*dq.w, dqx: 0.5*dq.x, dqy: 0.5*dq.y, dqz: 0.5*dq.z,
+      dwx: alx, dwy: aly, dwz: alz,
+      // store for display
+      _thr_world: thr_world, _torq_T: torq_T
+    };
+  }
+
+  // ── RK4 integration ──
+  const p0 = { x:s.x,  y:s.y,  z:s.z  };
+  const v0 = { x:s.vx, y:s.vy, z:s.vz };
+  const q0 = { w:s.qw, x:s.qx, y:s.qy, z:s.qz };
+  const w0 = { x:s.wx, y:s.wy, z:s.wz };
+
+  const k1 = derivs(p0, v0, q0, w0);
+
+  const p2 = { x:p0.x+0.5*dt*k1.dx, y:p0.y+0.5*dt*k1.dy, z:p0.z+0.5*dt*k1.dz };
+  const v2 = { x:v0.x+0.5*dt*k1.dvx, y:v0.y+0.5*dt*k1.dvy, z:v0.z+0.5*dt*k1.dvz };
+  const q2 = quatNorm({ w:q0.w+0.5*dt*k1.dqw, x:q0.x+0.5*dt*k1.dqx, y:q0.y+0.5*dt*k1.dqy, z:q0.z+0.5*dt*k1.dqz });
+  const w2 = { x:w0.x+0.5*dt*k1.dwx, y:w0.y+0.5*dt*k1.dwy, z:w0.z+0.5*dt*k1.dwz };
+  const k2 = derivs(p2, v2, q2, w2);
+
+  const p3 = { x:p0.x+0.5*dt*k2.dx, y:p0.y+0.5*dt*k2.dy, z:p0.z+0.5*dt*k2.dz };
+  const v3 = { x:v0.x+0.5*dt*k2.dvx, y:v0.y+0.5*dt*k2.dvy, z:v0.z+0.5*dt*k2.dvz };
+  const q3 = quatNorm({ w:q0.w+0.5*dt*k2.dqw, x:q0.x+0.5*dt*k2.dqx, y:q0.y+0.5*dt*k2.dqy, z:q0.z+0.5*dt*k2.dqz });
+  const w3 = { x:w0.x+0.5*dt*k2.dwx, y:w0.y+0.5*dt*k2.dwy, z:w0.z+0.5*dt*k2.dwz };
+  const k3 = derivs(p3, v3, q3, w3);
+
+  const p4 = { x:p0.x+dt*k3.dx, y:p0.y+dt*k3.dy, z:p0.z+dt*k3.dz };
+  const v4 = { x:v0.x+dt*k3.dvx, y:v0.y+dt*k3.dvy, z:v0.z+dt*k3.dvz };
+  const q4 = quatNorm({ w:q0.w+dt*k3.dqw, x:q0.x+dt*k3.dqx, y:q0.y+dt*k3.dqy, z:q0.z+dt*k3.dqz });
+  const w4 = { x:w0.x+dt*k3.dwx, y:w0.y+dt*k3.dwy, z:w0.z+dt*k3.dwz };
+  const k4 = derivs(p4, v4, q4, w4);
+
+  // Weighted average
+  s.x  += (dt/6)*(k1.dx  + 2*k2.dx  + 2*k3.dx  + k4.dx );
+  s.y  += (dt/6)*(k1.dy  + 2*k2.dy  + 2*k3.dy  + k4.dy );
+  s.z  += (dt/6)*(k1.dz  + 2*k2.dz  + 2*k3.dz  + k4.dz );
+  s.vx += (dt/6)*(k1.dvx + 2*k2.dvx + 2*k3.dvx + k4.dvx);
+  s.vy += (dt/6)*(k1.dvy + 2*k2.dvy + 2*k3.dvy + k4.dvy);
+  s.vz += (dt/6)*(k1.dvz + 2*k2.dvz + 2*k3.dvz + k4.dvz);
+  s.wx += (dt/6)*(k1.dwx + 2*k2.dwx + 2*k3.dwx + k4.dwx);
+  s.wy += (dt/6)*(k1.dwy + 2*k2.dwy + 2*k3.dwy + k4.dwy);
+  s.wz += (dt/6)*(k1.dwz + 2*k2.dwz + 2*k3.dwz + k4.dwz);
+
+  const qNew = quatNorm({
+    w: q0.w + (dt/6)*(k1.dqw + 2*k2.dqw + 2*k3.dqw + k4.dqw),
+    x: q0.x + (dt/6)*(k1.dqx + 2*k2.dqx + 2*k3.dqx + k4.dqx),
+    y: q0.y + (dt/6)*(k1.dqy + 2*k2.dqy + 2*k3.dqy + k4.dqy),
+    z: q0.z + (dt/6)*(k1.dqz + 2*k2.dqz + 2*k3.dqz + k4.dqz),
+  });
+  s.qw = qNew.w; s.qx = qNew.x; s.qy = qNew.y; s.qz = qNew.z;
+
+  // ── Display values (from k1 — first step best represents start-of-step state) ──
+  const F_tw = k1._thr_world;
+  const q_cur = { w:s.qw, x:s.qx, y:s.qy, z:s.qz };
+  const R_cur = quatToR(q_cur);
+  const F_rcs_world_disp = rotateVec(R_cur, F_rcs_body);
+  const Fnx = F_tw.x + F_rcs_world_disp.x;
+  const Fny = F_tw.y + F_rcs_world_disp.y - s.mass*g;
+  const Fnz = F_tw.z + F_rcs_world_disp.z;
   s.ax = Fnx / s.mass;
   s.ay = Fny / s.mass;
   s.az = Fnz / s.mass;
 
-  s.vx += s.ax * dt;
-  s.vy += s.ay * dt;
-  s.vz += s.az * dt;
+  s._Ft   = F_thrust_mag;
+  s._thr  = F_thrust_mag;  // alias for draw functions
+  s._Frcs = len3(F_rcs_world_disp);
+  s._mdot = F_thrust_mag > 0 ? F_thrust_mag / s.Ve_MAIN : 0;
+  s._gp   = ctrl.gimbalPitch;
+  s._gy   = ctrl.gimbalYaw;
+  const torq_disp = k1._torq_T ? add3(k1._torq_T, torq_R_body) : torq_R_body;
+  s._torqTx = k1._torq_T ? k1._torq_T.x : 0;
+  s._torqTy = k1._torq_T ? k1._torq_T.y : 0;
+  s._torqTz = k1._torq_T ? k1._torq_T.z : 0;
+  s._torqRx = torq_R_body.x; s._torqRy = torq_R_body.y; s._torqRz = torq_R_body.z;
+  s._Fg = s.mass * g;
+  s._Fd = 0;
+  s._Fnx = Fnx; s._Fny = Fny; s._Fnz = Fnz;
 
-  s.x += s.vx * dt;
-  s.y += s.vy * dt;
-  s.z += s.vz * dt;
-
-  // ── 11. Rotational dynamics (body frame) ──
-  // Euler's equations for rigid body (body frame):
-  // Ixx * αx = τx - (Izz - Iyy)*wy*wz
-  // Iyy * αy = τy - (Ixx - Izz)*wx*wz
-  // Izz * αz = τz - (Iyy - Ixx)*wx*wy
-  s.alx = (torq_net_body.x - (Izz - Iyy) * s.wy * s.wz) / Ixx;
-  s.aly = (torq_net_body.y - (Ixx - Izz) * s.wx * s.wz) / Iyy;
-  s.alz = (torq_net_body.z - (Iyy - Ixx) * s.wx * s.wy) / Izz;
-
-  s.wx += s.alx * dt;
-  s.wy += s.aly * dt;
-  s.wz += s.alz * dt;
-
-  // ── 12. Quaternion kinematics ──
-  // dq/dt = 0.5 * q ⊗ ω_quat   where ω_quat = [0, wx, wy, wz] (pure quaternion)
-  // This maps body-frame angular velocity to quaternion rate of change.
-  // No gimbal lock, no singularities.
-  const omega_quat = { w: 0, x: s.wx, y: s.wy, z: s.wz };
-  const dq = quatMul(q, omega_quat);
-  s.qw += 0.5 * dq.w * dt;
-  s.qx += 0.5 * dq.x * dt;
-  s.qy += 0.5 * dq.y * dt;
-  s.qz += 0.5 * dq.z * dt;
-
-  // Re-normalize every step to prevent numerical drift
-  const qNew = quatNorm({ w: s.qw, x: s.qx, y: s.qy, z: s.qz });
-  s.qw = qNew.w; s.qx = qNew.x; s.qy = qNew.y; s.qz = qNew.z;
-
-  // ── 13. Mass update ──
-  const fuel_used     = mdot * dt;
-  const rcs_fuel_used = rcs_mdot * dt;
-
+  // ── Mass update ──
+  const fuel_used = s._mdot * dt;
   if (s.fuelMass > 0) {
-    s.fuelMass -= fuel_used;
-    if (s.fuelMass < 0) { s.fuelMass = 0; }
+    s.fuelMass = Math.max(0, s.fuelMass - fuel_used);
     s.mass = s.dryMass + s.fuelMass + s.rcsFuelMass;
   }
   if (opts.rcsfuel && s.rcsFuelMass > 0) {
-    s.rcsFuelMass -= rcs_fuel_used;
-    if (s.rcsFuelMass < 0) { s.rcsFuelMass = 0; }
+    s.rcsFuelMass = Math.max(0, s.rcsFuelMass - rcs_mdot * dt);
     s.mass = s.dryMass + s.fuelMass + s.rcsFuelMass;
   }
 
-  // ── 14. Ground check ──
-  // Rocket bottom is at (y - comH). Ground at y=0.
-  // Contact when y <= comH.
+  // ── Ground check ──
   if (s.y <= s.comH) {
     if (s.vy < -2.0) {
-      // Hard landing / crash
       s.crashed = true;
       s.y = s.comH;
       s.vy = 0; s.vx = 0; s.vz = 0;
       s.wx = 0; s.wy = 0; s.wz = 0;
     } else {
-      // Gentle ground contact — stop vertical motion, sit on ground
       s.vy = 0;
       s.y = s.comH;
     }
@@ -2148,7 +2230,7 @@ function logLandingState() {
     `att=p${(euler.pitch*r2d).toFixed(1)}°y${(euler.yaw*r2d).toFixed(1)}°r${(euler.roll*r2d).toFixed(1)}° | ` +
     `ω=(${(s.wx*r2d).toFixed(2)},${(s.wy*r2d).toFixed(2)},${(s.wz*r2d).toFixed(2)})°/s | ` +
     `fuel=${s.fuelMass.toFixed(1)}kg rcs=${s.rcsFuelMass.toFixed(1)}kg | ` +
-    `thr=${ctrl.mainThrust.toFixed(0)}N gp=${(ctrl.gimbalPitch*r2d).toFixed(1)}°gy=${(ctrl.gimbalYaw*r2d).toFixed(1)}° | ` +
+    `thr=${ctrl.mainThrust.toFixed(0)}N gp=${ctrl.gimbalPitch.toFixed(1)}°gy=${ctrl.gimbalYaw.toFixed(1)}° | ` +
     `mass=${s.mass.toFixed(1)}kg`
   );
 }
@@ -2169,6 +2251,8 @@ function loop(timestamp) {
   for (let i=0; i<steps; i++) {
     // Landing controller overrides ctrl before physics integrates
     if (landing.active) updateLandingController(subDt);
+    // Hover test controller (mutually exclusive with landing test)
+    if (hoverTest.active) updateHoverController(subDt);
     physicsStep(subDt);
     simTime += subDt;
     if (state.crashed) break;
@@ -2408,10 +2492,10 @@ let landingParams = {
   T_p1: 2.0,       // Phase 1 duration (omega cancellation) [s]
   T_p2: 5.0,       // Phase 2 duration (attitude transition) [s]
   T_p4: 4.0,       // Phase 4 duration (re-verticalisation) [s]
-  T_p5: 20.0,       // Phase 5 duration (precision landing) [s]
+  T_p5: 60.0,       // Phase 5 duration (precision landing) [s]
   H0:   800,       // Trigger altitude for phase 3 [m]
   Hs:   300,       // Final target altitude for sigma formula [m]
-  V0:   0,         // Desired final vertical velocity after phase 3 [m/s]
+  V0:   -3,        // Desired final vertical velocity after phase 3 [m/s]
   maxThrustThreshold: 200000, // Phase 3 trigger thrust [N]
   targetX: 0,
   targetZ: 0,
@@ -2458,8 +2542,8 @@ let landing = {
   p4_flipThX: 0,   p4_flipThY: 0,  p4_flipThZ: 0,
 
   // Phase 5 recorded state
-  p5_x0: 0, p5_z0: 0,
-  p5_vx0: 0, p5_vz0: 0,
+  p5_x0: 0, p5_z0: 0, p5_y0: 0,
+  p5_vx0: 0, p5_vz0: 0, p5_vy0: 0,
 
   // Phase 5 finish holddown
   successHold: false,
@@ -2599,7 +2683,7 @@ function startLandingTest() {
   s.crashed = false;
 
   // 3. Zero manual controls
-  ctrl.mainThrust  = 0;
+  ctrl.mainThrust  = 0; ctrl.tBodyOverride = null; ctrl.F_world = null;
   ctrl.gimbalPitch = 0;
   ctrl.gimbalYaw   = 0;
   Object.keys(ctrl.rcs).forEach(k => ctrl.rcs[k] = false);
@@ -2625,7 +2709,7 @@ function startLandingTest() {
 function abortLanding() {
   if (!landing.active) return;
   landing.active = false;
-  ctrl.mainThrust  = 0;
+  ctrl.mainThrust  = 0; ctrl.tBodyOverride = null; ctrl.F_world = null;
   ctrl.gimbalPitch = 0;
   ctrl.gimbalYaw   = 0;
   Object.keys(ctrl.rcs).forEach(k => ctrl.rcs[k] = false);
@@ -2634,6 +2718,444 @@ function abortLanding() {
   setLandingDebug('');
   console.log('[Landing] ABORTED by user');
 }
+
+// ════════════════════════════════════════
+//   HOVER TEST STATE MACHINE
+//   Phase A: Weight balance / hover stabilise (upright rocket, kill residual velocities)
+//   Phase B: Precision landing (Phase 5 HL formula to target)
+// ════════════════════════════════════════
+let hoverTest = {
+  active: false,
+  phase: 0,              // 'A' = hover-stabilise, 'B' = precision land
+  phaseTimer: 0,
+  phaseStartTime: 0,
+  targetX: 0,
+  targetY: 0,
+  targetZ: 0,
+  hoverT: 3,             // seconds to spend in hover stabilise
+  // Phase B initial conditions (same as landing phase 5)
+  pB_x0:0, pB_z0:0, pB_y0:0,
+  pB_vx0:0, pB_vz0:0, pB_vy0:0,
+  pB_T: 8,
+  successHold: false,
+  successHoldStart: 0,
+};
+
+function setHoverStatus(msg, color) {
+  const el = document.getElementById('hoverStatus');
+  if (el) { el.textContent = 'Status: ' + msg; el.style.color = color || '#cc44ff'; }
+}
+function setHoverDebug(msg) {
+  const el = document.getElementById('hoverDebug');
+  if (el) el.textContent = msg;
+}
+function updateHoverPhaseBar(ph) {
+  // ph: 'A'=1, 'B'=2, 0=reset
+  ['hpb1','hpb2'].forEach((id,i) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (ph === 0) { el.style.background = 'var(--border)'; return; }
+    const active = (ph === 'A' && i===0) || (ph === 'B' && i===1);
+    const done   = (ph === 'B' && i===0);
+    el.style.background = done ? 'var(--accent3)' : active ? '#cc44ff' : 'var(--border)';
+  });
+}
+
+// ════════════════════════════════════════
+//   START HOVER TEST
+// ════════════════════════════════════════
+function startHoverTest() {
+  if (hoverTest.active || landing.active) return;
+
+  // Read inputs
+  const initX  = parseFloat(document.getElementById('ht_initX').value)  || 0;
+  const initY  = parseFloat(document.getElementById('ht_initY').value)  || 500;
+  const initZ  = parseFloat(document.getElementById('ht_initZ').value)  || 0;
+  const initVx = parseFloat(document.getElementById('ht_initVx').value) || 0;
+  const initVy = parseFloat(document.getElementById('ht_initVy').value) || 0;
+  const initVz = parseFloat(document.getElementById('ht_initVz').value) || 0;
+  const tgtX   = parseFloat(document.getElementById('ht_tgtX').value)   || 0;
+  const tgtY   = parseFloat(document.getElementById('ht_tgtY').value)   || 0;
+  const tgtZ   = parseFloat(document.getElementById('ht_tgtZ').value)   || 0;
+  const hoverT = parseFloat(document.getElementById('ht_hoverT').value) || 3;
+
+  hoverTest.targetX = tgtX;
+  hoverTest.targetY = tgtY;
+  hoverTest.targetZ = tgtZ;
+  hoverTest.hoverT  = Math.max(1, hoverT);
+
+  // 1. Reset simulation (keeps geometry & fuel)
+  resetSim();
+
+  const s = state;
+
+  // 2. Place rocket UPRIGHT in the air at given position
+  //    Upright = identity quaternion (body Y = world Y = up)
+  s.x = initX;
+  s.y = Math.max(s.comH + 10, initY);  // ensure above ground
+  s.z = initZ;
+  // Phase A: rocket starts stationary (velocities = 0 for hover stabilise)
+  // Phase B velocities (from inputs) will be injected at the A→B transition
+  s.vx = 0; s.vy = 0; s.vz = 0;
+  // Perfectly vertical: identity quaternion
+  s.qw = 1; s.qx = 0; s.qy = 0; s.qz = 0;
+  // Zero angular rates
+  s.wx = 0; s.wy = 0; s.wz = 0;
+  s.ax = 0; s.ay = 0; s.az = 0;
+  // Full fuel
+  s.fuelMass    = initCfg.fuelMass;
+  s.rcsFuelMass = initCfg.rcsFuelMass;
+  s.mass        = s.dryMass + s.fuelMass + s.rcsFuelMass;
+  s.crashed     = false;
+
+  // 3. Zero manual controls
+  ctrl.mainThrust  = 0; ctrl.tBodyOverride = null; ctrl.F_world = null;
+  ctrl.gimbalPitch = 0;
+  ctrl.gimbalYaw   = 0;
+  Object.keys(ctrl.rcs).forEach(k => ctrl.rcs[k] = false);
+
+  // 4. Init hover state machine — Phase A
+  hoverTest.active         = true;
+  hoverTest.phase          = 'A';
+  hoverTest.phaseStartTime = simTime;
+  hoverTest.phaseTimer     = 0;
+  hoverTest.successHold    = false;
+
+  // 5. Start sim
+  startSim();
+
+  console.log(`[HoverTest] STARTED — Rocket at (${initX},${s.y.toFixed(1)},${initZ}) vel=(${initVx},${initVy},${initVz}) upright`);
+  console.log(`[HoverTest] Target: (${tgtX},${tgtY},${tgtZ})  hoverT=${hoverTest.hoverT}s`);
+  setHoverStatus('Phase A: Hover Stabilise…', '#cc44ff');
+  updateHoverPhaseBar('A');
+}
+
+// ════════════════════════════════════════
+//   ABORT HOVER TEST
+// ════════════════════════════════════════
+function abortHoverTest() {
+  if (!hoverTest.active) return;
+  hoverTest.active = false;
+  ctrl.mainThrust  = 0; ctrl.tBodyOverride = null; ctrl.F_world = null;
+  ctrl.gimbalPitch = 0;
+  ctrl.gimbalYaw   = 0;
+  Object.keys(ctrl.rcs).forEach(k => ctrl.rcs[k] = false);
+  setHoverStatus('ABORTED', 'var(--danger)');
+  updateHoverPhaseBar(0);
+  setHoverDebug('');
+  console.log('[HoverTest] ABORTED by user');
+}
+
+// ════════════════════════════════════════
+//   HOVER TEST CONTROLLER  (called every sub-step alongside landing controller)
+// ════════════════════════════════════════
+function updateHoverController(dt) {
+  if (!hoverTest.active) return;
+
+  const s  = state;
+  const g  = s.gravity;
+
+  // ── Success hold ──
+  if (hoverTest.successHold) {
+    const F_hover = s.mass * g;
+    ctrl.mainThrust  = Math.min(F_hover, 500000);
+    ctrl.gimbalPitch = 0;
+    ctrl.gimbalYaw   = 0;
+    if (simTime - hoverTest.successHoldStart >= 1.0) {
+      ctrl.mainThrust = 0;
+      hoverTest.active = false;
+      hoverTest.successHold = false;
+      setHoverStatus('✅ HOVER TEST SUCCESS!', 'var(--accent3)');
+      document.getElementById('hpb1').style.background = 'var(--accent3)';
+      document.getElementById('hpb2').style.background = 'var(--accent3)';
+      console.log('[HoverTest] SUCCESS');
+    }
+    return;
+  }
+
+  hoverTest.phaseTimer = simTime - hoverTest.phaseStartTime;
+
+  // ── Fuel check ──
+  if (s.fuelMass <= 0) {
+    hoverTest.active = false;
+    ctrl.mainThrust = 0;
+    setHoverStatus('FAILED – Fuel depleted', 'var(--danger)');
+    console.error('[HoverTest] FAILED – fuel empty');
+    return;
+  }
+
+  const q     = { w:s.qw, x:s.qx, y:s.qy, z:s.qz };
+
+  // ────────────────────────────────────────────────────
+  //  PHASE A: Hover / Weight-balance stabilise
+  //  Rocket is upright. Goal:
+  //    1. Zero out translational velocities (vx, vz) using gimbal
+  //    2. Hold altitude (fight gravity) with main thrust
+  //    3. Keep attitude upright (damp any micro-tilts via RCS)
+  //    4. Run for hoverT seconds then transition to Phase B
+  // ────────────────────────────────────────────────────
+  if (hoverTest.phase === 'A') {
+    Object.keys(ctrl.rcs).forEach(k => ctrl.rcs[k] = false);
+
+    // ── Attitude damp: keep rocket upright via RCS ──
+    // Very small tilt tolerance — RCS corrects any drift
+    const eps_w = 0.002; // rad/s
+    if (Math.abs(s.wx) > eps_w) {
+      if (s.wx > 0) ctrl.rcs.rpitch = true;
+      else          ctrl.rcs.lpitch = true;
+    }
+    if (Math.abs(s.wz) > eps_w) {
+      if (s.wz > 0) ctrl.rcs.ryaw = true;
+      else          ctrl.rcs.lyaw = true;
+    }
+    if (Math.abs(s.wy) > eps_w) {
+      if (s.wy > 0) ctrl.rcs.lroll = true;
+      else          ctrl.rcs.rroll = true;
+    }
+
+    // ── Translational velocity zeroing via gimbal ──
+    // We want to produce world-X and world-Z deceleration forces.
+    // Since rocket is near-upright, body Y ≈ world Y.
+    // Gimbal pitch tilts thrust into body-X → world-X force.
+    // Gimbal yaw  tilts thrust into body-Z → world-Z force.
+    // Desired world decel: ax_des = -kp * vx,  az_des = -kp * vz
+    const kp = 0.4;  // proportional gain
+    const F_hover = s.mass * g;  // gravity-cancelling thrust
+
+    const ax_des = -kp * s.vx;
+    const az_des = -kp * s.vz;
+
+    // gimbalPitch: sin(gp) ≈ gp for small angles → gp = M*ax_des / F_hover
+    // (sign: positive gp tilts body-X thrust in +world-X direction)
+    const gp_rad = Math.atan2(s.mass * ax_des, F_hover);
+    const gy_rad = Math.atan2(s.mass * az_des, F_hover);
+
+    const maxGimbal = 15 * Math.PI / 180;
+    ctrl.gimbalPitch = Math.max(-maxGimbal, Math.min(maxGimbal, gp_rad)) * 180/Math.PI;
+    ctrl.gimbalYaw   = Math.max(-maxGimbal, Math.min(maxGimbal, gy_rad)) * 180/Math.PI;
+
+    // ── Altitude hold: thrust = F_hover / (cos(gp)*cos(gy)) ──
+    const gp_clamped = ctrl.gimbalPitch * Math.PI / 180;
+    const gy_clamped = ctrl.gimbalYaw   * Math.PI / 180;
+    const thrust_hover = F_hover / Math.max(Math.cos(gp_clamped)*Math.cos(gy_clamped), 0.5);
+    ctrl.mainThrust = Math.min(thrust_hover, 500000);
+
+    // ── Simple status in debug panel only (no console spam) ──
+    setHoverDebug(
+      `── Phase A  t=${hoverTest.phaseTimer.toFixed(1)}/${hoverTest.hoverT}s ──\n` +
+      `POS  x=${s.x.toFixed(2)}  y=${s.y.toFixed(2)}  z=${s.z.toFixed(2)}\n` +
+      `VEL  vx=${s.vx.toFixed(3)} vy=${s.vy.toFixed(3)} vz=${s.vz.toFixed(3)}\n` +
+      `F_hover=${F_hover.toFixed(0)}N → thrust=${ctrl.mainThrust.toFixed(0)}N\n` +
+      `gp=${ctrl.gimbalPitch.toFixed(2)}° gy=${ctrl.gimbalYaw.toFixed(2)}°`
+    );
+
+    // ── Transition to Phase B after hoverT seconds ──
+    if (hoverTest.phaseTimer >= hoverTest.hoverT) {
+      // Clear controls
+      ctrl.mainThrust  = 0; ctrl.tBodyOverride = null; ctrl.F_world = null;
+      ctrl.gimbalPitch = 0;
+      ctrl.gimbalYaw   = 0;
+      Object.keys(ctrl.rcs).forEach(k => ctrl.rcs[k] = false);
+
+      // Inject initial velocities for Phase B — rocket gets "kicked" at transition
+      const vx_b = parseFloat(document.getElementById('ht_initVx').value) || 0;
+      const vy_b = parseFloat(document.getElementById('ht_initVy').value) || 0;
+      const vz_b = parseFloat(document.getElementById('ht_initVz').value) || 0;
+      s.vx = vx_b; s.vy = vy_b; s.vz = vz_b;
+
+      // Store Phase B initial state (position from hover, velocity from inputs)
+      hoverTest.pB_x0  = s.x;  hoverTest.pB_z0  = s.z;  hoverTest.pB_y0  = s.y;
+      hoverTest.pB_vx0 = vx_b; hoverTest.pB_vz0 = vz_b; hoverTest.pB_vy0 = vy_b;
+      // T for Phase B = Hover T input (NOT landing panel slider)
+      hoverTest.pB_T   = parseFloat(document.getElementById('ht_hoverT').value) || 15;
+
+      hoverTest.phase          = 'B';
+      hoverTest.phaseStartTime = simTime;
+      hoverTest.phaseTimer     = 0;
+
+      console.log(
+        `[HoverTest] ══ Phase A→B TRANSITION ══\n` +
+        `  Hover complete at t=${hoverTest.phaseTimer.toFixed(3)}s\n` +
+        `  ── Final hover state (before velocity injection) ──\n` +
+        `  pos : x=${s.x.toFixed(4)}  y=${s.y.toFixed(4)}  z=${s.z.toFixed(4)}\n` +
+        `  vel : vx=${s.vx.toFixed(4)}  vy=${s.vy.toFixed(4)}  vz=${s.vz.toFixed(4)}\n` +
+        `  acc : ax=${s.ax.toFixed(5)}  ay=${s.ay.toFixed(5)}  az=${s.az.toFixed(5)}\n` +
+        `  att ω: wx=${(s.wx*180/Math.PI).toFixed(4)}  wy=${(s.wy*180/Math.PI).toFixed(4)}  wz=${(s.wz*180/Math.PI).toFixed(4)} °/s\n` +
+        `  ── Injecting Phase B velocities ──\n` +
+        `  vx_inject=${vx_b}  vy_inject=${vy_b}  vz_inject=${vz_b}\n` +
+        `  ── Phase B initial conditions ──\n` +
+        `  pB_x0=${s.x.toFixed(3)}  pB_y0=${s.y.toFixed(3)}  pB_z0=${s.z.toFixed(3)}\n` +
+        `  target: x=${hoverTest.targetX}  y=${hoverTest.targetY}  z=${hoverTest.targetZ}\n` +
+        `  Dx=${(hoverTest.targetX - s.x).toFixed(3)}  Dy=${(hoverTest.targetY - s.y).toFixed(3)}  Dz=${(hoverTest.targetZ - s.z).toFixed(3)}\n` +
+        `  T5=${hoverTest.pB_T}s`
+      );
+      setHoverStatus('Phase B: Precision Land…', 'var(--accent3)');
+      updateHoverPhaseBar('B');
+    }
+    return;
+  }
+
+  // ────────────────────────────────────────────────────
+  //  PHASE B: Precision landing (HL formula — same as Phase 5)
+  //  Target altitude: hoverTest.targetY (height above ground = comH if 0)
+  // ────────────────────────────────────────────────────
+  if (hoverTest.phase === 'B') {
+    Object.keys(ctrl.rcs).forEach(k => ctrl.rcs[k] = false);
+
+    const t  = hoverTest.phaseTimer;
+    const T5 = hoverTest.pB_T;
+
+    // ── Desired world-frame accelerations from HL formula ──
+    // fX.a = HL net acceleration for X axis (m/s²)
+    // Required thrust acceleration = -fX.a (opposite sign convention)
+    const Dx = hoverTest.targetX - hoverTest.pB_x0;
+    const fX = hlFormula(t, T5, hoverTest.pB_vx0, Dx);
+
+    const Dz = hoverTest.targetZ - hoverTest.pB_z0;
+    const fZ = hlFormula(t, T5, hoverTest.pB_vz0, Dz);
+
+    const targetWorldY = s.comH + Math.max(0, hoverTest.targetY);
+    const Dy = targetWorldY - hoverTest.pB_y0;           // e.g. 10 - 200 = -190 (going down)
+    const fY = hlFormula(t, T5, hoverTest.pB_vy0, Dy);  // same convention as X/Z
+
+    // Thrust must provide HL acceleration AND cancel gravity
+    // Net world force Y = m*(a_HL_y - (-g)) = m*(g - fY.a) ... wait:
+    // physics net ay = F_thrust_y/m - g
+    // we want net ay = -fY.a  (HL correction)
+    // so F_thrust_y/m = -fY.a + g  →  Fy_world = m*(g - fY.a)
+    const Fx_world = s.mass * (-fX.a);
+    const Fz_world = s.mass * (-fZ.a);
+    const Fy_world = s.mass * (g - fY.a);
+
+    // ── Convert desired world force → body frame ──
+    const F_world_vec = { x: Fx_world, y: Fy_world, z: Fz_world };
+    const F_body_vec  = worldToBody(q, F_world_vec);
+    const Fx_b = F_body_vec.x;
+    const Fy_b = F_body_vec.y;
+    const Fz_b = F_body_vec.z;
+
+    // ── Store world-frame force for RK4 live re-decomposition ──
+    ctrl.F_world = { x: Fx_world, y: Fy_world, z: Fz_world };
+
+    // ── Thrust magnitude = magnitude of desired body-frame force ──
+    const thrust_mag = Math.sqrt(Fx_b*Fx_b + Fy_b*Fy_b + Fz_b*Fz_b);
+    ctrl.mainThrust = Math.min(Math.max(thrust_mag, 0), 500000);
+
+    // ── Set thrust direction DIRECTLY in body frame — bypass gimbal angle math entirely ──
+    // This avoids asin singularities and angle clamping that caused force delivery failures
+    if (thrust_mag > 1) {
+      ctrl.tBodyOverride = { x: Fx_b / thrust_mag, y: Fy_b / thrust_mag, z: Fz_b / thrust_mag };
+      // Display-only gimbal values (informational, physics ignores these when override is set)
+      ctrl.gimbalPitch = Math.asin(Math.max(-1, Math.min(1, Fx_b / thrust_mag))) * 180/Math.PI;
+      ctrl.gimbalYaw   = Math.atan2(-(Fz_b / thrust_mag), Fy_b / thrust_mag) * 180/Math.PI;
+    } else {
+      ctrl.tBodyOverride = null; ctrl.F_world = null;
+      ctrl.gimbalPitch = 0;
+      ctrl.gimbalYaw   = 0;
+    }
+
+    // ── Formula predicted values for comparison ──
+    const pred_x  = hoverTest.pB_x0 + fX.x;
+    const pred_y  = hoverTest.pB_y0 + fY.x;
+    const pred_z  = hoverTest.pB_z0 + fZ.x;
+    const pred_vx = fX.v;
+    const pred_vy = fY.v;
+    const pred_vz = fZ.v;
+    // pred net ay (matches s.ay = F_net_y/m = thrust_y/m - g) = (-fY.a) - g... wait:
+    // we want net ay = -fY.a, thrust provides g - fY.a, so net = (g-fY.a) - g = -fY.a ✓
+    const pred_ax = -fX.a;
+    const pred_ay = -fY.a;   // net world ay formula expects
+    const pred_az = -fZ.a;
+    const act_ax  = s.ax;
+    const act_ay  = s.ay;
+    const act_az  = s.az;
+
+    // ── Differences ──
+    const diff_x  = s.x  - pred_x;
+    const diff_y  = s.y  - pred_y;
+    const diff_z  = s.z  - pred_z;
+    const diff_vx = s.vx - pred_vx;
+    const diff_vy = s.vy - pred_vy;
+    const diff_vz = s.vz - pred_vz;
+    const diff_ax = act_ax - pred_ax;
+    const diff_ay = act_ay - pred_ay;
+    const diff_az = act_az - pred_az;
+
+    const distXZ = Math.sqrt((s.x - hoverTest.targetX)**2 + (s.z - hoverTest.targetZ)**2);
+    const distY  = Math.abs(s.y - targetWorldY);
+
+    // ── Live debug panel (compact, visible on screen) ──
+    const fmt = (v, d=2) => v.toFixed(d);
+    const sign = v => v >= 0 ? '+' : '';
+    setHoverDebug(
+      `── Phase B  t=${fmt(t,1)}/${T5}s ──\n` +
+      `POS  actual  (${fmt(s.x,1)}, ${fmt(s.y,1)}, ${fmt(s.z,1)})\n` +
+      `     pred    (${fmt(pred_x,1)}, ${fmt(pred_y,1)}, ${fmt(pred_z,1)})\n` +
+      `     Δ       (${sign(diff_x)}${fmt(diff_x,2)}, ${sign(diff_y)}${fmt(diff_y,2)}, ${sign(diff_z)}${fmt(diff_z,2)})\n` +
+      `VEL  actual  (${fmt(s.vx,2)}, ${fmt(s.vy,2)}, ${fmt(s.vz,2)})\n` +
+      `     pred    (${fmt(pred_vx,2)}, ${fmt(pred_vy,2)}, ${fmt(pred_vz,2)})\n` +
+      `     Δ       (${sign(diff_vx)}${fmt(diff_vx,2)}, ${sign(diff_vy)}${fmt(diff_vy,2)}, ${sign(diff_vz)}${fmt(diff_vz,2)})\n` +
+      `ACC  actual  (${fmt(act_ax,3)}, ${fmt(act_ay,3)}, ${fmt(act_az,3)})\n` +
+      `     pred    (${fmt(pred_ax,3)}, ${fmt(pred_ay,3)}, ${fmt(pred_az,3)})\n` +
+      `     Δ       (${sign(diff_ax)}${fmt(diff_ax,3)}, ${sign(diff_ay)}${fmt(diff_ay,3)}, ${sign(diff_az)}${fmt(diff_az,3)})\n` +
+      `dist XZ=${fmt(distXZ,1)}m Y=${fmt(distY,1)}m\n` +
+      `F=${fmt(ctrl.mainThrust,0)}N gp=${fmt(ctrl.gimbalPitch,1)}° gy=${fmt(ctrl.gimbalYaw,1)}°`
+    );
+
+    // ── Console state log every 0.5s ──
+    if (!hoverTest._lastLogT || (t - hoverTest._lastLogT) >= 0.5) {
+      hoverTest._lastLogT = t;
+      console.log(
+        `[HoverTest·PhB] t=${fmt(t,2)}s / ${T5}s\n` +
+        `  ── POSITION ──\n` +
+        `  actual : x=${fmt(s.x,3)}  y=${fmt(s.y,3)}  z=${fmt(s.z,3)}\n` +
+        `  formula: x=${fmt(pred_x,3)}  y=${fmt(pred_y,3)}  z=${fmt(pred_z,3)}\n` +
+        `  Δ      : x=${sign(diff_x)}${fmt(diff_x,3)}  y=${sign(diff_y)}${fmt(diff_y,3)}  z=${sign(diff_z)}${fmt(diff_z,3)}\n` +
+        `  ── VELOCITY ──\n` +
+        `  actual : vx=${fmt(s.vx,3)}  vy=${fmt(s.vy,3)}  vz=${fmt(s.vz,3)}\n` +
+        `  formula: vx=${fmt(pred_vx,3)}  vy=${fmt(pred_vy,3)}  vz=${fmt(pred_vz,3)}\n` +
+        `  Δ      : vx=${sign(diff_vx)}${fmt(diff_vx,3)}  vy=${sign(diff_vy)}${fmt(diff_vy,3)}  vz=${sign(diff_vz)}${fmt(diff_vz,3)}\n` +
+        `  ── ACCELERATION ──\n` +
+        `  actual : ax=${fmt(act_ax,4)}  ay=${fmt(act_ay,4)}  az=${fmt(act_az,4)}\n` +
+        `  formula: ax=${fmt(pred_ax,4)}  ay=${fmt(pred_ay,4)}  az=${fmt(pred_az,4)}\n` +
+        `  Δ      : ax=${sign(diff_ax)}${fmt(diff_ax,4)}  ay=${sign(diff_ay)}${fmt(diff_ay,4)}  az=${sign(diff_az)}${fmt(diff_az,4)}\n` +
+        `  ── HL PARAMS (X/Y/Z) ──\n` +
+        `  Dx=${fmt(Dx,2)} k1x=${fmt(fX.k1,4)} Ax=${fmt(fX.A,4)} ax(t)=${fmt(fX.a,4)}\n` +
+        `  Dy=${fmt(Dy,2)} k1y=${fmt(fY.k1,4)} Ay=${fmt(fY.A,4)} ay(t)=${fmt(fY.a,4)}\n` +
+        `  Dz=${fmt(Dz,2)} k1z=${fmt(fZ.k1,4)} Az=${fmt(fZ.A,4)} az(t)=${fmt(fZ.a,4)}\n` +
+        `  ── THRUST ──\n` +
+        `  F=${fmt(ctrl.mainThrust,1)}N  gp=${fmt(ctrl.gimbalPitch,2)}°  gy=${fmt(ctrl.gimbalYaw,2)}°\n` +
+        `  distXZ=${fmt(distXZ,2)}m  distY=${fmt(distY,2)}m`
+      );
+    }
+
+    // ── Success / end check ──
+    const euler5  = quatToEuler(q);
+    const onGround = s.y <= s.comH + 0.5;
+    const velOk   = Math.abs(s.vx)<1 && Math.abs(s.vz)<1 && Math.abs(s.vy)<2;
+    const attOk   = Math.abs(euler5.pitch)<3*Math.PI/180 && Math.abs(euler5.yaw)<3*Math.PI/180;
+    const posOk   = distXZ < 10 && distY < 10;
+
+    if (t >= T5 || (onGround && velOk && attOk && posOk) || (posOk && velOk && !onGround && distY < 5)) {
+      ctrl.mainThrust = 0; ctrl.gimbalPitch = 0; ctrl.gimbalYaw = 0; ctrl.tBodyOverride = null; ctrl.F_world = null;
+      console.log(
+        `[HoverTest] ══ Phase B END ══\n` +
+        `  pos actual  : (${fmt(s.x,2)}, ${fmt(s.y,2)}, ${fmt(s.z,2)})\n` +
+        `  pos target  : (${hoverTest.targetX}, ${targetWorldY.toFixed(2)}, ${hoverTest.targetZ})\n` +
+        `  pos Δ       : (${fmt(s.x-hoverTest.targetX,2)}, ${fmt(s.y-targetWorldY,2)}, ${fmt(s.z-hoverTest.targetZ,2)})\n` +
+        `  vel actual  : (${fmt(s.vx,3)}, ${fmt(s.vy,3)}, ${fmt(s.vz,3)})\n` +
+        `  vel formula : (${fmt(pred_vx,3)}, ${fmt(pred_vy,3)}, ${fmt(pred_vz,3)})\n` +
+        `  vel Δ       : (${fmt(diff_vx,3)}, ${fmt(diff_vy,3)}, ${fmt(diff_vz,3)})\n` +
+        `  distXZ=${fmt(distXZ,2)}m  distY=${fmt(distY,2)}m  t=${fmt(t,2)}s`
+      );
+      hoverTest.successHold      = true;
+      hoverTest.successHoldStart = simTime;
+      hoverTest.phaseStartTime   = simTime;
+    }
+    return;
+  }
+}
+
 
 // ════════════════════════════════════════
 //   ADVANCE TO NEXT PHASE
@@ -2648,7 +3170,7 @@ function nextPhase() {
   const lp = landingParams;
 
   // Clear controls at phase boundary
-  ctrl.mainThrust  = 0;
+  ctrl.mainThrust  = 0; ctrl.tBodyOverride = null; ctrl.F_world = null;
   ctrl.gimbalPitch = 0;
   ctrl.gimbalYaw   = 0;
   Object.keys(ctrl.rcs).forEach(k => ctrl.rcs[k] = false);
@@ -2788,10 +3310,9 @@ function nextPhase() {
   }
 
   else if (landing.phase === 5) {
-    // Record phase 5 initial state
-    landing.p5_x0  = s.x;  landing.p5_z0  = s.z;
-    landing.p5_vx0 = s.vx; landing.p5_vz0 = s.vz;
-    console.log(`[Landing] Phase 5: pos=(${s.x.toFixed(1)},${s.z.toFixed(1)}) vel=(${s.vx.toFixed(2)},${s.vz.toFixed(2)})`);
+    landing.p5_x0  = s.x;  landing.p5_z0  = s.z;  landing.p5_y0  = s.y;
+    landing.p5_vx0 = s.vx; landing.p5_vz0 = s.vz; landing.p5_vy0 = s.vy;
+    console.log(`[Landing] Phase 5: pos=(${s.x.toFixed(1)},${s.y.toFixed(1)},${s.z.toFixed(1)}) vel=(${s.vx.toFixed(2)},${s.vy.toFixed(2)},${s.vz.toFixed(2)})`);
     setLandingStatus('Phase 5/5: Precision land…', 'var(--accent3)');
     updatePhaseBar(5);
   }
@@ -2801,6 +3322,48 @@ function nextPhase() {
     landing.successHold      = true;
     landing.successHoldStart = simTime;
   }
+}
+
+// ── hlFormula: full HL trajectory formula ──
+// Returns { a, v, x, k1, k2, A, omega }
+function hlFormula(t, T, Vi, D) {
+  const omega = 2 * Math.PI / T;
+
+  if (Math.abs(Vi) < 0.01) {
+    return { a: 0, v: 0, x: 0, k1: 0, k2: 0, A: 0, omega };
+  }
+
+  const cotArg = Math.PI * (1 - (2 * D) / (Vi * T));
+  const k1 = Math.atan2(1, cotArg);
+
+  const arcsinArg = -Vi / T;
+  let k2;
+  if (arcsinArg < -1 || arcsinArg > 1) {
+    console.warn(`[hlFormula] arcsin arg out of range: -Vi/T = ${arcsinArg.toFixed(4)}. Vi=${Vi.toFixed(2)}, T=${T.toFixed(2)}. Clamping.`);
+    k2 = Math.asin(Math.max(-1, Math.min(1, arcsinArg)));
+  } else {
+    k2 = Math.asin(arcsinArg);
+  }
+
+  const sinK1 = Math.sin(k1);
+  if (Math.abs(sinK1) < 1e-6) {
+    console.warn(`[hlFormula] sin(k1) near zero (${sinK1.toExponential(3)}). k1=${k1.toFixed(6)}. Formula may be unstable.`);
+  }
+  const A = (Math.abs(sinK1) < 1e-6) ? 0 : -Vi / (T * sinK1);
+
+  const phase = omega * t - k1;
+
+  const a = -A * Math.sin(phase) - Math.sin(k2);
+
+  const v = Vi
+    + (Vi / (2 * Math.PI * sinK1)) * (Math.cos(phase) - Math.cos(k1))
+    - (Vi / T) * t;
+
+  const x = Vi * t
+    + (Vi / (2 * Math.PI * sinK1)) * ((T / (2 * Math.PI)) * Math.sin(phase) - t * Math.cos(k1) + (T / (2 * Math.PI)) * Math.sin(k1))
+    - (Vi / (2 * T)) * t * t;
+
+  return { a, v, x, k1, k2, A, omega };
 }
 
 // ════════════════════════════════════════
@@ -3011,7 +3574,7 @@ function updateLandingController(dt) {
   // ════════════════════════
   if (landing.phase === 2.5) {
     // No thrust, no RCS — free fall to trigger point
-    ctrl.mainThrust  = 0;
+    ctrl.mainThrust  = 0; ctrl.tBodyOverride = null; ctrl.F_world = null;
     ctrl.gimbalPitch = 0;
     ctrl.gimbalYaw   = 0;
     Object.keys(ctrl.rcs).forEach(k => ctrl.rcs[k] = false);
@@ -3251,7 +3814,7 @@ function updateLandingController(dt) {
     );
 
     if (t >= T4) {
-      ctrl.mainThrust=0; ctrl.gimbalPitch=0; ctrl.gimbalYaw=0;
+      ctrl.mainThrust=0; ctrl.gimbalPitch=0; ctrl.gimbalYaw=0; ctrl.tBodyOverride=null;
       Object.keys(ctrl.rcs).forEach(k=>ctrl.rcs[k]=false);
       const eF = quatToEuler(q);
       console.log(
@@ -3264,75 +3827,69 @@ function updateLandingController(dt) {
   }
 
   // ════════════════════════
-  //   PHASE 5: Precision landing
+  //   PHASE 5: Precision landing (HL formula — all 3 axes)
   // ════════════════════════
   if (landing.phase === 5) {
     Object.keys(ctrl.rcs).forEach(k => ctrl.rcs[k] = false);
 
-    const t   = landing.phaseTimer;
-    const T5  = lp.T_p5;
-    const w5  = 2*Math.PI / T5;
+    const t  = landing.phaseTimer;
+    const T5 = lp.T_p5;
 
-    // ── X axis guidance ──
-    const Dx  = lp.targetX - landing.p5_x0;
-    const Vi_x = landing.p5_vx0;
-    const k1x  = Math.atan(1 / (Math.PI * (1 - (2*Dx) / (Vi_x * T5 + 1e-9))));
-    const k2x  = Math.asin(Math.max(-1, Math.min(1, -Vi_x / T5)));
-    const Ax   = -Vi_x / (T5 * Math.sin(k1x) + 1e-9);
-    const ax_des = -Ax * Math.sin(w5*t - k1x) - Math.sin(k2x);
+    // ── X axis ──
+    const Dx   = lp.targetX - landing.p5_x0;
+    const fX   = hlFormula(t, T5, landing.p5_vx0, Dx);
+    const Fx_world = s.mass * (-fX.a);
 
-    // ── Z axis guidance ──
+    // ── Z axis ──
     const Dz   = lp.targetZ - landing.p5_z0;
-    const Vi_z = landing.p5_vz0;
-    const k1z  = Math.atan(1 / (Math.PI * (1 - (2*Dz) / (Vi_z * T5 + 1e-9))));
-    const k2z  = Math.asin(Math.max(-1, Math.min(1, -Vi_z / T5)));
-    const Az   = -Vi_z / (T5 * Math.sin(k1z) + 1e-9);
-    const az_des = -Az * Math.sin(w5*t - k1z) - Math.sin(k2z);
+    const fZ   = hlFormula(t, T5, landing.p5_vz0, Dz);
+    const Fz_world = s.mass * (-fZ.a);
 
-    // ── World frame force vector ──
-    // Horizontal corrections + vertical hover
-    const Fx_world = s.mass * ax_des;
-    const Fz_world = s.mass * az_des;
-    const Fy_world = s.mass * g;  // maintain altitude
+    // ── Y axis ──
+    // Dy = target - current, same convention as X/Z
+    const Dy   = s.comH - landing.p5_y0;  // e.g. 10 - 200 = -190 (going down to ground)
+    const fY   = hlFormula(t, T5, landing.p5_vy0, Dy);
+    const Fy_world = s.mass * (g - fY.a); // thrust cancels gravity + provides HL correction
 
-    // Transform to body frame
+    // ── World → Body frame ──
     const F_world_vec = { x: Fx_world, y: Fy_world, z: Fz_world };
+    ctrl.F_world = F_world_vec;  // store for RK4 live re-decomposition
     const F_body_vec  = worldToBody(q, F_world_vec);
-
     const Fx_b = F_body_vec.x;
     const Fy_b = F_body_vec.y;
     const Fz_b = F_body_vec.z;
 
+    // ── Thrust — direct body override, no asin singularity ──
     const thrust_mag5 = Math.sqrt(Fx_b*Fx_b + Fy_b*Fy_b + Fz_b*Fz_b);
-    ctrl.mainThrust  = Math.min(thrust_mag5, 500000);
-    ctrl.gimbalPitch = (thrust_mag5 > 1) ? Math.atan2(Fx_b, Fy_b) * 180/Math.PI : 0;
-    ctrl.gimbalYaw   = (thrust_mag5 > 1) ? Math.atan2(Fz_b, Fy_b) * 180/Math.PI : 0;
-
-    // Clamp gimbal (degrees)
-    ctrl.gimbalPitch = Math.max(-20, Math.min(20, ctrl.gimbalPitch));
-    ctrl.gimbalYaw   = Math.max(-20, Math.min(20, ctrl.gimbalYaw));
-
-    // Distance to target (XZ only)
-    const distXZ = Math.sqrt((s.x - lp.targetX)**2 + (s.z - lp.targetZ)**2);
-
-    setLandingDebug(
-      `t=${t.toFixed(1)}/${T5}s\n`+
-      `dx=${distXZ.toFixed(1)}m vx=${s.vx.toFixed(2)} vz=${s.vz.toFixed(2)}\n`+
-      `vy=${s.vy.toFixed(2)} F=${ctrl.mainThrust.toFixed(0)}N`
-    );
-
-    // ── Landing success check ──
-    const onOrNearGround = s.y <= s.comH + 0.5;
-    const velOk = Math.abs(s.vx) < 0.5 && Math.abs(s.vz) < 0.5 && Math.abs(s.vy) < 0.5;
-    const omegaOk = Math.abs(s.wx) < 0.01 && Math.abs(s.wz) < 0.01;
-    const attOk   = Math.abs(euler.pitch) < 2*Math.PI/180 && Math.abs(euler.yaw) < 2*Math.PI/180;
-    const posOk   = distXZ < 5;
-
-    if ((t >= T5 || (velOk && attOk && posOk)) && onOrNearGround) {
-      ctrl.mainThrust  = 0;
+    ctrl.mainThrust = Math.min(Math.max(thrust_mag5, 0), 500000);
+    if (thrust_mag5 > 1) {
+      ctrl.tBodyOverride = { x: Fx_b / thrust_mag5, y: Fy_b / thrust_mag5, z: Fz_b / thrust_mag5 };
+      ctrl.gimbalPitch = Math.asin(Math.max(-1, Math.min(1, Fx_b / thrust_mag5))) * 180/Math.PI;
+      ctrl.gimbalYaw   = Math.atan2(-(Fz_b / thrust_mag5), Fy_b / thrust_mag5) * 180/Math.PI;
+    } else {
+      ctrl.tBodyOverride = null; ctrl.F_world = null;
       ctrl.gimbalPitch = 0;
       ctrl.gimbalYaw   = 0;
-      nextPhase(); // → success hold
+    }
+
+    const distXZ = Math.sqrt((s.x-lp.targetX)**2 + (s.z-lp.targetZ)**2);
+    setLandingDebug(
+      `t=${t.toFixed(1)}/${T5}s\n`+
+      `dx=${distXZ.toFixed(1)}m dy=${(s.y-s.comH).toFixed(1)}m\n`+
+      `vx=${s.vx.toFixed(2)} vy=${s.vy.toFixed(2)} vz=${s.vz.toFixed(2)}\n`+
+      `F=${ctrl.mainThrust.toFixed(0)}N gp=${ctrl.gimbalPitch.toFixed(1)}° gy=${ctrl.gimbalYaw.toFixed(1)}°`
+    );
+
+    // ── Success / end ──
+    const onGround = s.y <= s.comH + 0.5;
+    const velOk    = Math.abs(s.vx)<1 && Math.abs(s.vz)<1 && Math.abs(s.vy)<2;
+    const attOk    = Math.abs(euler.pitch)<3*Math.PI/180 && Math.abs(euler.yaw)<3*Math.PI/180;
+    const posOk    = distXZ < 10;
+
+    if (t >= T5 || (onGround && velOk && attOk && posOk)) {
+      ctrl.mainThrust = 0; ctrl.gimbalPitch = 0; ctrl.gimbalYaw = 0; ctrl.tBodyOverride = null; ctrl.F_world = null;
+      console.log(`[Landing] Phase 5 END: pos=(${s.x.toFixed(1)},${s.y.toFixed(1)},${s.z.toFixed(1)}) vel=(${s.vx.toFixed(2)},${s.vy.toFixed(2)},${s.vz.toFixed(2)}) distXZ=${distXZ.toFixed(1)}m`);
+      nextPhase();
     }
     return;
   }
@@ -3342,7 +3899,7 @@ function updateLandingController(dt) {
 function abortLandingFailed(msg) {
   landing.active = false;
   landing.successHold = false;
-  ctrl.mainThrust  = 0;
+  ctrl.mainThrust  = 0; ctrl.tBodyOverride = null; ctrl.F_world = null;
   ctrl.gimbalPitch = 0;
   ctrl.gimbalYaw   = 0;
   Object.keys(ctrl.rcs).forEach(k => ctrl.rcs[k] = false);

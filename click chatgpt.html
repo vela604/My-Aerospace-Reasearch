@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Worst Clock Ever</title>
+
+<style>
+
+body{
+    background:lime;
+    overflow:hidden;
+    font-family:Comic Sans MS;
+}
+
+#clock{
+    width:420px;
+    height:420px;
+    background:yellow;
+    border:17px dashed red;
+    border-radius:7%;
+    margin:auto;
+    margin-top:40px;
+    position:relative;
+    transform:rotate(3deg);
+    box-shadow:
+    0 0 40px hotpink,
+    0 0 90px cyan,
+    0 0 120px orange;
+}
+
+.number{
+    position:absolute;
+    color:blue;
+    font-size:40px;
+    font-weight:bold;
+    user-select:none;
+}
+
+#n1{top:10px;left:180px;}
+#n2{top:40px;right:70px;}
+#n3{top:170px;right:5px;}
+#n4{bottom:60px;right:50px;}
+#n5{bottom:10px;right:120px;}
+#n6{bottom:-5px;left:190px;}
+#n7{bottom:30px;left:80px;}
+#n8{bottom:100px;left:10px;}
+#n9{top:170px;left:-5px;}
+#n10{top:70px;left:20px;}
+#n11{top:20px;left:80px;}
+#n12{top:-10px;left:170px;}
+
+.hand{
+    position:absolute;
+    bottom:50%;
+    left:50%;
+    transform-origin:bottom;
+}
+
+#hour{
+    width:20px;
+    height:100px;
+    background:brown;
+    margin-left:-10px;
+    border-radius:0;
+}
+
+#minute{
+    width:12px;
+    height:150px;
+    background:purple;
+    margin-left:-6px;
+}
+
+#second{
+    width:4px;
+    height:180px;
+    background:black;
+    margin-left:-2px;
+}
+
+#center{
+    width:35px;
+    height:35px;
+    background:red;
+    border:5px dotted white;
+    border-radius:50%;
+    position:absolute;
+    top:50%;
+    left:50%;
+    transform:translate(-50%,-50%);
+}
+
+#digital{
+    width:600px;
+    margin:auto;
+    margin-top:25px;
+    text-align:center;
+    background:magenta;
+    color:yellow;
+    font-size:55px;
+    padding:25px;
+    border:10px groove cyan;
+    letter-spacing:11px;
+    transform:rotate(-2deg);
+}
+
+marquee{
+    font-size:40px;
+    color:red;
+    background:black;
+    margin-top:20px;
+}
+
+button{
+    position:fixed;
+    top:10px;
+    right:10px;
+    font-size:30px;
+    background:orange;
+    border:6px dotted blue;
+    cursor:pointer;
+}
+
+</style>
+</head>
+
+<body>
+
+<button onclick="alert('Clock broken successfully')">
+CLICK ME
+</button>
+
+<marquee behavior="alternate" scrollamount="25">
+🔥 SUPER AMAZING WORST CLOCK 🔥
+</marquee>
+
+<div id="clock">
+
+    <div class="number" id="n1">1</div>
+    <div class="number" id="n2">2</div>
+    <div class="number" id="n3">3</div>
+    <div class="number" id="n4">4</div>
+    <div class="number" id="n5">5</div>
+    <div class="number" id="n6">6</div>
+    <div class="number" id="n7">7</div>
+    <div class="number" id="n8">8</div>
+    <div class="number" id="n9">9</div>
+    <div class="number" id="n10">10</div>
+    <div class="number" id="n11">11</div>
+    <div class="number" id="n12">12</div>
+
+    <div class="hand" id="hour"></div>
+    <div class="hand" id="minute"></div>
+    <div class="hand" id="second"></div>
+
+    <div id="center"></div>
+
+</div>
+
+<div id="digital">
+    99:99:99
+</div>
+
+<script>
+
+let h = document.getElementById("hour");
+let m = document.getElementById("minute");
+let s = document.getElementById("second");
+let d = document.getElementById("digital");
+
+function terribleClock(){
+
+    let now = new Date();
+
+    let hr = now.getHours();
+    let min = now.getMinutes();
+    let sec = now.getSeconds();
+
+    /* intentionally weird math */
+
+    let hDeg = hr * 35;
+    let mDeg = min * 7;
+    let sDeg = sec * 12;
+
+    h.style.transform =
+    "rotate(" + hDeg + "deg)";
+
+    m.style.transform =
+    "rotate(" + mDeg + "deg)";
+
+    s.style.transform =
+    "rotate(" + sDeg + "deg)";
+
+    d.innerHTML =
+    sec + ":" + hr + ":" + min;
+
+    document.body.style.background =
+    "rgb(" +
+    Math.random()*255 + "," +
+    Math.random()*255 + "," +
+    Math.random()*255 + ")";
+
+}
+
+setInterval(terribleClock,300);
+
+</script>
+
+</body>
+</html>

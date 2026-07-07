@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Complex Analog & Digital Clock</title>
+    <style>
+        :root {
+            --bg-color: #e0e5ec;
+            --clock-bg: #e0e5ec;
+            --shadow-light: #ffffff;
+            --shadow-dark: #a3b1c6;
+            --text-color: #444;
+            --accent-color: #6d5dfc;
+            --second-hand: #ff4757;
+            --glass-bg: rgba(255, 255, 255, 0.2);
+            --glass-border: rgba(255, 255, 255, 0.3);
+        }
+
+        [data-theme="dark"] {
+            --bg-color: #1a1a1a;
+            --clock-bg: #1a1a1a;
+            --shadow-light: #2a2a2a;
+            --shadow-dark: #0a0a0a;
+            --text-color: #eee;
+            --accent-color: #00d2ff;
+            --glass-bg: rgba(0, 0, 0, 0.2);
+            --glass-border: rgba(255, 255, 255, 0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: var(--bg-color);
+            color: var(--text-color);
+            transition: all 0.5s ease;
+            overflow: hidden;
+        }
+
+        .container {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2rem;
+            padding: 3rem;
+            border-radius: 50px;
+            background: var(--clock-bg);
+            box-shadow: 20px 20px 60px var(--shadow-dark),
+                        -20px -20px 60px var(--shadow-light);
+            z-index: 1;
+        }
+
+        /* Theme Toggle */
+        .theme-switch {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            cursor: pointer;
+            padding: 10px;
+            border-radius: 50%;
+            background: var(--clock-bg);
+            box-shadow: 5px 5px 10px var(--shadow-dark),
+                        -5px -5px 10px var(--shadow-light);
+            transition: 0.3s;
+        }
+
+        .theme-switch:active {
+            box-shadow: inset 2px 2px 5px var(--shadow-dark),
+                        inset -2px -2px 5px var(--shadow-light);
+        }
+
+        /* Analog Clock */
+        .clock-outer {
+            width: 300px;
+            height: 300px;
+            border-radius: 50%;
+            background: var(--clock-bg);
+            box-shadow: inset 10px 10px 20px var(--shadow-dark),
+                        inset -10px -10px 20px var(--shadow-light);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+
+        .clock-inner {
+            width: 260px;
+            height: 260px;
+            border-radius: 50%;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* Numbers */
+        .number {
+            position: absolute;
+            font-weight: bold;
+            font-size: 1.2rem;
+            color: var(--text-color);
+            transform: translate(-50%, -50%);
+        }
+
+        /* Hands */
+        .hand {
+            position: absolute;
+            bottom: 50%;
+            left: 50%;
+            transform-origin: bottom;
+            border-radius: 10px;
+            z-index: 10;
+        }
+
+        .hour-hand {
+            width: 6px;
+            height: 60px;
+            background: var(--text-color);
+            transform: translateX(-50%);
+        }
+
+        .min-hand {
+            width: 4px;
+            height: 90px;
+            background: var(--accent-color);
+            transform: translateX(-50%);
+        }
+
+        .sec-hand {
+            width: 2px;
+            height: 100px;
+            background: var(--second-hand);
+            transform: translateX(-50%);
+        }
+
+        .center-dot {
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            background: var(--second-hand);
+            border-radius: 50%;
+            z-index: 11;
+            box-shadow: 0 0 10px rgba(0,0,0,0.2);
+        }
+
+        /* Digital Display */
+        .digital-clock {
+            text-align: center;
+            padding: 1rem 2rem;
+            border-radius: 20px;
+            background: var(--clock-bg);
+            box-shadow: 10px 10px 20px var(--shadow-dark),
+                        -10px -10px 20px var(--shadow-light);
+        }
+
+        .time {
+            font-size: 2.5rem;
+            font-weight: 800;
+            letter-spacing: 2px;
+            color: var(--accent-color);
+            margin-bottom: 0.5rem;
+        }
+
+        .date {
+            font-size: 1rem;
+            font-weight: 500;
+            color: var(--text-color);
+            opacity: 0.8;
+            text-transform: uppercase;
+        }
+
+        /* Background Elements */
+        .bg-shape {
+            position: absolute;
+            z-index: -1;
+            filter: blur(80px);
+            border-radius: 50%;
+        }
+
+        .shape1 {
+            width: 400px;
+            height: 400px;
+            background: var(--accent-color);
+            top: -100px;
+            left: -100px;
+            opacity: 0.1;
+        }
+
+        .shape2 {
+            width: 300px;
+            height: 300px;
+            background: var(--second-hand);
+            bottom: -50px;
+            right: -50px;
+            opacity: 0.1;
+        }
+
+        @media (max-width: 500px) {
+            .container {
+                padding: 2rem;
+                transform: scale(0.8);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-shape shape1"></div>
+    <div class="bg-shape shape2"></div>
+
+    <div class="container">
+        <div class="theme-switch" id="themeToggle">
+            <svg id="sun" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+            <svg id="moon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+        </div>
+
+        <div class="clock-outer">
+            <div class="clock-inner" id="analogClock">
+                <!-- Numbers will be inserted by JS -->
+                <div class="hand hour-hand" id="hourHand"></div>
+                <div class="hand min-hand" id="minHand"></div>
+                <div class="hand sec-hand" id="secHand"></div>
+                <div class="center-dot"></div>
+            </div>
+        </div>
+
+        <div class="digital-clock">
+            <div class="time" id="digitalTime">00:00:00</div>
+            <div class="date" id="digitalDate">Monday, Jan 01</div>
+        </div>
+    </div>
+
+    <script>
+        const hourHand = document.getElementById('hourHand');
+        const minHand = document.getElementById('minHand');
+        const secHand = document.getElementById('secHand');
+        const digitalTime = document.getElementById('digitalTime');
+        const digitalDate = document.getElementById('digitalDate');
+        const analogClock = document.getElementById('analogClock');
+        const themeToggle = document.getElementById('themeToggle');
+        const sunIcon = document.getElementById('sun');
+        const moonIcon = document.getElementById('moon');
+
+        // Create Clock Numbers
+        function createNumbers() {
+            for (let i = 1; i <= 12; i++) {
+                const number = document.createElement('div');
+                number.className = 'number';
+                number.innerText = i;
+                
+                const angle = (i * 30) * (Math.PI / 180);
+                const radius = 110;
+                const x = 130 + radius * Math.sin(angle);
+                const y = 130 - radius * Math.cos(angle);
+                
+                number.style.left = `${x}px`;
+                number.style.top = `${y}px`;
+                analogClock.appendChild(number);
+            }
+        }
+
+        function updateClock() {
+            const now = new Date();
+
+            // Analog Clock
+            const seconds = now.getSeconds();
+            const minutes = now.getMinutes();
+            const hours = now.getHours();
+
+            const secDegrees = (seconds / 60) * 360;
+            const minDegrees = (minutes / 60) * 360 + (seconds / 60) * 6;
+            const hourDegrees = (hours % 12 / 12) * 360 + (minutes / 60) * 30;
+
+            secHand.style.transform = `translateX(-50%) rotate(${secDegrees}deg)`;
+            minHand.style.transform = `translateX(-50%) rotate(${minDegrees}deg)`;
+            hourHand.style.transform = `translateX(-50%) rotate(${hourDegrees}deg)`;
+
+            // Digital Clock
+            const h = String(hours).padStart(2, '0');
+            const m = String(minutes).padStart(2, '0');
+            const s = String(seconds).padStart(2, '0');
+            digitalTime.innerText = `${h}:${m}:${s}`;
+
+            // Date
+            const options = { weekday: 'long', month: 'short', day: 'numeric' };
+            digitalDate.innerText = now.toLocaleDateString('en-US', options);
+        }
+
+        // Theme Toggle Logic
+        let isDark = false;
+        themeToggle.addEventListener('click', () => {
+            isDark = !isDark;
+            document.body.setAttribute('data-theme', isDark ? 'dark' : 'light');
+            sunIcon.style.display = isDark ? 'block' : 'none';
+            moonIcon.style.display = isDark ? 'none' : 'block';
+        });
+
+        // Initialize
+        createNumbers();
+        setInterval(updateClock, 1000);
+        updateClock();
+    </script>
+</body>
+</html>

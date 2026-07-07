@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>THE WORST CLOCK EVER</title>
+    <style>
+        body {
+            background-color: #ff00ff; /* Eye-bleeding magenta */
+            color: #00ff00; /* Neon green text on magenta */
+            font-family: "Comic Sans MS", "Comic Sans", cursive;
+            cursor: wait;
+            overflow: scroll;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 200vh; /* Unnecessary scrolling */
+        }
+
+        h1 {
+            font-size: 50px;
+            text-decoration: underline overline;
+            background: yellow;
+            color: red;
+            transform: rotate(-5deg);
+            animation: shake 0.1s infinite;
+        }
+
+        @keyframes shake {
+            0% { transform: translate(1px, 1px) rotate(0deg); }
+            10% { transform: translate(-1px, -2px) rotate(-1deg); }
+            20% { transform: translate(-3px, 0px) rotate(1deg); }
+            30% { transform: translate(3px, 2px) rotate(0deg); }
+            40% { transform: translate(1px, -1px) rotate(1deg); }
+            50% { transform: translate(-1px, 2px) rotate(-1deg); }
+            60% { transform: translate(-3px, 1px) rotate(0deg); }
+            70% { transform: translate(3px, 1px) rotate(-1deg); }
+            80% { transform: translate(-1px, -1px) rotate(1deg); }
+            90% { transform: translate(1px, 2px) rotate(0deg); }
+            100% { transform: translate(1px, -2px) rotate(-1deg); }
+        }
+
+        .clock-container {
+            border: 10px dashed blue;
+            padding: 50px;
+            background: white;
+            position: relative;
+            margin-top: 100px;
+        }
+
+        /* Analog Clock - Intentionally Broken */
+        #analog {
+            width: 200px;
+            height: 200px;
+            border: 5px solid brown;
+            border-radius: 20%; /* Not even a circle */
+            position: relative;
+            background: silver;
+        }
+
+        .hand {
+            position: absolute;
+            background: black;
+            transform-origin: top; /* Wrong origin */
+            left: 50%;
+            top: 10%; /* Wrong position */
+        }
+
+        #hour { width: 10px; height: 100px; background: orange; }
+        #min { width: 5px; height: 150px; background: purple; }
+        #sec { width: 2px; height: 80px; background: lime; }
+
+        .number {
+            position: absolute;
+            font-size: 8px; /* Too small to read */
+            color: transparent; /* Invisible numbers */
+        }
+
+        /* Digital Clock - Chaotic */
+        #digital {
+            font-size: 10px;
+            margin-top: 20px;
+            border: 20px solid black;
+            padding: 2px;
+            background: #444;
+            color: #444; /* Same as background */
+        }
+
+        #random-popup {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            background: white;
+            color: black;
+            padding: 20px;
+            border: 5px solid red;
+            z-index: 9999;
+            display: none;
+        }
+
+        button {
+            background: red;
+            color: white;
+            font-size: 30px;
+            margin: 20px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>TIME IS JUST AN ILLUSION</h1>
+
+    <div class="clock-container">
+        <div id="analog">
+            <div id="hour" class="hand"></div>
+            <div id="min" class="hand"></div>
+            <div id="sec" class="hand"></div>
+            <div style="position:absolute; top:50%; left:50%;">CENTER?</div>
+        </div>
+
+        <div id="digital">
+            HIDDEN TIME: <span id="time-val">00:00:00</span>
+        </div>
+        
+        <p style="font-size: 50px; color: yellow;">DO NOT CLICK ANYTHING</p>
+        <button onclick="alert('I told you not to click!')">CLICK ME</button>
+    </div>
+
+    <div id="random-popup">
+        YOU ARE WASTING TIME!
+        <button onclick="document.getElementById('random-popup').style.display='none'">CLOSE (IF YOU CAN)</button>
+    </div>
+
+    <marquee scrollamount="20" direction="right">Hurry up! Time is running away!</marquee>
+    <marquee scrollamount="30" direction="left" style="color: white; background: black;">Wait, where are you going?</marquee>
+
+    <script>
+        const hour = document.getElementById('hour');
+        const min = document.getElementById('min');
+        const sec = document.getElementById('sec');
+        const timeVal = document.getElementById('time-val');
+
+        function update() {
+            const now = new Date();
+            
+            // Randomly "wrong" time
+            const offset = Math.random() * 1000000;
+            const fakeTime = new Date(now.getTime() + offset);
+
+            // Broken Analog logic
+            const s = fakeTime.getSeconds();
+            const m = fakeTime.getMinutes();
+            const h = fakeTime.getHours();
+
+            // Hands rotate in wrong directions and speeds
+            sec.style.transform = `rotate(${-s * 15}deg)`; 
+            min.style.transform = `rotate(${m * 1.5}deg)`;
+            hour.style.transform = `rotate(${h * 50}deg)`;
+
+            // Digital clock is almost invisible and shows binary for no reason
+            timeVal.innerText = h.toString(2) + ":" + m.toString(2) + ":" + s.toString(2);
+            
+            // Randomly change background color to be annoying
+            if(Math.random() > 0.9) {
+                document.body.style.backgroundColor = '#' + Math.floor(Math.random()*16777215).toString(16);
+            }
+        }
+
+        // Annoying popups
+        setInterval(() => {
+            if(Math.random() > 0.95) {
+                document.getElementById('random-popup').style.display = 'block';
+                document.getElementById('random-popup').style.top = Math.random() * 80 + '%';
+                document.getElementById('random-popup').style.left = Math.random() * 80 + '%';
+            }
+        }, 2000);
+
+        setInterval(update, 100); // Updates too fast, flickering
+    </script>
+
+    <audio autoplay loop>
+        <!-- No actual source, just to trigger "can't autoplay" warnings or errors in console -->
+        <source src="invalid_file.mp3" type="audio/mpeg">
+    </audio>
+
+    <div style="margin-top: 500px;">
+        <p>Why are you still scrolling?</p>
+        <p>There is nothing here.</p>
+        <p>The clock is wrong anyway.</p>
+    </div>
+
+</body>
+</html>
