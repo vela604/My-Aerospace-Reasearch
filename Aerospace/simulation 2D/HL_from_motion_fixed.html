@@ -2260,7 +2260,7 @@ function drawRocket(ctx) {
 
   ctx.save();
   ctx.translate(cx, cy);
-  ctx.rotate(-theta); // canvas Y is inverted
+  ctx.rotate(theta); // FIXED: was -theta, which mirrored the tilt direction left↔right
 
   // Body (relative to CoM origin at canvas translate point)
   // In canvas: Y goes DOWN. Rocket is drawn upward (nose at negative Y, bottom at positive Y).
