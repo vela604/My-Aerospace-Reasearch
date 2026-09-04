@@ -369,56 +369,31 @@
       <button class="btn btn-start" id="btnStart" onclick="startSim()">▶ START</button>
       <button class="btn btn-stop" id="btnStop" onclick="stopSim()">⏸ STOP</button>
       <button class="btn btn-reset" onclick="resetSim()">↺ RESET</button>
-      <button class="btn" id="btnTest" onclick="activateTestMode()"
-        style="border-color:#cc44ff;color:#cc44ff;margin-top:4px;">
-        🎯 LANDING TEST
-      </button>
       <button class="btn" onclick="activateHLMode()"
         style="border-color:#00ffcc;color:#00ffcc;margin-top:4px;">
         🎯 HL LANDING
       </button>
       <button class="btn" onclick="loadPreset()"
         style="border-color:#ffaa00;color:#ffaa00;margin-top:4px;">
-        🧪 PRESET TEST
-      </button>
-      <button class="btn" onclick="showHLPanel()"
-        style="border-color:#00ffcc;color:#00ffcc;margin-top:4px;">
-        🚀 HOVER→LAND
+        🧪 LOAD SCENARIO
       </button>
     </div>
 
-    <div class="panel-section" id="hlConfigPanel" style="display:none; border-color:#00ffcc;">
-      <div class="section-title" style="color:#00ffcc;">Hover → Land Config</div>
+    <div class="panel-section" id="hlConfigPanel" style="border-color:#00ffcc;">
+      <div class="section-title" style="color:#00ffcc;">HL Landing Config</div>
       <div class="ctrl-row">
         <div class="ctrl-label">Total Time T (s)</div>
-        <input type="number" min="5" max="120" step="1" value="20" id="sl_hl_T" class="input-num">
-      </div>
-      <div style="font-size:9px;color:#00ffcc;margin:6px 0 3px;border-top:1px solid #0a2840;padding-top:4px;">Z values (dist to target)</div>
-      <div class="ctrl-row">
-        <div class="ctrl-label">Z_X horiz dist (m)</div>
-        <input type="number" min="0" step="10" value="200" id="sl_hl_ZX" class="input-num">
-      </div>
-      <div class="ctrl-row">
-        <div class="ctrl-label">Z_Y vert dist (m)</div>
-        <input type="number" min="0" step="10" value="200" id="sl_hl_ZY" class="input-num">
+        <input type="number" min="5" max="120" step="1" value="20" id="sl_hl_T" class="input-num" oninput="updateHLConfig()">
       </div>
       <div style="font-size:9px;color:#00ffcc;margin:6px 0 3px;border-top:1px solid #0a2840;padding-top:4px;">Land Target (absolute)</div>
       <div class="ctrl-row">
         <div class="ctrl-label">Target X (m)</div>
-        <input type="number" step="10" value="100" id="hl_targetX_inp" class="input-num">
+        <input type="number" step="10" value="-90" id="hl_targetX_inp" class="input-num" oninput="updateHLConfig()">
       </div>
       <div class="ctrl-row">
         <div class="ctrl-label">Target Y (m)</div>
-        <input type="number" step="1" value="0" id="hl_targetY_inp" class="input-num">
+        <input type="number" step="1" value="0" id="hl_targetY_inp" class="input-num" oninput="updateHLConfig()">
       </div>
-      <div style="font-size:9px;color:var(--dim);margin-top:4px;">
-        θ₀ = 0° (upright) · Z_θ = 0.001 rad (fixed)
-      </div>
-      <button class="btn" onclick="loadHLPreset()"
-        style="border-color:#00ffcc;color:#00ffcc;margin-top:6px;">① LOAD PRESET</button>
-      <button class="btn" id="btnHL2" onclick="hlBtn2Click()"
-        style="border-color:#00ff88;color:#00ff88;margin-top:2px;">② HOVER (then land)</button>
-      <div id="hlStatus" style="font-size:9px;color:var(--dim);margin-top:4px;">Not loaded</div>
     </div>
 
     <div class="panel-section">
@@ -511,7 +486,7 @@
       </div>
       <div class="ctrl-row">
         <div class="ctrl-label">Gimbal Angle (°) <span id="lbl_gimbal" style="color:var(--accent2)">0</span></div>
-        <input type="range" class="orange" min="-90" max="90" step="0.5" value="0" id="sl_gimbal" oninput="updateThrusters()">
+        <input type="range" class="orange" min="-10" max="10" step="0.1" value="0" id="sl_gimbal" oninput="updateThrusters()">
       </div>
       <div class="angle-display">
         <div class="angle-dial">
@@ -586,9 +561,9 @@
     </div>
 
     <div class="panel-section" id="testPanel" style="border-color:#cc44ff;">
-      <div class="section-title" style="color:#cc44ff;">🎯 Landing Test</div>
+      <div class="section-title" style="color:#cc44ff;">🎯 HL Stabilization Phase</div>
       <div style="font-size:9px;color:var(--dim);margin-bottom:6px;" id="testStatus">
-        Inactive — activate when vy &lt; 0
+        Inactive — starts when HL LANDING is activated
       </div>
       <div class="data-row"><span class="key">T (s)</span><span class="val" id="td_T">—</span></div>
       <div class="data-row"><span class="key">t elapsed (s)</span><span class="val" id="td_t">—</span></div>
@@ -814,181 +789,12 @@ function hlFormula(t, T, Vi, D) {
   return { a, v, x, k1, k2, A, omega };
 }
 
-function showHLPanel() {
-  const p = document.getElementById('hlConfigPanel');
-  p.style.display = p.style.display === 'none' ? 'block' : 'none';
-}
-
-function loadHLPreset() {
-  resetSim();
-
-  // ── Hardcoded Preset ──
-  const PRESET = {
-    dryMass  : 5000,
-    fuelMass : 3000,
-    rocketH  : 20,
-    rocketW  : 4,
-    gravity  : 9.81,
-    x        : 100,   // start position
-    y        : 500,    // altitude 300m
-    vx       : -10,     // rightward drift
-    vy       : -0,    // falling
-    theta    : -15,     // deg tilted
-    omega    : -0.05,  // rad/s spin
-  };
-
-  const T_total = parseFloat(document.getElementById('sl_hl_T').value);
-  const targetX = parseFloat(document.getElementById('hl_targetX_inp').value);
-  const targetY = parseFloat(document.getElementById('hl_targetY_inp').value);
-
-  // Sync sliders
-  initCfg.dryMass  = PRESET.dryMass;
-  initCfg.fuelMass = PRESET.fuelMass;
-  initCfg.rocketH  = PRESET.rocketH;
-  initCfg.rocketW  = PRESET.rocketW;
-  initCfg.gravity  = PRESET.gravity;
-  initCfg.initAngle = 0;
-  document.getElementById('sl_mass').value = PRESET.dryMass;
-  document.getElementById('sl_fuel').value = PRESET.fuelMass;
-  document.getElementById('sl_rh').value   = PRESET.rocketH;
-  document.getElementById('sl_rw').value   = PRESET.rocketW;
-  document.getElementById('sl_grav').value = PRESET.gravity;
-  document.getElementById('sl_ang').value  = 0;
-  updateLabels();
-
-  const totalMass = PRESET.dryMass + PRESET.fuelMass;
-  const comH = computeCoM(PRESET.fuelMass, totalMass, PRESET.rocketH);
-  const I    = momentOfInertia(totalMass, PRESET.rocketH, PRESET.rocketW, comH);
-
-  state = {
-    x: PRESET.x, y: PRESET.y,
-    vx: PRESET.vx, vy: PRESET.vy,
-    ax: 0, ay: 0,
-    theta: PRESET.theta * Math.PI / 180,
-    omega: PRESET.omega,
-    alpha: 0,
-    mass: totalMass, dryMass: PRESET.dryMass,
-    fuelMass: PRESET.fuelMass, fuelMassInit: PRESET.fuelMass,
-    H: PRESET.rocketH, W: PRESET.rocketW,
-    gravity: PRESET.gravity,
-    comH: comH, I: I,
-    crashed: false, landed: false,
-  };
-
-  maxAlt = PRESET.y;
-  trajectory = [[PRESET.x, PRESET.y]];
-
-  hl.T       = T_total;
-  hl.Z_X     = targetX - PRESET.x;
-  hl.Z_Y     = PRESET.y - targetY;
-  hl.targetX = targetX;
-  hl.targetY = targetY;
-  hl.active  = false;
-  hl.hovering = false;
-  hl.t       = 0;
-  hl.startX  = 0;
-  hl.startY  = 0;
-
-  console.log("=== HOVER→LAND PRESET LOADED ===");
-  console.log(`Start: x=${PRESET.x} y=${PRESET.y} vx=${PRESET.vx} vy=${PRESET.vy} theta=${PRESET.theta}° omega=${PRESET.omega}rad/s`);
-  console.log(`Target: x=${targetX} y=${targetY}  T=${T_total}s`);
-
-  document.getElementById('hlStatus').textContent = `Preset loaded — y=300, tilted ${PRESET.theta}°. Press ② to hover+land.`;
-  updateDataPanel(); drawFrame(); updateStatusUI('stopped');
-}
-
-function hlBtn2Click() {
-  if (!hl.active) {
-    // First press: start hover
-    activateHL();
-    document.getElementById('btnHL2').textContent = '③ BEGIN LANDING';
-    document.getElementById('btnHL2').style.borderColor = '#ffaa00';
-    document.getElementById('btnHL2').style.color = '#ffaa00';
-  } else if (hl.hovering) {
-    // Second press: transition to landing
-    beginHLLanding();
-    document.getElementById('btnHL2').textContent = '— LANDING —';
-    document.getElementById('btnHL2').style.borderColor = '#ff2244';
-    document.getElementById('btnHL2').style.color = '#ff2244';
-  }
-}
-
-function activateHL() {
-  if (hl.T <= 0) {
-    document.getElementById('hlStatus').textContent = 'ERR: Load preset first!';
-    return;
-  }
-  // Auto-start sim if not running
-  if (!running) startSim();
-
-  hl.active   = true;
-  hl.hovering = true;   // start in hover phase — engine on, balance Mg
-  hl.t        = 0;
-  document.getElementById('hlDataPanel').style.display = 'block';
-  document.getElementById('hlLiveStatus').textContent  = 'HOVERING — balancing Mg';
-  document.getElementById('hlStatus').textContent = `Hovering... press again to begin landing`;
-  console.log("=== HOVER→LAND: HOVER PHASE START ===");
-}
-
-// Call this to transition from hover → land
-function beginHLLanding() {
-  if (!hl.active || !hl.hovering) return;
-  hl.hovering = false;
-
-  const s = state;
-  const g  = s.gravity;
-  const H  = s.y - 100;        // target stable at 100m above ground
-  const V0 = s.vy;
-  const M  = s.mass;
-
-  if (H <= 0) { alert("Altitude too low (need > 100m)."); return; }
-  if (V0 >= 0) { alert("Rocket must be falling (vy < 0)."); return; }
-
-  // T = -3H / (2*V0)  — time to reach 100m altitude
-  const T = (-3 * H) / (2 * V0);
-  if (T <= 0.1) { alert("Too close to target altitude."); return; }
-  const p = -V0 / (T * T);
-  const t_hover = Math.sqrt(-V0 / p);
-
-  // Store in testMode — reuse existing controller
-  testMode.active            = true;
-  testMode.locked            = false;
-  testMode.T                 = T;
-  testMode.t                 = 0;
-  testMode.M                 = M;
-  testMode.Ve                = Ve_MAIN;
-  testMode.H                 = H;
-  testMode.V0                = V0;
-  testMode.p                 = p;
-  testMode.q                 = 0;
-  testMode.g                 = g;
-  testMode.t_hover           = t_hover;
-  testMode.hovering          = false;
-  testMode.F_final           = 0;
-  testMode.K                 = 0;
-  testMode.s                 = 0;
-  testMode.Fx                = 0;
-  testMode.Fy                = 0;
-  testMode._fuelAtActivation = s.fuelMass;
-  testMode._impactLogged     = false;
-  testMode._hlHandoff        = false;   // flag: HL hover shuru hua?
-
-  // RE controller
-  testMode.re.active    = false;
-  testMode.re.t         = 0;
-  testMode.re.g         = 0;
-  testMode.re.callCount = 0;
-  rotationalEquilibrium(s.theta * 180 / Math.PI, s.omega, T);
-
-  // HL formula params — snap Z values for later
-  hl.stab        = null;
-  hl.formulaActive = false;
-  hl.t           = 0;
-
-  console.log(`=== HL STAB via testMode ===`);
-  console.log(`H_eff=${H.toFixed(2)}m  T=${T.toFixed(3)}s  t_hover=${t_hover.toFixed(3)}s`);
-  document.getElementById('hlLiveStatus').textContent = 'STABILIZING — decel + RE';
-  document.getElementById('hlStatus').textContent = `Stabilizing to 100m, then HL formula`;
+// Syncs the HL Landing config panel inputs (T, target X/Y) into the live hl state.
+function updateHLConfig() {
+  hl.T       = parseFloat(document.getElementById('sl_hl_T').value) || 20;
+  hl.targetX = parseFloat(document.getElementById('hl_targetX_inp').value) || 0;
+  hl.targetY = parseFloat(document.getElementById('hl_targetY_inp').value) || 0;
+  if (!running) drawFrame();
 }
 
 function stepHL(dt) {
@@ -1097,7 +903,7 @@ function stepHL(dt) {
 
   document.getElementById('sl_mt').value = Math.min(300000, ctrl.mainThrust);
   document.getElementById('lbl_mt').textContent = ctrl.mainThrust.toFixed(0);
-  document.getElementById('sl_gimbal').value = Math.max(-90, Math.min(90, ctrl.gimbalDeg));
+  document.getElementById('sl_gimbal').value = Math.max(-10, Math.min(10, ctrl.gimbalDeg));
   document.getElementById('lbl_gimbal').textContent = ctrl.gimbalDeg.toFixed(1);
   document.getElementById('gimbalNeedle').style.transform = `translateX(-50%) rotate(${ctrl.gimbalDeg}deg)`;
 
@@ -1212,7 +1018,7 @@ function resetSim() {
   testMode.re.g         = 0;
   testMode.re.callCount = 0;
   testMode._impactLogged = false;
-  document.getElementById('testStatus').textContent = "Inactive — activate when vy < 0";
+  document.getElementById('testStatus').textContent = "Inactive — starts when HL LANDING is activated";
   document.getElementById('testStatus').style.color = '';
   // Reset hover→land mode
   hl.active = false;
@@ -1222,22 +1028,15 @@ function resetSim() {
   hl.Z_Y_corr = 0;
   hl.hovering = false;
   document.getElementById('hlDataPanel').style.display = 'none';
-  if (document.getElementById('hlStatus'))
-    document.getElementById('hlStatus').textContent = 'Not loaded';
-  const btnHL2 = document.getElementById('btnHL2');
-  if (btnHL2) {
-    btnHL2.textContent = '② HOVER (then land)';
-    btnHL2.style.borderColor = '#00ff88';
-    btnHL2.style.color = '#00ff88';
-  }
+  updateHLConfig();
   updateLabels();
   updateStatusUI('stopped');
   updateDataPanel();
   drawFrame();
 }
 
-// ===================== PRESET TEST STATE =====================
-// Injects a mid-air falling rocket with drift + spin for landing test validation.
+// ===================== SCENARIO LOADER =====================
+// Injects a mid-air falling rocket with drift + spin so HL LANDING has something to catch.
 function loadPreset() {
   // First do a clean reset
   resetSim();
@@ -1252,10 +1051,10 @@ function loadPreset() {
     // Mid-air state
     x        : 100,      // m  (horizontal position)
     y        : 800,    // m  (altitude — enough time for RE + decel)
-    vx       : -20,      // m/s  (rightward drift)
+    vx       : -15,      // m/s  (rightward drift)
     vy       : -0,    // m/s  (falling — negative = downward)
-    theta    : 20,     // deg  (tilted CCW from vertical)
-    omega    : 0.00,    // rad/s  (CCW spin, positive)
+    theta    : -30,     // deg  (tilted CCW from vertical)
+    omega    : 0.05,    // rad/s  (CCW spin, positive)
   };
 
   // ── Sync initCfg sliders to preset values ──
@@ -1306,7 +1105,7 @@ function loadPreset() {
   trajectory = [[PRESET.x, PRESET.y]];
 
   // ── Log preset values to console ──
-  console.log("=== PRESET TEST LOADED ===");
+  console.log("=== SCENARIO LOADED ===");
   console.log(`  Alt    : ${PRESET.y} m`);
   console.log(`  Vx     : ${PRESET.vx} m/s`);
   console.log(`  Vy     : ${PRESET.vy} m/s`);
@@ -1315,7 +1114,7 @@ function loadPreset() {
   console.log(`  mass   : ${totalMass} kg`);
   console.log(`  comH   : ${comH.toFixed(3)} m`);
   console.log(`  I      : ${I.toFixed(1)} kg·m²`);
-  console.log("Press START then LANDING TEST to begin.");
+  console.log("Press START then HL LANDING to begin.");
 
   updateDataPanel();
   drawFrame();
@@ -1338,58 +1137,7 @@ function stopSim() {
   updateStatusUI('stopped');
 }
 
-function activateTestMode() {
-  const s = state;
-
-  if (s.vy >= 0) { alert("Test mode activates only when rocket is falling (vy < 0)."); return; }
-  if (!running)  { alert("Simulation must be RUNNING to activate landing test."); return; }
-
-  const g  = s.gravity;
-  const H  = s.y;
-  const V0 = s.vy;
-  const M  = s.mass;
-
-  if (H <= 0) { alert("Cannot compute impact time."); return; }
-
-  const T = (-3 * H) / (2 * V0);
-  if (T <= 0.1) { alert("Impact too imminent (T < 0.1s)."); return; }
-  const p_c     = -V0 / (T * T);
-  const t_hover = Math.sqrt(-V0 / p_c);
-
-  testMode.active            = true;
-  testMode.locked            = false;
-  testMode.T                 = T;
-  testMode.t                 = 0;
-  testMode.M                 = M;
-  testMode.Ve                = Ve_MAIN;
-  testMode.H                 = H;
-  testMode.V0                = V0;
-  testMode.p                 = p_c;
-  testMode.q                 = 0;
-  testMode.g                 = g;
-  testMode.t_hover           = t_hover;
-  testMode.hovering          = false;
-  testMode.F_final           = 0;
-  testMode.K                 = 0;
-  testMode.s                 = 0;
-  testMode.Fx                = 0;
-  testMode.Fy                = 0;
-  testMode._fuelAtActivation = s.fuelMass;
-  testMode._impactLogged     = false;
-  testMode._hlHandoff        = false;
-
-  testMode.re.active    = false;
-  testMode.re.t         = 0;
-  testMode.re.g         = 0;
-  testMode.re.callCount = 0;
-  rotationalEquilibrium(s.theta * 180 / Math.PI, s.omega, T);
-
-  console.log("=== LANDING TEST === T=" + T.toFixed(3) + "s  H=" + H.toFixed(2) + "m  V0=" + V0.toFixed(3) + "m/s");
-  document.getElementById('testStatus').textContent = "ACTIVE — Decel → Hover mode";
-  document.getElementById('testStatus').style.color = '#cc44ff';
-}
-
-// ── HL Landing Mode: same as testMode but H = y-100, then handoff to HL formula ──
+// ── HL Landing Mode: decel + rotational-equilibrium stabilization, then handoff to HL formula ──
 function activateHLMode() {
   const s = state;
 
@@ -1664,12 +1412,12 @@ function physicsStep(dt) {
       if (testMode._hlHandoff) {
         const thetaDeg_ = Math.abs(state.theta * 180 / Math.PI);
         const omegaAbs_ = Math.abs(state.omega);
-        if (thetaDeg_ < 0.1 && omegaAbs_ < 0.001/* && Math.abs(state.vx) <= 12*/ && Math.abs(state.vy) <= 12) {
+        if (thetaDeg_ < 0.5 && omegaAbs_ < 0.002/* && Math.abs(state.vx) <= 12*/ && Math.abs(state.vy) <= 12) {
           testMode.active  = false;
           testMode.locked  = true;
           testMode._hlHandoff = false;
           // Snap clean
-          //state.theta = 0; state.omega = 0;
+          state.theta = 0; state.omega = 0;
           // Start HL formula
           hl.Vi_X = state.vx;
           hl.Vi_Y = state.vy;
@@ -1807,7 +1555,7 @@ function physicsStep(dt) {
       ctrl.gimbalDeg  = gimbalRad_ctrl * 180 / Math.PI;
 
       // Update gimbal slider + needle display
-      document.getElementById('sl_gimbal').value = Math.max(-90, Math.min(90, ctrl.gimbalDeg));
+      document.getElementById('sl_gimbal').value = Math.max(-10, Math.min(10, ctrl.gimbalDeg));
       document.getElementById('lbl_gimbal').textContent = ctrl.gimbalDeg.toFixed(1);
       document.getElementById('gimbalNeedle').style.transform =
         `translateX(-50%) rotate(${ctrl.gimbalDeg}deg)`;
@@ -2007,7 +1755,7 @@ function physicsStep(dt) {
   // toh saare thrusts aur forces turant band karo
   if (testMode.active && !testMode.locked) {
     const totalVel = Math.sqrt(s.vx * s.vx + s.vy * s.vy);
-    if (s.y < 0.05 && totalVel < 0.01) {
+    if (s.y < 5 && totalVel < 3) {
       ctrl.mainThrust    = 0;
       ctrl.gimbalDeg     = 0;
       ctrl.sideThrust    = 0;
@@ -2840,12 +2588,12 @@ document.addEventListener('keydown', (e) => {
       break;
     case 'ArrowLeft':
       e.preventDefault();
-      document.getElementById('sl_gimbal').value = Math.max(-90, ctrl.gimbalDeg - 1);
+      document.getElementById('sl_gimbal').value = Math.max(-10, ctrl.gimbalDeg - 1);
       updateThrusters();
       break;
     case 'ArrowRight':
       e.preventDefault();
-      document.getElementById('sl_gimbal').value = Math.min(90, ctrl.gimbalDeg + 1);
+      document.getElementById('sl_gimbal').value = Math.min(10, ctrl.gimbalDeg + 1);
       updateThrusters();
       break;
   }
@@ -2857,6 +2605,7 @@ resizeCanvas();
 state = buildInitState();
 updateInitConfig();
 updateThrusters();
+updateHLConfig();
 drawFrame();
 updateDataPanel();
 updateStatusUI('stopped');
